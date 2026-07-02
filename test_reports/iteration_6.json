@@ -1,0 +1,40 @@
+{
+  "summary": "Verified reworked usage-based credit system end-to-end. Backend: 8/8 new tests pass in test_credit_system.py (plans shape, register grants 15 credits, 402 gating with no job/template, start job with credits returns job_id and errored job does NOT deduct credits, unlimited-annual bypass, estimate_cost sync + deduct_credits async unit checks, admin login/me, list templates). Regression: 8/8 rate-limit tests still pass. Frontend: Pricing shows 50/120/Unlimited + packs +25/+60/+150 with $9/$19/$39; Generator button reads 'Generate website' (no '(1 credit)') and shows numeric credits chip=125 for admin; after flipping admin to annual in Mongo, sidebar/generator/dashboard/billing all render ∞ and Billing shows Annual + Unlimited monthly credits. Admin restored to quarterly/25+100 after test.",
+  "feature_verification": {
+    "GET /api/plans": "PASS - monthly $20/50, quarterly $49/120, annual $149/unlimited=true; packs pack_25 $9/25, pack_60 $19/60, pack_150 $39/150.",
+    "Register grants 15 extra_credits": "PASS - credits=15, plan_credits=0, extra_credits=15, unlimited=false.",
+    "402 gating": "PASS - user with plan_credits=0 and extra_credits=0 gets 402 with detail mentioning 'credit', no job/template created.",
+    "Start job with credits + no deduction on error": "PASS - registered user (15 credits) starts job_id/pending; LLM budget exhausted causes job status='error'; /auth/me credits still 15 (no deduction).",
+    "Unlimited annual bypass": "PASS - annual+active user (plan_credits=0/extra_credits=0) sees unlimited=true in /auth/me and /subscription, and POST /templates/generate returns job_id.",
+    "estimate_cost + deduct_credits unit": "PASS - estimate_cost('hi')=1, 60k chars=5, 120k chars=10; deduct 12 from (10,5) -> (0,3); over-deduct 999 -> (0,0).",
+    "Regression rate limiting": "PASS - 8/8 in test_rate_limiting.py.",
+    "Frontend /pricing": "PASS - Monthly '50 credits', 3-Month '120 credits', Annual 'Unlimited'; packs '+25 Starter Pack $9', '+60 Growth Pack $19', '+150 Pro Pack $39'.",
+    "Frontend Generator button copy": "PASS - button text is exactly 'Generate website' (no '(1 credit)'); generator-credits chip shows numeric (125) for admin.",
+    "Frontend ∞ for unlimited": "PASS - after setting admin.plan=annual/active in Mongo: sidebar-credits=∞, dashboard has ∞, generator-credits=∞, billing-total-credits=∞ and Billing card shows Annual + Monthly credits 'Unlimited'."
+  },
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_credit_system.py",
+    "/app/backend/tests/test_rate_limiting.py",
+    "/app/test_reports/pytest/iter6_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py estimate_cost uses round() which halves-to-even; boundary inputs at 0.5 credits could unexpectedly round down to 0, but MIN_OPERATION_COST=1 clamps this correctly.",
+    "deduct_credits reads user then $inc — a small race window exists if two concurrent generations finish at once; consider a single atomic pipeline update using $let/$max, though real-world impact is low.",
+    "_start_job checks credits BEFORE rate limit; a 429 could still be returned to a user just above 0 credits, which is fine but note the ordering.",
+    "Annual plan has monthly_credits=300 in SUBSCRIPTION_PLANS but is marked unlimited=true; the 300 is a fallback if unlimited logic changes — clear comment recommended.",
+    "public_user sends 'monthly_credits' from plan['monthly_credits']; Billing.jsx already treats annual/unlimited specially to render 'Unlimited', which is correct."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_credit_system.py (new, 8 tests)"
+  ],
+  "success_rate": {"backend": "100% (8/8 new + 8/8 regression)", "frontend": "100% (pricing, generator, billing, unlimited displays)"},
+  "test_credentials": "admin@sitegenie.com / Sg!Adm1n_9f3kQ2xL7vB",
+  "seed_data_creation": "Registered ~4 test_* users during runs (auto-cleaned by session fixture that deletes users/user_sessions/gen_jobs/templates whose email matches ^test_). Admin was temporarily set to plan=annual/active for UI ∞ verification and RESTORED to quarterly/active with plan_credits=25/extra_credits=100.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "LLM key budget is exhausted so any generate flow returning job_id will move to status='error' asynchronously; tests must assert that credits are unchanged after an errored job. Register endpoint lowercases email; use lowercase 'test_' prefix when directly querying Mongo by email. Route for the generator page is /generate (not /generator). pytest requires -o 'addopts=' and -o 'asyncio_mode=auto' because /app/backend/pytest.ini adds xdist args that break plain runs; also REACT_APP_BACKEND_URL must be exported OR load_dotenv('/app/frontend/.env') is used (already done in test_credit_system.py).",
+  "rca_of_the_issue": "No open bugs. Prior Pricing.jsx credits-missing bug (iteration 5) is confirmed FIXED — plan cards render 50/120/Unlimited correctly."
+}

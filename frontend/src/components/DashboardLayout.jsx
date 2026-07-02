@@ -47,7 +47,7 @@ export default function DashboardLayout({ children }) {
         <div className="p-3 border-t border-white/10">
           <div className="px-4 py-3 mb-2 bg-surface2">
             <div className="text-xs text-white/40 uppercase tracking-wider">Credits</div>
-            <div className="font-mono text-2xl font-bold text-brand" data-testid="sidebar-credits">{user?.credits ?? 0}</div>
+            <div className="font-mono text-2xl font-bold text-brand" data-testid="sidebar-credits">{user?.unlimited ? "∞" : (user?.credits ?? 0)}</div>
           </div>
           <button
             onClick={logout}
@@ -68,7 +68,7 @@ export default function DashboardLayout({ children }) {
             <span className="font-display font-bold">SiteGenie</span>
           </Link>
           <div className="flex items-center gap-3">
-            <span className="font-mono text-brand font-bold" data-testid="mobile-credits">{user?.credits ?? 0} cr</span>
+            <span className="font-mono text-brand font-bold" data-testid="mobile-credits">{user?.unlimited ? "∞" : (user?.credits ?? 0)} cr</span>
             <button onClick={() => navigate("/generate")} className="text-xs bg-brand px-3 py-1.5">New</button>
           </div>
         </header>

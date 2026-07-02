@@ -64,7 +64,7 @@ export default function Billing() {
                   </div>
                   <div className="border border-white/10 p-4">
                     <div className="text-white/40 text-xs flex items-center gap-1"><Zap className="w-3 h-3" /> Monthly credits</div>
-                    <div className="font-mono text-lg mt-1">{sub.monthly_credits}</div>
+                    <div className="font-mono text-lg mt-1">{sub.unlimited ? "Unlimited" : sub.monthly_credits}</div>
                   </div>
                   <div className="border border-white/10 p-4">
                     <div className="text-white/40 text-xs flex items-center gap-1"><Calendar className="w-3 h-3" /> {sub.cancel_at_period_end ? "Access until" : "Renews on"}</div>
@@ -105,9 +105,9 @@ export default function Billing() {
           {/* Credits breakdown */}
           <div className="border border-white/10 bg-surface1 p-6 flex flex-col" data-testid="credits-breakdown">
             <div className="text-xs text-white/40 uppercase font-mono">Available credits</div>
-            <div className="font-mono text-5xl font-bold text-brand mt-2" data-testid="billing-total-credits">{sub.plan_credits + sub.extra_credits}</div>
+            <div className="font-mono text-5xl font-bold text-brand mt-2" data-testid="billing-total-credits">{sub.unlimited ? "∞" : sub.plan_credits + sub.extra_credits}</div>
             <div className="mt-6 space-y-3 text-sm">
-              <div className="flex items-center justify-between"><span className="text-white/50">Plan credits</span><span className="font-mono">{sub.plan_credits}</span></div>
+              <div className="flex items-center justify-between"><span className="text-white/50">Plan credits</span><span className="font-mono">{sub.unlimited ? "∞" : sub.plan_credits}</span></div>
               <div className="flex items-center justify-between"><span className="text-white/50">Purchased credits</span><span className="font-mono">{sub.extra_credits}</span></div>
             </div>
             <button onClick={() => navigate("/pricing")} data-testid="buy-credits-btn" className="mt-auto pt-6 text-neon text-sm hover:underline text-left flex items-center gap-1">

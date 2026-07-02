@@ -22,14 +22,14 @@ export default function TemplateView() {
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
 
   const runJob = async (promise, label) => {
-    if ((user?.credits ?? 0) < 1) { toast.error("Not enough credits."); navigate("/pricing"); return; }
+    if ((user?.credits ?? 0) < 1 && !user?.unlimited) { toast.error("You're out of credits. Purchase a credit pack to continue."); navigate("/pricing"); return; }
     setBusy(true); setBusyLabel(label);
     try {
       const { data } = await promise;
       const job = await pollGenerationJob(data.job_id);
       setTpl((t) => ({ ...t, html: job.template.html }));
       await refreshUser();
-      toast.success(`${label} complete! 1 credit used.`);
+      toast.success(job.unlimited ? `${label} complete!` : `${label} complete! ${job.cost} credits used.`);
     } catch (e) {
       const status = e.response?.status;
       if (status === 402) { toast.error("Not enough credits."); navigate("/pricing"); }
@@ -109,7 +109,7 @@ export default function TemplateView() {
               <h2 className="font-display text-xl font-bold flex items-center gap-2"><Wand2 className="w-5 h-5 text-neon" /> Edit with AI</h2>
               <button onClick={() => setEditOpen(false)} className="text-white/50 hover:text-white"><X className="w-5 h-5" /></button>
             </div>
-            <p className="text-white/50 text-sm mb-3">Describe the changes and AI will revise your site. Costs 1 credit.</p>
+            <p className="text-white/50 text-sm mb-3">Describe the changes and AI will revise your site. Credits are spent based on the work done.</p>
             <textarea data-testid="edit-instructions" rows={4} value={instructions} onChange={(e) => setInstructions(e.target.value)}
               className="w-full bg-surface1 border border-white/10 focus:border-neon px-4 py-3 outline-none transition-colors duration-300 text-white"
               placeholder="e.g. Make the hero darker, add a pricing section, change the tagline to..." />

@@ -62,17 +62,20 @@ logger = logging.getLogger("sitegenie")
 
 # ---------------- Business config ----------------
 SUBSCRIPTION_PLANS = {
-    "monthly":   {"name": "Monthly",  "amount": 20.00,  "monthly_credits": 20, "billing_days": 30,  "interval": "month"},
-    "quarterly": {"name": "3-Month",  "amount": 49.00,  "monthly_credits": 25, "billing_days": 90,  "interval": "quarter"},
-    "annual":    {"name": "Annual",   "amount": 149.00, "monthly_credits": 30, "billing_days": 365, "interval": "year"},
+    "monthly":   {"name": "Monthly",  "amount": 20.00,  "monthly_credits": 50,  "billing_days": 30,  "interval": "month",   "unlimited": False},
+    "quarterly": {"name": "3-Month",  "amount": 49.00,  "monthly_credits": 120, "billing_days": 90,  "interval": "quarter", "unlimited": False},
+    "annual":    {"name": "Annual",   "amount": 149.00, "monthly_credits": 300, "billing_days": 365, "interval": "year",    "unlimited": True},
 }
 CREDIT_RESET_DAYS = 30
 CREDIT_PACKS = {
-    "pack_10": {"name": "Starter Pack", "amount": 9.00,  "credits": 10},
-    "pack_25": {"name": "Growth Pack",  "amount": 19.00, "credits": 25},
-    "pack_60": {"name": "Pro Pack",     "amount": 39.00, "credits": 60},
+    "pack_25":  {"name": "Starter Pack", "amount": 9.00,  "credits": 25},
+    "pack_60":  {"name": "Growth Pack",  "amount": 19.00, "credits": 60},
+    "pack_150": {"name": "Pro Pack",     "amount": 39.00, "credits": 150},
 }
-CREDIT_COST_PER_TEMPLATE = 1
+# Usage-based metering: credits are a currency consumed per AI operation based on
+# the amount of work (tokens processed), similar to Emergent's own credit system.
+TOKENS_PER_CREDIT = 3000
+MIN_OPERATION_COST = 1
 
 # ---------------- Models ----------------
 class RegisterInput(BaseModel):
@@ -160,12 +163,26 @@ async def record_failed_login(identifier: str):
 async def clear_login_attempts(identifier: str):
     await db.login_attempts.delete_many({"identifier": identifier})
 
-async def deduct_one_credit(user_id: str):
-    r = await db.users.update_one(
-        {"user_id": user_id, "plan_credits": {"$gt": 0}}, {"$inc": {"plan_credits": -1}})
-    if r.modified_count == 0:
+def estimate_cost(*texts) -> int:
+    total_chars = sum(len(t or "") for t in texts)
+    tokens = total_chars / 4.0
+    return max(MIN_OPERATION_COST, round(tokens / TOKENS_PER_CREDIT))
+
+def user_is_unlimited(user: dict) -> bool:
+    plan = SUBSCRIPTION_PLANS.get(user.get("plan"))
+    return bool(plan and plan.get("unlimited") and user.get("subscription_status") == "active")
+
+async def deduct_credits(user_id: str, amount: int):
+    """Drain plan_credits first, then extra_credits; never below zero."""
+    u = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    pc = int(u.get("plan_credits", 0))
+    ec = int(u.get("extra_credits", 0))
+    from_plan = min(pc, amount)
+    from_extra = min(ec, amount - from_plan)
+    if from_plan or from_extra:
         await db.users.update_one(
-            {"user_id": user_id, "extra_credits": {"$gt": 0}}, {"$inc": {"extra_credits": -1}})
+            {"user_id": user_id},
+            {"$inc": {"plan_credits": -from_plan, "extra_credits": -from_extra}})
 
 async def process_subscription(user: dict) -> dict:
     """Lazy subscription lifecycle: migrate legacy credits, apply 30-day credit resets,
@@ -231,6 +248,7 @@ def public_user(u: dict) -> dict:
         "plan": u.get("plan"),
         "plan_name": u.get("plan_name"),
         "monthly_credits": plan["monthly_credits"] if plan else None,
+        "unlimited": user_is_unlimited(u),
         "subscription_status": u.get("subscription_status", "none"),
         "current_period_end": u.get("current_period_end"),
         "next_credit_reset": u.get("next_credit_reset"),
@@ -285,7 +303,7 @@ async def register(input: RegisterInput, response: Response):
     doc = {
         "user_id": user_id, "email": email, "name": input.name,
         "password_hash": hash_password(input.password), "picture": "",
-        "role": "user", "plan_credits": 0, "extra_credits": 3,
+        "role": "user", "plan_credits": 0, "extra_credits": 15,
         "plan": None, "plan_name": None, "subscription_status": "none",
         "current_period_end": None, "next_credit_reset": None, "cancel_at_period_end": False,
         "created_at": datetime.now(timezone.utc),
@@ -328,7 +346,7 @@ async def google_session(input: GoogleSessionInput, response: Response):
         user = {
             "user_id": user_id, "email": email, "name": data.get("name", ""),
             "picture": data.get("picture", ""), "role": "user",
-            "plan_credits": 0, "extra_credits": 3,
+            "plan_credits": 0, "extra_credits": 15,
             "plan": None, "plan_name": None, "subscription_status": "none",
             "current_period_end": None, "next_credit_reset": None, "cancel_at_period_end": False,
             "created_at": datetime.now(timezone.utc),
@@ -430,6 +448,7 @@ async def _run_generation(job_id: str, user_id: str, fields: dict, mode: str = "
         await _fail_job(job_id, e)
         return
 
+    cost = estimate_cost(prompt, html)
     if mode == "new":
         template_id = f"tpl_{uuid.uuid4().hex[:12]}"
         await db.templates.insert_one({
@@ -444,13 +463,17 @@ async def _run_generation(job_id: str, user_id: str, fields: dict, mode: str = "
             {"template_id": template_id, "user_id": user_id},
             {"$set": {"html": html, "updated_at": datetime.now(timezone.utc)}},
         )
-    await deduct_one_credit(user_id)
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    charged = 0 if user_is_unlimited(user) else cost
+    if charged:
+        await deduct_credits(user_id, charged)
     await db.gen_jobs.update_one({"job_id": job_id},
-                                 {"$set": {"status": "done", "template_id": template_id}})
+                                 {"$set": {"status": "done", "template_id": template_id,
+                                           "cost": charged, "mode": mode}})
 
 async def _start_job(user: dict, fields: dict, mode: str = "new", template_id: str = None):
-    if total_credits(user) < CREDIT_COST_PER_TEMPLATE:
-        raise HTTPException(status_code=402, detail="Not enough credits. Please purchase more.")
+    if not user_is_unlimited(user) and total_credits(user) <= 0:
+        raise HTTPException(status_code=402, detail="You're out of credits. Purchase a credit pack to keep building.")
     await check_rate_limit(f"gen:{user['user_id']}", GEN_MAX_PER_WINDOW, GEN_WINDOW_SECONDS)
     job_id = f"job_{uuid.uuid4().hex[:12]}"
     await db.gen_jobs.insert_one({
@@ -495,6 +518,8 @@ async def generation_status(job_id: str, user: dict = Depends(get_current_user))
                 "html": tpl["html"],
             }
             resp["credits_remaining"] = total_credits(updated)
+            resp["cost"] = job.get("cost", 0)
+            resp["unlimited"] = user_is_unlimited(updated)
     return resp
 
 @api_router.get("/templates")
@@ -644,6 +669,7 @@ async def get_subscription(user: dict = Depends(get_current_user)):
         "amount": plan["amount"] if plan else None,
         "billing_days": plan["billing_days"] if plan else None,
         "monthly_credits": plan["monthly_credits"] if plan else None,
+        "unlimited": user_is_unlimited(user),
         "plan_credits": int(user.get("plan_credits", 0)),
         "extra_credits": int(user.get("extra_credits", 0)),
         "current_period_end": user.get("current_period_end"),
@@ -888,7 +914,7 @@ async def startup():
             await db.users.insert_one({
                 "user_id": f"user_{uuid.uuid4().hex[:12]}", "email": admin_email,
                 "name": "Admin", "password_hash": hash_password(admin_password), "picture": "",
-                "role": "admin", "plan_credits": 30, "extra_credits": 100,
+                "role": "admin", "plan_credits": 300, "extra_credits": 100,
                 "plan": "annual", "plan_name": "Annual", "subscription_status": "active",
                 "cancel_at_period_end": False,
                 "current_period_end": (now + timedelta(days=365)).isoformat(),

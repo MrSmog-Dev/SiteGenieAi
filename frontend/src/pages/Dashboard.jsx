@@ -31,8 +31,8 @@ export default function Dashboard() {
               <span className="text-xs text-white/40 uppercase font-mono">Credits left</span>
               <Zap className="w-4 h-4 text-brand" />
             </div>
-            <div className="font-mono text-4xl font-bold mt-3 text-brand">{user?.credits ?? 0}</div>
-            {(user?.credits ?? 0) <= 2 && <div className="text-neon text-xs mt-2">Running low — top up soon.</div>}
+            <div className="font-mono text-4xl font-bold mt-3 text-brand">{user?.unlimited ? "∞" : (user?.credits ?? 0)}</div>
+            {!user?.unlimited && (user?.credits ?? 0) <= 5 && <div className="text-neon text-xs mt-2">Running low — top up soon.</div>}
           </div>
           <div className="border border-white/10 bg-surface1 p-6" data-testid="stat-plan">
             <div className="flex items-center justify-between">

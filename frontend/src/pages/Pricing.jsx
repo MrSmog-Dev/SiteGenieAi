@@ -51,7 +51,7 @@ export default function Pricing() {
       <div className="max-w-6xl mx-auto px-6 py-16">
         <div className="text-center mb-14">
           <h1 className="font-display text-4xl md:text-5xl font-bold">Choose your plan</h1>
-          <p className="mt-4 text-white/50">Subscribe for monthly credits. <span className="font-mono text-white/70">1 credit = 1 website</span>.</p>
+          <p className="mt-4 text-white/50">Subscribe for a monthly credit allowance. <span className="font-mono text-white/70">Credits are spent per AI build & edit.</span></p>
         </div>
 
         {/* Subscriptions */}
@@ -63,10 +63,10 @@ export default function Pricing() {
               <div className="mt-4 flex items-end gap-1">
                 <span className="font-display text-5xl font-bold">${p.amount}</span>
               </div>
-              <div className="mt-6 font-mono text-brand text-2xl font-bold">{p.credits} credits</div>
+              <div className="mt-6 font-mono text-brand text-2xl font-bold">{p.unlimited ? "Unlimited" : `${p.monthly_credits} credits`}</div>
               <ul className="mt-6 space-y-3 text-sm text-white/60">
-                <li className="flex gap-2"><Check className="w-4 h-4 text-brand shrink-0" /> {p.credits} AI website generations</li>
-                <li className="flex gap-2"><Check className="w-4 h-4 text-brand shrink-0" /> Unlimited previews & exports</li>
+                <li className="flex gap-2"><Check className="w-4 h-4 text-brand shrink-0" /> {p.unlimited ? "Unlimited AI builds & edits" : `${p.monthly_credits} credits every 30 days`}</li>
+                <li className="flex gap-2"><Check className="w-4 h-4 text-brand shrink-0" /> AI edits & regenerations</li>
                 <li className="flex gap-2"><Check className="w-4 h-4 text-brand shrink-0" /> Buy extra credits anytime</li>
               </ul>
               <button data-testid={`subscribe-${id}`} disabled={busy === `subscription-${id}`} onClick={() => checkout("subscription", id)}

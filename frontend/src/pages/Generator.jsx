@@ -22,8 +22,8 @@ export default function Generator() {
 
   const generate = async (e) => {
     e.preventDefault();
-    if ((user?.credits ?? 0) < 1) {
-      toast.error("You're out of credits. Please buy more.");
+    if ((user?.credits ?? 0) < 1 && !user?.unlimited) {
+      toast.error("You're out of credits. Purchase a credit pack to continue.");
       navigate("/pricing");
       return;
     }
@@ -34,7 +34,7 @@ export default function Generator() {
       setResult(job.template);
       await refreshUser();
       setLoading(false);
-      toast.success("Website generated! 1 credit used.");
+      toast.success(job.unlimited ? "Website generated!" : `Website generated! ${job.cost} credits used.`);
     } catch (e) {
       setLoading(false);
       const status = e.response?.status;
@@ -66,7 +66,7 @@ export default function Generator() {
             </div>
             <div className="flex items-center gap-2 border border-white/10 px-3 py-2 bg-surface1">
               <Zap className="w-4 h-4 text-brand" />
-              <span className="font-mono text-sm" data-testid="generator-credits">{user?.credits ?? 0}</span>
+              <span className="font-mono text-sm" data-testid="generator-credits">{user?.unlimited ? "∞" : (user?.credits ?? 0)}</span>
             </div>
           </div>
 
@@ -103,7 +103,7 @@ export default function Generator() {
             </div>
             <button data-testid="generate-btn" disabled={loading}
               className="w-full flex items-center justify-center gap-2 bg-brand hover:bg-brand-hover py-4 font-medium transition-colors duration-300 disabled:opacity-60">
-              {loading ? <><Loader2 className="w-5 h-5 animate-spin" /> Generating your website…</> : <><Sparkles className="w-5 h-5" /> Generate website (1 credit)</>}
+              {loading ? <><Loader2 className="w-5 h-5 animate-spin" /> Generating your website…</> : <><Sparkles className="w-5 h-5" /> Generate website</>}
             </button>
           </form>
         </div>

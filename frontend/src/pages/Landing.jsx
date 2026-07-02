@@ -7,15 +7,15 @@ const HERO_BG = "https://images.unsplash.com/photo-1546497974-b213c9efb599?crop=
 const PREVIEW = "https://images.unsplash.com/photo-1634084462412-b54873c0a56d?crop=entropy&cs=srgb&fm=jpg&q=85&w=1200";
 
 const plans = [
-  { id: "monthly", name: "Monthly", price: 20, per: "/mo", credits: 20, highlight: false },
-  { id: "quarterly", name: "3-Month", price: 49, per: "/qtr", credits: 75, highlight: true },
-  { id: "annual", name: "Annual", price: 149, per: "/yr", credits: 160, highlight: false },
+  { id: "monthly", name: "Monthly", price: 20, per: "/mo", credits: 50, unlimited: false, highlight: false },
+  { id: "quarterly", name: "3-Month", price: 49, per: "/qtr", credits: 120, unlimited: false, highlight: true },
+  { id: "annual", name: "Annual", price: 149, per: "/yr", credits: 300, unlimited: true, highlight: false },
 ];
 
 const features = [
   { icon: Sparkles, title: "AI-crafted sites", desc: "Describe your business. Our AI writes copy and designs a full responsive site in seconds." },
   { icon: Palette, title: "On-brand styling", desc: "Pick your brand color and style — every template is tailored to your industry." },
-  { icon: Gauge, title: "Credit-based", desc: "One credit generates one complete website. Simple, predictable, no surprises." },
+  { icon: Gauge, title: "Credits as currency", desc: "Credits are spent as you build — bigger jobs cost more. Top up anytime with a credit pack." },
   { icon: Rocket, title: "Export & ship", desc: "Download production-ready HTML and launch anywhere in minutes." },
 ];
 
@@ -63,7 +63,7 @@ export default function Landing() {
               Generate a stunning<br /><span className="text-brand">website with AI</span> — no code, no designer.
             </h1>
             <p className="mt-8 text-lg text-white/60 max-w-xl">
-              For businesses without a website. Describe what you do, and SiteGenie builds a complete, branded, responsive site in seconds. Powered by credits.
+              For businesses without a website. Describe what you do, and SiteGenie builds a complete, branded, responsive site — then keep refining it with AI. Powered by credits.
             </p>
             <div className="mt-10 flex flex-wrap items-center gap-4">
               <Link to={cta} data-testid="hero-cta-btn" className="group inline-flex items-center gap-2 bg-brand hover:bg-brand-hover px-8 py-4 font-medium transition-colors duration-300">
@@ -71,7 +71,7 @@ export default function Landing() {
               </Link>
               <a href="#pricing" className="inline-flex items-center gap-2 border border-white/15 hover:border-white/40 px-8 py-4 transition-colors duration-300">View pricing</a>
             </div>
-            <div className="mt-6 text-sm text-white/40 font-mono">3 free credits on sign up · 1 credit = 1 full website</div>
+            <div className="mt-6 text-sm text-white/40 font-mono">15 free credits on sign up · credits spent per AI build & edit</div>
           </motion.div>
 
           <motion.div initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.2 }}
@@ -128,7 +128,7 @@ export default function Landing() {
       <section id="pricing" className="px-6 py-24 max-w-6xl mx-auto">
         <div className="text-center mb-14">
           <h2 className="font-display text-4xl sm:text-5xl font-bold">Simple subscription pricing</h2>
-          <p className="mt-4 text-white/50">Every plan includes AI generation credits. <span className="font-mono text-white/70">1 credit = 1 website</span>. Need more? Buy credit packs anytime.</p>
+          <p className="mt-4 text-white/50">Every plan includes AI credits you spend as you build & edit. Bigger jobs cost more. Need more? <span className="font-mono text-white/70">Buy credit packs anytime.</span></p>
         </div>
         <div className="grid md:grid-cols-3 gap-4">
           {plans.map((p) => (
@@ -139,11 +139,11 @@ export default function Landing() {
                 <span className="font-display text-5xl font-bold">${p.price}</span>
                 <span className="text-white/40 mb-2 text-sm">{p.per}</span>
               </div>
-              <div className="mt-6 font-mono text-brand text-2xl font-bold">{p.credits} credits</div>
+              <div className="mt-6 font-mono text-brand text-2xl font-bold">{p.unlimited ? "Unlimited" : `${p.credits} credits`}</div>
               <ul className="mt-6 space-y-3 text-sm text-white/60">
-                <li className="flex gap-2"><Check className="w-4 h-4 text-brand shrink-0" /> {p.credits} AI website generations</li>
-                <li className="flex gap-2"><Check className="w-4 h-4 text-brand shrink-0" /> Unlimited previews & edits</li>
-                <li className="flex gap-2"><Check className="w-4 h-4 text-brand shrink-0" /> HTML export</li>
+                <li className="flex gap-2"><Check className="w-4 h-4 text-brand shrink-0" /> {p.unlimited ? "Unlimited AI builds & edits" : `${p.credits} credits / cycle`}</li>
+                <li className="flex gap-2"><Check className="w-4 h-4 text-brand shrink-0" /> Unlimited previews & exports</li>
+                <li className="flex gap-2"><Check className="w-4 h-4 text-brand shrink-0" /> AI edits & regenerations</li>
                 <li className="flex gap-2"><Check className="w-4 h-4 text-brand shrink-0" /> Buy extra credits anytime</li>
               </ul>
               <Link to={user ? "/pricing" : "/register"} data-testid={`landing-plan-${p.id}`}
