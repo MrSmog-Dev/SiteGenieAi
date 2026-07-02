@@ -17,7 +17,11 @@ export default function Pricing() {
     if (!user) { navigate("/register"); return; }
     setBusy(`${kind}-${plan_id}`);
     try {
-      const { data } = await api.post("/checkout/session", { kind, plan_id, origin_url: window.location.origin });
+      const endpoint = kind === "subscription" ? "/subscription/checkout" : "/checkout/session";
+      const payload = kind === "subscription"
+        ? { plan_id, origin_url: window.location.origin }
+        : { kind, plan_id, origin_url: window.location.origin };
+      const { data } = await api.post(endpoint, payload);
       window.location.href = data.url;
     } catch (e) {
       toast.error(formatApiError(e.response?.data?.detail) || e.message);

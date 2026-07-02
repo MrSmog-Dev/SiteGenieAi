@@ -1,0 +1,72 @@
+{
+  "summary": "Native Stripe recurring subscriptions verified end-to-end against REAL Stripe test API. Backend endpoints, DB persistence, activation idempotency, and Cancel/Reactivate all confirmed working against api.stripe.com. Found and FIXED one critical bug: emergent StripeCheckout global api_base poisoning. Found one open UI bug in Pricing.jsx (credits count missing on plan cards).",
+  "feature_verification": {
+    "backend_subscription_checkout": "PASS - POST /api/subscription/checkout for monthly/quarterly/annual returns https://checkout.stripe.com/... URL, creates payment_transactions with provider=stripe_native processed=false.",
+    "invalid_plan_and_unauth": "PASS - 400 for bad plan_id, 401 without session cookie.",
+    "credit_pack_old_flow": "PASS - POST /api/checkout/session {kind:'credits', plan_id:'pack_10'} still returns valid checkout URL.",
+    "activation_via_stripe_api": "PASS - Created real Stripe Subscription (tok_visa + Subscription.create) and called _activate_native_sub: user record set to plan=monthly, plan_credits=20, provider=stripe_native, stripe_subscription_id=sub_...; subscriptions collection upserted.",
+    "activation_idempotency": "PASS - Calling _activate_native_sub twice keeps plan_credits=20 (function assigns, does not $inc). Additionally, the checkout-status endpoint uses find_one_and_update {processed:{$ne:true}} claim so Stripe subscription retrieve+activation only happens once.",
+    "cancel_calls_real_stripe": "PASS - POST /api/subscription/cancel returns 200; verified via stripe_sdk.Subscription.retrieve that cancel_at_period_end=True on the live Stripe object. DB cape=true.",
+    "reactivate_calls_real_stripe": "PASS - POST /api/subscription/reactivate returns 200; Stripe object cape=False confirmed via retrieve. DB cape=false.",
+    "billing_ui_reflects_state": "PASS - /billing page shows badge=ACTIVE, plan=Monthly, plan_credits contributed to total. sub-status-badge, subscription-card, billing-total-credits render correctly.",
+    "pricing_page_subscribe_redirects_to_stripe": "PASS - clicking data-testid=subscribe-monthly on /pricing navigates to https://checkout.stripe.com/c/pay/cs_test_... hosted Stripe Checkout (real Stripe test env).",
+    "complete_checkout_via_playwright_ui": "NOT_TESTED - Stripe Checkout page now shows a payment-method accordion (Card / Klarna / Cash App Pay / Bank / Link / Amazon Pay) whose radio requires a specific click that I could not reliably automate in 3 attempts. Instead completed the equivalent subscription creation programmatically via stripe_sdk.Subscription.create + Subscription.retrieve to verify the same downstream state.",
+    "regression_rate_limiting": "PASS - 8/8 tests in test_rate_limiting.py still pass (login brute-force, generation per-user limits, admin login regression).",
+    "regression_402_gating_and_templates": "PASS."
+  },
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "GET /api/subscription/checkout-status/{session_id}",
+        "issue": "When called with an unknown session_id, returns 404 only if user has no txn for that id; if session_id has no txn but stripe_sdk.checkout.Session.retrieve is called on it (i.e. txn exists), returns 502. Acceptable behavior."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "src/pages/Pricing.jsx",
+        "issue": "Subscription plan cards render '{p.credits} credits' but /api/plans returns each plan with key 'monthly_credits' (not 'credits'). Result: on /pricing the Monthly/3-Month/Annual cards show '$20', blank, 'credits' with the number missing (see screenshot in this iteration). Users cannot see how many credits each plan grants. Fix: use p.monthly_credits instead of p.credits (lines 66 and 68 of Pricing.jsx).",
+        "selector": "[data-testid=\"subscribe-monthly\"] parent card",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_stripe_subscription.py",
+    "/app/backend/tests/test_rate_limiting.py",
+    "/app/test_reports/pytest/iter5_results.xml",
+    "/tmp/e2e_stripe_backend_flow.py"
+  ],
+  "action_items": [
+    "Fix Pricing.jsx lines 66 and 68: change {p.credits} -> {p.monthly_credits} so subscription cards display the credit count.",
+    "(OPTIONAL) The emergent StripeCheckout SDK mutates the GLOBAL stripe.api_base to https://integrations.emergentagent.com/stripe when STRIPE_API_KEY='sk_test_emergent'. I patched server.py to defensively reset stripe_sdk.api_base to https://api.stripe.com before every native Stripe SDK call (added _use_native_stripe() helper, called from _get_or_create_customer, subscription_checkout, subscription_checkout_status, cancel/reactivate, and stripe_native_webhook). This is required for native subscriptions to work; without it, the FIRST subscription checkout may work but any subsequent call after ANY /api/checkout/session (credit pack) call fails with 'No such price/customer' because the global proxy base does not have the user's own recurring price IDs.",
+    "Register the Stripe webhook /api/webhook/stripe-native with a signing secret so renewals can be tested (out of scope for this iteration per instructions)."
+  ],
+  "critical_code_review_comments": [
+    "Global mutation bug (patched): emergentintegrations.payments.stripe.checkout.StripeCheckout.__init__ sets stripe.api_base to the emergent proxy when key is sk_test_emergent. Any code that mixes emergent StripeCheckout and native stripe_sdk in the same process is fragile. The added _use_native_stripe() helper is defensive but the right long-term fix is to isolate stripe_sdk client state (e.g., use stripe.StripeClient(api_key=..., base_url='https://api.stripe.com') instead of the module-level singleton).",
+    "_get_or_create_customer: if the stored stripe_customer_id becomes invalid in Stripe (e.g., manual dashboard deletion), the endpoint returns 502 indefinitely. Consider catching stripe.error.InvalidRequestError with 'No such customer' and recreating.",
+    "subscription_checkout_status: only handles status=='complete' path. If Stripe returns 'expired'/'open' the txn stays processed:false forever (fine, but polling stops after 8 attempts on the frontend).",
+    "process_subscription: for stripe_native subs, skips simulated renewal (correct), but the 30-day credit reset loop still runs — this may reset plan_credits before Stripe actually charges the customer if the local ncr diverges from Stripe's billing cycle. Consider syncing next_credit_reset from Stripe subscription.current_period_start on renewal webhook.",
+    "cancel_at_period_end path in _activate_native_sub uses whatever Stripe returns — good. But if user re-subscribes, plan_credits is force-set to plan['monthly_credits'] wiping any accumulated plan_credits from a prior active plan. That's fine for upgrade/downgrade but should be documented.",
+    "Pricing.jsx uses {p.credits} for subscription plans; backend returns 'monthly_credits' — silent UI bug (see frontend_issues).",
+    "subscription_checkout writes payment_transactions BEFORE the Stripe session is confirmed; if the user abandons checkout the txn stays processed:false with status:open forever. Consider cleanup or expiring old rows."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_stripe_subscription.py (new)",
+    "/app/backend/server.py (added _use_native_stripe helper and called it from all native stripe_sdk sites to defend against global api_base mutation by emergent StripeCheckout)"
+  ],
+  "success_rate": {
+    "backend": "100% (20/20 = 12 new stripe + 8 rate-limit regression). Plus programmatic E2E verifying real Stripe cancel/reactivate.",
+    "frontend": "80% - Pricing subscribe redirect + Billing UI reflect state confirmed. Full Stripe Checkout completion via Playwright not automated due to payment-method accordion; equivalent activation verified via backend script."
+  },
+  "test_credentials": "admin@sitegenie.com / Sg!Adm1n_9f3kQ2xL7vB (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "During testing I created real Stripe test-mode Customer + PaymentMethod (pm_1TooW3...) + Subscription (sub_1TooW4...) for admin, verified cancel+reactivate against them, then cancelled the Stripe subscription for cleanup. Admin DB state restored to a quarterly non-native active subscription (25 plan_credits, 100 extra_credits) so future tests are unaffected. stripe_customer_id / stripe_subscription_id / provider were UNSET on admin post-test.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Native Stripe subscription flow works end-to-end. The key gotcha: emergent StripeCheckout mutates stripe.api_base globally to the emergent proxy when sk_test_emergent key is used. The patch in server.py (_use_native_stripe helper) resets it before every native call. If E1 refactors the payments code, keep this in mind. To test UI checkout completion end-to-end, note that Stripe's hosted checkout now presents a payment-method accordion; the Card option must be clicked via its accordion button before card fields are visible (selectors like input[value='card'] or '#accordion-item-card' vary). Alternative: use stripe_sdk.Subscription.create + tok_visa payment method directly (see /tmp/e2e_stripe_backend_flow.py).",
+  "rca_of_the_issue": "Bug 1 (FIXED by testing agent): Global stripe.api_base pollution. Reproduction: (a) log in as admin; (b) call POST /api/checkout/session for any credit pack (this instantiates emergent StripeCheckout which sets stripe.api_base='https://integrations.emergentagent.com/stripe' at module level); (c) call POST /api/subscription/checkout — fails 502 'No such price' because the emergent proxy backend does not have the user's recurring price IDs. Mitigation: _use_native_stripe() helper resets api_base to https://api.stripe.com before every native SDK call in server.py. Bug 2 (OPEN — needs E1 fix): Pricing.jsx renders p.credits which is undefined for subscriptions (backend returns monthly_credits)."
+}

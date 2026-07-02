@@ -16,15 +16,20 @@ export default function PaymentReturn() {
     started.current = true;
     const params = new URLSearchParams(window.location.search);
     const sessionId = params.get("session_id");
+    const isSubscription = params.get("type") === "subscription";
     if (!sessionId) { setState("error"); return; }
+    const statusUrl = isSubscription
+      ? `/subscription/checkout-status/${sessionId}`
+      : `/checkout/status/${sessionId}`;
 
     let attempts = 0;
     const poll = async () => {
       attempts += 1;
       if (attempts > 8) { setState("timeout"); return; }
       try {
-        const { data } = await api.get(`/checkout/status/${sessionId}`);
-        if (data.payment_status === "paid") {
+        const { data } = await api.get(statusUrl);
+        const done = isSubscription ? data.status === "complete" : data.payment_status === "paid";
+        if (done) {
           setInfo(data);
           await refreshUser();
           setState("success");

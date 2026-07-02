@@ -24,6 +24,8 @@ from emergentintegrations.payments.stripe.checkout import (
     StripeCheckout, CheckoutSessionResponse, CheckoutStatusResponse, CheckoutSessionRequest,
 )
 
+import stripe as stripe_sdk
+
 # ---------------- DB ----------------
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
@@ -31,6 +33,26 @@ db = client[os.environ['DB_NAME']]
 
 EMERGENT_LLM_KEY = os.environ['EMERGENT_LLM_KEY']
 STRIPE_API_KEY = os.environ['STRIPE_API_KEY']
+STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY', '')
+STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
+STRIPE_PRICE_IDS = {
+    "monthly": os.environ.get('STRIPE_PRICE_MONTHLY', ''),
+    "quarterly": os.environ.get('STRIPE_PRICE_QUARTERLY', ''),
+    "annual": os.environ.get('STRIPE_PRICE_ANNUAL', ''),
+}
+if STRIPE_SECRET_KEY:
+    stripe_sdk.api_key = STRIPE_SECRET_KEY
+
+STRIPE_NATIVE_API_BASE = "https://api.stripe.com"
+
+def _use_native_stripe():
+    """Force stripe_sdk to talk directly to Stripe (not the emergent proxy).
+    Emergent's StripeCheckout mutates the global stripe.api_base when
+    STRIPE_API_KEY contains 'sk_test_emergent', which would otherwise break
+    native subscription/customer calls that rely on the user's own Stripe key."""
+    stripe_sdk.api_base = STRIPE_NATIVE_API_BASE
+    if STRIPE_SECRET_KEY:
+        stripe_sdk.api_key = STRIPE_SECRET_KEY
 
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
@@ -77,6 +99,10 @@ class GenerateInput(BaseModel):
 class CheckoutInput(BaseModel):
     kind: str          # "subscription" | "credits"
     plan_id: str       # key in SUBSCRIPTION_PLANS or CREDIT_PACKS
+    origin_url: str
+
+class SubCheckoutInput(BaseModel):
+    plan_id: str
     origin_url: str
 
 class EditInput(BaseModel):
@@ -155,9 +181,10 @@ async def process_subscription(user: dict) -> dict:
     if user.get("subscription_status") == "active":
         now = datetime.now(timezone.utc)
         plan = SUBSCRIPTION_PLANS.get(user.get("plan"))
+        is_native = user.get("provider") == "stripe_native"
         cpe = parse_dt(user.get("current_period_end"))
-        # billing period end -> renew or cancel
-        while plan and cpe and now >= cpe:
+        # Simulated billing renewal ONLY for non-native subs (native handled by Stripe webhooks).
+        while not is_native and plan and cpe and now >= cpe:
             if user.get("cancel_at_period_end"):
                 user["subscription_status"] = "cancelled"
                 user["plan"] = None
@@ -176,7 +203,7 @@ async def process_subscription(user: dict) -> dict:
                 "payment_status": "paid", "status": "complete", "processed": True,
                 "created_at": datetime.now(timezone.utc),
             })
-        # 30-day credit resets
+        # 30-day credit resets (applies to both native and simulated)
         if user.get("subscription_status") == "active" and plan:
             ncr = parse_dt(user.get("next_credit_reset"))
             while ncr and now >= ncr:
@@ -629,6 +656,13 @@ async def get_subscription(user: dict = Depends(get_current_user)):
 async def cancel_subscription(user: dict = Depends(get_current_user)):
     if user.get("subscription_status") != "active":
         raise HTTPException(status_code=400, detail="No active subscription")
+    if user.get("provider") == "stripe_native" and user.get("stripe_subscription_id"):
+        try:
+            _use_native_stripe()
+            stripe_sdk.Subscription.modify(user["stripe_subscription_id"], cancel_at_period_end=True)
+        except Exception:
+            logger.exception("stripe cancel failed")
+            raise HTTPException(status_code=502, detail="Could not cancel with Stripe. Try again.")
     await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"cancel_at_period_end": True}})
     await db.subscriptions.update_one({"user_id": user["user_id"]}, {"$set": {"cancel_at_period_end": True}})
     return {"success": True, "cancel_at_period_end": True}
@@ -637,9 +671,186 @@ async def cancel_subscription(user: dict = Depends(get_current_user)):
 async def reactivate_subscription(user: dict = Depends(get_current_user)):
     if user.get("subscription_status") != "active" or not user.get("cancel_at_period_end"):
         raise HTTPException(status_code=400, detail="Nothing to reactivate")
+    if user.get("provider") == "stripe_native" and user.get("stripe_subscription_id"):
+        try:
+            _use_native_stripe()
+            stripe_sdk.Subscription.modify(user["stripe_subscription_id"], cancel_at_period_end=False)
+        except Exception:
+            logger.exception("stripe reactivate failed")
+            raise HTTPException(status_code=502, detail="Could not reactivate with Stripe. Try again.")
     await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"cancel_at_period_end": False}})
     await db.subscriptions.update_one({"user_id": user["user_id"]}, {"$set": {"cancel_at_period_end": False}})
     return {"success": True, "cancel_at_period_end": False}
+
+# ---------------- Native Stripe recurring subscriptions ----------------
+def _sub_period_end(sub) -> datetime:
+    ts = sub.get("current_period_end") if isinstance(sub, dict) else getattr(sub, "current_period_end", None)
+    if ts:
+        return datetime.fromtimestamp(int(ts), tz=timezone.utc)
+    return None
+
+async def _get_or_create_customer(user: dict) -> str:
+    _use_native_stripe()
+    if user.get("stripe_customer_id"):
+        return user["stripe_customer_id"]
+    cust = stripe_sdk.Customer.create(
+        email=user["email"], name=user.get("name", ""), metadata={"user_id": user["user_id"]})
+    await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"stripe_customer_id": cust.id}})
+    return cust.id
+
+async def _activate_native_sub(user_id: str, plan_id: str, sub):
+    plan = SUBSCRIPTION_PLANS.get(plan_id)
+    if not plan:
+        return
+    now = datetime.now(timezone.utc)
+    cpe = _sub_period_end(sub) or (now + timedelta(days=plan["billing_days"]))
+    sub_id = sub["id"] if isinstance(sub, dict) else sub.id
+    cancel_flag = bool(sub.get("cancel_at_period_end") if isinstance(sub, dict) else getattr(sub, "cancel_at_period_end", False))
+    await db.users.update_one({"user_id": user_id}, {"$set": {
+        "plan": plan_id, "plan_name": plan["name"], "subscription_status": "active",
+        "cancel_at_period_end": cancel_flag, "plan_credits": plan["monthly_credits"],
+        "current_period_end": cpe.isoformat(),
+        "next_credit_reset": (now + timedelta(days=CREDIT_RESET_DAYS)).isoformat(),
+        "provider": "stripe_native", "stripe_subscription_id": sub_id,
+        "subscription_started_at": now.isoformat(),
+    }})
+    await db.subscriptions.update_one(
+        {"user_id": user_id},
+        {"$set": {"user_id": user_id, "plan": plan_id, "status": "active",
+                  "stripe_subscription_id": sub_id, "started_at": now.isoformat()}},
+        upsert=True,
+    )
+
+async def _renew_native_sub(user_id: str, plan_id: str, sub):
+    plan = SUBSCRIPTION_PLANS.get(plan_id)
+    if not plan:
+        return
+    now = datetime.now(timezone.utc)
+    cpe = _sub_period_end(sub) or (now + timedelta(days=plan["billing_days"]))
+    sub_id = sub["id"] if isinstance(sub, dict) else sub.id
+    await db.users.update_one({"user_id": user_id}, {"$set": {
+        "subscription_status": "active", "plan": plan_id, "plan_name": plan["name"],
+        "plan_credits": plan["monthly_credits"], "current_period_end": cpe.isoformat(),
+        "next_credit_reset": (now + timedelta(days=CREDIT_RESET_DAYS)).isoformat(),
+        "provider": "stripe_native", "stripe_subscription_id": sub_id,
+    }})
+    await db.payment_transactions.insert_one({
+        "session_id": f"inv_{sub_id}_{int(now.timestamp())}", "user_id": user_id,
+        "amount": plan["amount"], "currency": "usd", "kind": "renewal", "plan_id": plan_id,
+        "credits": plan["monthly_credits"], "payment_status": "paid", "status": "complete",
+        "processed": True, "provider": "stripe_native", "created_at": now,
+    })
+
+@api_router.post("/subscription/checkout")
+async def subscription_checkout(input: SubCheckoutInput, user: dict = Depends(get_current_user)):
+    if not STRIPE_SECRET_KEY:
+        raise HTTPException(status_code=503, detail="Subscriptions are not configured yet.")
+    price = STRIPE_PRICE_IDS.get(input.plan_id)
+    plan = SUBSCRIPTION_PLANS.get(input.plan_id)
+    if not price or not plan:
+        raise HTTPException(status_code=400, detail="Invalid plan")
+    customer_id = await _get_or_create_customer(user)
+    _use_native_stripe()
+    origin = input.origin_url.rstrip("/")
+    try:
+        session = stripe_sdk.checkout.Session.create(
+            mode="subscription", customer=customer_id,
+            line_items=[{"price": price, "quantity": 1}],
+            success_url=f"{origin}/payment-return?type=subscription&session_id={{CHECKOUT_SESSION_ID}}",
+            cancel_url=f"{origin}/pricing",
+            metadata={"user_id": user["user_id"], "plan_id": input.plan_id},
+            subscription_data={"metadata": {"user_id": user["user_id"], "plan_id": input.plan_id}},
+        )
+    except Exception:
+        logger.exception("subscription checkout failed")
+        raise HTTPException(status_code=502, detail="Could not start checkout. Please try again.")
+    await db.payment_transactions.insert_one({
+        "session_id": session.id, "user_id": user["user_id"], "amount": plan["amount"],
+        "currency": "usd", "kind": "subscription", "plan_id": input.plan_id,
+        "credits": plan["monthly_credits"], "payment_status": "initiated", "status": "open",
+        "processed": False, "provider": "stripe_native", "created_at": datetime.now(timezone.utc),
+    })
+    return {"url": session.url, "session_id": session.id}
+
+@api_router.get("/subscription/checkout-status/{session_id}")
+async def subscription_checkout_status(session_id: str, user: dict = Depends(get_current_user)):
+    txn = await db.payment_transactions.find_one(
+        {"session_id": session_id, "user_id": user["user_id"]}, {"_id": 0})
+    if not txn:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    _use_native_stripe()
+    try:
+        session = stripe_sdk.checkout.Session.retrieve(session_id)
+    except Exception:
+        raise HTTPException(status_code=502, detail="Could not retrieve payment status.")
+    payment_status = session.get("payment_status")
+    status = session.get("status")
+    await db.payment_transactions.update_one(
+        {"session_id": session_id}, {"$set": {"payment_status": payment_status, "status": status}})
+    if status == "complete" and session.get("subscription"):
+        claimed = await db.payment_transactions.find_one_and_update(
+            {"session_id": session_id, "processed": {"$ne": True}}, {"$set": {"processed": True}})
+        if claimed:
+            sub = stripe_sdk.Subscription.retrieve(session["subscription"])
+            await _activate_native_sub(user["user_id"], txn["plan_id"], sub)
+    updated = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0})
+    return {"payment_status": payment_status, "status": status, "kind": "subscription",
+            "plan_id": txn["plan_id"], "user": public_user(updated)}
+
+@api_router.post("/webhook/stripe-native")
+async def stripe_native_webhook(request: Request):
+    body = await request.body()
+    sig = request.headers.get("stripe-signature")
+    _use_native_stripe()
+    if STRIPE_WEBHOOK_SECRET:
+        try:
+            event = stripe_sdk.Webhook.construct_event(body, sig, STRIPE_WEBHOOK_SECRET)
+        except Exception:
+            logger.exception("native webhook signature verification failed")
+            raise HTTPException(status_code=400, detail="Invalid webhook")
+    else:
+        import json as _json
+        try:
+            event = _json.loads(body)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid payload")
+    etype = event["type"]
+    obj = event["data"]["object"]
+    try:
+        if etype == "checkout.session.completed":
+            meta = obj.get("metadata") or {}
+            uid, plan_id, sub_id = meta.get("user_id"), meta.get("plan_id"), obj.get("subscription")
+            if uid and plan_id and sub_id:
+                await db.payment_transactions.find_one_and_update(
+                    {"session_id": obj["id"], "processed": {"$ne": True}},
+                    {"$set": {"processed": True, "payment_status": "paid", "status": "complete"}})
+                sub = stripe_sdk.Subscription.retrieve(sub_id)
+                await _activate_native_sub(uid, plan_id, sub)
+        elif etype == "invoice.paid":
+            if obj.get("billing_reason") != "subscription_create":  # first invoice handled at checkout
+                sub_id = obj.get("subscription")
+                if sub_id:
+                    sub = stripe_sdk.Subscription.retrieve(sub_id)
+                    meta = (sub.get("metadata") if isinstance(sub, dict) else sub.metadata) or {}
+                    if meta.get("user_id") and meta.get("plan_id"):
+                        await _renew_native_sub(meta["user_id"], meta["plan_id"], sub)
+        elif etype == "customer.subscription.deleted":
+            meta = obj.get("metadata") or {}
+            if meta.get("user_id"):
+                await db.users.update_one({"user_id": meta["user_id"]}, {"$set": {
+                    "subscription_status": "cancelled", "plan": None, "plan_name": None,
+                    "plan_credits": 0, "cancel_at_period_end": False}})
+        elif etype == "customer.subscription.updated":
+            meta = obj.get("metadata") or {}
+            if meta.get("user_id"):
+                upd = {"cancel_at_period_end": bool(obj.get("cancel_at_period_end", False))}
+                cpe = _sub_period_end(obj)
+                if cpe:
+                    upd["current_period_end"] = cpe.isoformat()
+                await db.users.update_one({"user_id": meta["user_id"]}, {"$set": upd})
+    except Exception:
+        logger.exception("native webhook handling error")
+    return {"received": True}
 
 async def subscription_worker():
     """Periodically process active subscriptions for credit resets and renewals."""
