@@ -40,7 +40,7 @@ logger = logging.getLogger("sitegenie")
 
 # ---------------- Business config ----------------
 SUBSCRIPTION_PLANS = {
-    "monthly":   {"name": "Monthly",  "amount": 19.00,  "monthly_credits": 20, "billing_days": 30,  "interval": "month"},
+    "monthly":   {"name": "Monthly",  "amount": 20.00,  "monthly_credits": 20, "billing_days": 30,  "interval": "month"},
     "quarterly": {"name": "3-Month",  "amount": 49.00,  "monthly_credits": 25, "billing_days": 90,  "interval": "quarter"},
     "annual":    {"name": "Annual",   "amount": 149.00, "monthly_credits": 30, "billing_days": 365, "interval": "year"},
 }

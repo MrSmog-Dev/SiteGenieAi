@@ -7,7 +7,7 @@ const HERO_BG = "https://images.unsplash.com/photo-1546497974-b213c9efb599?crop=
 const PREVIEW = "https://images.unsplash.com/photo-1634084462412-b54873c0a56d?crop=entropy&cs=srgb&fm=jpg&q=85&w=1200";
 
 const plans = [
-  { id: "monthly", name: "Monthly", price: 19, per: "/mo", credits: 20, highlight: false },
+  { id: "monthly", name: "Monthly", price: 20, per: "/mo", credits: 20, highlight: false },
   { id: "quarterly", name: "3-Month", price: 49, per: "/qtr", credits: 75, highlight: true },
   { id: "annual", name: "Annual", price: 149, per: "/yr", credits: 160, highlight: false },
 ];
