@@ -45,6 +45,12 @@ An online store that creates website templates for businesses that don't have a 
 - Billing page (/billing): plan status, dates, credit breakdown, cancel/reactivate, payment history.
 - Plans updated to per-30-day allowances: Monthly 20/30d, 3-Month 25/30d, Annual 30/30d.
 
+## Implemented — Iter 3-6 (2026-07-02)
+- Rate limiting: login brute-force (5/15min per IP+email) + generation (15/5min per user).
+- Native Stripe recurring subscriptions (mode=subscription, own test key): auto-create prices, checkout, cancel/reactivate via Stripe API, webhook /api/webhook/stripe-native for renewals (webhook secret pending registration).
+- Security audit fixes: CORS allowlist, SameSite=Lax cookie, strong admin password, payment idempotency, iframe sandbox, credit floor.
+- REWORKED credit system (usage-based currency): cost per AI op = max(1, round((prompt+output chars/4)/3000)). Plans: Monthly $20/50cr, 3-Month $49/120cr, Annual $149/UNLIMITED. plan_credits (30d reset) + extra_credits (packs). 402 block at 0 credits (non-unlimited); packs pack_25/60/150. New users get 15 free credits.
+
 ## Backlog / Remaining
 - P1: Regenerate/edit an existing template; custom section prompts.
 - P1: Real recurring Stripe subscriptions (currently one-time checkouts that grant plan+credits with expiry).
