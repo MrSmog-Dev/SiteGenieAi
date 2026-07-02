@@ -126,7 +126,7 @@ export default function Generator() {
                 <div className="font-mono text-sm">Designing your site…</div>
               </div>
             ) : result ? (
-              <iframe data-testid="preview-iframe" title="preview" srcDoc={result.html} className="w-full h-full" style={{ minHeight: 500 }} />
+              <iframe data-testid="preview-iframe" title="preview" sandbox="allow-scripts" srcDoc={result.html} className="w-full h-full" style={{ minHeight: 500 }} />
             ) : (
               <div className="h-full flex flex-col items-center justify-center gap-3 bg-surface2 text-white/40 p-8 text-center">
                 <Sparkles className="w-10 h-10" />

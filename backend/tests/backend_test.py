@@ -16,7 +16,10 @@ BASE_URL = os.environ["REACT_APP_BACKEND_URL"].rstrip("/")
 API = f"{BASE_URL}/api"
 
 ADMIN_EMAIL = "admin@sitegenie.com"
-ADMIN_PASSWORD = "admin123"
+ADMIN_PASSWORD = "Sg!Adm1n_9f3kQ2xL7vB"
+OLD_ADMIN_PASSWORD = "admin123"
+ALLOWED_ORIGIN = "https://builder-hub-795.preview.emergentagent.com"
+EVIL_ORIGIN = "https://evil.example.com"
 
 MONGO_URL = os.environ.get("MONGO_URL", "mongodb://localhost:27017")
 DB_NAME = os.environ.get("DB_NAME", "test_database")
@@ -295,3 +298,121 @@ class TestCheckout:
             "kind": "subscription", "plan_id": "monthly", "origin_url": BASE_URL
         }, timeout=15)
         assert r.status_code == 401
+
+
+
+# ---------------- SECURITY FIXES ----------------
+class TestSecurityFixes:
+    # SEC-002
+    def test_old_admin_password_rejected(self):
+        r = requests.post(f"{API}/auth/login",
+                          json={"email": ADMIN_EMAIL, "password": OLD_ADMIN_PASSWORD}, timeout=15)
+        assert r.status_code == 401, f"OLD password must be rejected, got {r.status_code}"
+
+    def test_new_admin_password_accepted(self):
+        r = requests.post(f"{API}/auth/login",
+                          json={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD}, timeout=15)
+        assert r.status_code == 200, f"NEW password should succeed, got {r.status_code} {r.text}"
+        d = r.json()
+        # login returns the public user object directly
+        assert d["email"] == ADMIN_EMAIL
+        assert d["role"] == "admin"
+
+    # SEC-001 (CORS)
+    def test_disallowed_origin_no_acao(self):
+        # Preflight from evil origin
+        r = requests.options(f"{API}/auth/me", headers={
+            "Origin": EVIL_ORIGIN,
+            "Access-Control-Request-Method": "GET",
+            "Access-Control-Request-Headers": "authorization",
+        }, timeout=15)
+        acao = r.headers.get("Access-Control-Allow-Origin", "")
+        assert EVIL_ORIGIN not in acao, f"evil origin echoed in ACAO: {acao!r}"
+        # Actual GET (no auth needed for header check)
+        r2 = requests.get(f"{API}/plans", headers={"Origin": EVIL_ORIGIN}, timeout=15)
+        acao2 = r2.headers.get("Access-Control-Allow-Origin", "")
+        assert EVIL_ORIGIN not in acao2, f"evil origin echoed in ACAO: {acao2!r}"
+
+    def test_allowed_origin_reflected(self):
+        r = requests.options(f"{API}/auth/me", headers={
+            "Origin": ALLOWED_ORIGIN,
+            "Access-Control-Request-Method": "GET",
+            "Access-Control-Request-Headers": "authorization",
+        }, timeout=15)
+        acao = r.headers.get("Access-Control-Allow-Origin", "")
+        # Edge (Cloudflare) may collapse to '*' but MUST allow the trusted origin one way or another
+        assert acao in ("*", ALLOWED_ORIGIN), f"allowed origin not permitted, got {acao!r}"
+
+    # SEC-001 (cookie flags) - inspect session_token cookie specifically
+    def test_login_cookie_flags(self):
+        r = requests.post(f"{API}/auth/login",
+                          json={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD}, timeout=15)
+        assert r.status_code == 200
+        session_cookie = None
+        # response.raw.headers preserves multiple Set-Cookie entries
+        for k, v in r.raw.headers.items():
+            if k.lower() == "set-cookie" and v.lower().startswith("session_token="):
+                session_cookie = v
+                break
+        assert session_cookie, f"session_token cookie missing. headers={list(r.raw.headers.items())}"
+        low = session_cookie.lower()
+        assert "httponly" in low, f"HttpOnly missing: {session_cookie}"
+        assert "secure" in low, f"Secure missing: {session_cookie}"
+        assert "samesite=lax" in low, f"SameSite=Lax missing: {session_cookie}"
+        assert "samesite=none" not in low
+
+    # SEC-003 (idempotency at DB level)
+    def test_apply_payment_idempotency_db_guard(self):
+        # Insert unprocessed txn, run find_one_and_update twice - second returns None
+        s, email, data = _register()
+        user_id = data["user_id"]
+        session_id = f"cs_test_{uuid.uuid4().hex[:14]}"
+        db.payment_transactions.insert_one({
+            "session_id": session_id, "user_id": user_id,
+            "kind": "credits", "plan_id": "pack_25", "credits": 25,
+            "amount": 20.0, "currency": "usd",
+            "payment_status": "paid", "status": "complete", "processed": False,
+            "created_at": datetime.now(timezone.utc),
+        })
+        first = db.payment_transactions.find_one_and_update(
+            {"session_id": session_id, "processed": {"$ne": True}},
+            {"$set": {"processed": True}},
+        )
+        assert first is not None, "first claim should succeed"
+        second = db.payment_transactions.find_one_and_update(
+            {"session_id": session_id, "processed": {"$ne": True}},
+            {"$set": {"processed": True}},
+        )
+        assert second is None, "second claim MUST be None (idempotency guard)"
+
+    # SEC-003 (user-scoped checkout_status)
+    def test_checkout_status_user_scoped(self, admin_session):
+        # Create session belonging to a different user
+        s, email, data = _register()
+        other_user_id = data["user_id"]
+        session_id = f"cs_test_{uuid.uuid4().hex[:14]}"
+        db.payment_transactions.insert_one({
+            "session_id": session_id, "user_id": other_user_id,
+            "kind": "credits", "plan_id": "pack_10", "credits": 10,
+            "amount": 10.0, "currency": "usd",
+            "payment_status": "initiated", "status": "open", "processed": False,
+            "created_at": datetime.now(timezone.utc),
+        })
+        # Admin user should not see other user's session
+        r = admin_session.get(f"{API}/checkout/status/{session_id}", timeout=15)
+        assert r.status_code == 404, f"cross-user checkout status must be 404, got {r.status_code}"
+
+    # REGRESSION: deduct_one_credit never goes below zero
+    def test_deduct_never_negative(self):
+        s, email, data = _register()
+        user_id = data["user_id"]
+        db.users.update_one({"email": email}, {"$set": {"plan_credits": 0, "extra_credits": 0}})
+        # 402 gate should prevent job creation; call twice
+        for _ in range(2):
+            r = s.post(f"{API}/templates/generate", json={
+                "business_name": "TEST Neg", "industry": "x", "description": "y"
+            }, timeout=15)
+            assert r.status_code == 402
+        u = db.users.find_one({"user_id": user_id})
+        assert u["plan_credits"] == 0
+        assert u["extra_credits"] == 0

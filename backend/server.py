@@ -104,11 +104,11 @@ def total_credits(u: dict) -> int:
     return int(u.get("plan_credits", 0)) + int(u.get("extra_credits", 0))
 
 async def deduct_one_credit(user_id: str):
-    u = await db.users.find_one({"user_id": user_id}, {"_id": 0})
-    if int(u.get("plan_credits", 0)) > 0:
-        await db.users.update_one({"user_id": user_id}, {"$inc": {"plan_credits": -1}})
-    else:
-        await db.users.update_one({"user_id": user_id}, {"$inc": {"extra_credits": -1}})
+    r = await db.users.update_one(
+        {"user_id": user_id, "plan_credits": {"$gt": 0}}, {"$inc": {"plan_credits": -1}})
+    if r.modified_count == 0:
+        await db.users.update_one(
+            {"user_id": user_id, "extra_credits": {"$gt": 0}}, {"$inc": {"extra_credits": -1}})
 
 async def process_subscription(user: dict) -> dict:
     """Lazy subscription lifecycle: migrate legacy credits, apply 30-day credit resets,
@@ -191,7 +191,7 @@ async def create_session(user_id: str) -> str:
 
 def set_session_cookie(response: Response, token: str):
     response.set_cookie(key="session_token", value=token, httponly=True,
-                        secure=True, samesite="none", max_age=7 * 24 * 3600, path="/")
+                        secure=True, samesite="lax", max_age=7 * 24 * 3600, path="/")
 
 async def get_current_user(request: Request) -> dict:
     token = request.cookies.get("session_token")
@@ -496,18 +496,23 @@ async def create_checkout(input: CheckoutInput, request: Request, user: dict = D
     return {"url": session.url, "session_id": session.session_id}
 
 async def apply_payment(txn: dict):
-    """Grant credits/plan once per session."""
-    if txn.get("processed"):
+    """Grant credits/plan once per session. Atomic idempotency guard prevents double-credit."""
+    # Atomically claim the transaction; if already processed, another call handled it.
+    claimed = await db.payment_transactions.find_one_and_update(
+        {"session_id": txn["session_id"], "processed": {"$ne": True}},
+        {"$set": {"processed": True}},
+    )
+    if not claimed:
         return
-    user_id = txn["user_id"]
-    if txn["kind"] == "credits":
-        await db.users.update_one({"user_id": user_id}, {"$inc": {"extra_credits": int(txn.get("credits", 0))}})
-    elif txn["kind"] == "subscription":
-        plan = SUBSCRIPTION_PLANS.get(txn["plan_id"])
+    user_id = claimed["user_id"]
+    if claimed["kind"] == "credits":
+        await db.users.update_one({"user_id": user_id}, {"$inc": {"extra_credits": int(claimed.get("credits", 0))}})
+    elif claimed["kind"] == "subscription":
+        plan = SUBSCRIPTION_PLANS.get(claimed["plan_id"])
         if plan:
             now = datetime.now(timezone.utc)
             await db.users.update_one({"user_id": user_id}, {"$set": {
-                "plan": txn["plan_id"], "plan_name": plan["name"],
+                "plan": claimed["plan_id"], "plan_name": plan["name"],
                 "subscription_status": "active", "cancel_at_period_end": False,
                 "plan_credits": plan["monthly_credits"],
                 "current_period_end": (now + timedelta(days=plan["billing_days"])).isoformat(),
@@ -516,15 +521,15 @@ async def apply_payment(txn: dict):
             }})
             await db.subscriptions.update_one(
                 {"user_id": user_id},
-                {"$set": {"user_id": user_id, "plan": txn["plan_id"], "status": "active",
+                {"$set": {"user_id": user_id, "plan": claimed["plan_id"], "status": "active",
                           "started_at": now.isoformat()}},
                 upsert=True,
             )
-    await db.payment_transactions.update_one({"session_id": txn["session_id"]}, {"$set": {"processed": True}})
 
 @api_router.get("/checkout/status/{session_id}")
 async def checkout_status(session_id: str, request: Request, user: dict = Depends(get_current_user)):
-    txn = await db.payment_transactions.find_one({"session_id": session_id}, {"_id": 0})
+    txn = await db.payment_transactions.find_one(
+        {"session_id": session_id, "user_id": user["user_id"]}, {"_id": 0})
     if not txn:
         raise HTTPException(status_code=404, detail="Transaction not found")
     stripe = get_stripe(request)
@@ -549,8 +554,9 @@ async def stripe_webhook(request: Request):
     stripe = get_stripe(request)
     try:
         event = await stripe.handle_webhook(body, sig)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        logger.exception("stripe webhook error")
+        raise HTTPException(status_code=400, detail="Invalid webhook")
     if event.payment_status == "paid" and event.session_id:
         txn = await db.payment_transactions.find_one({"session_id": event.session_id}, {"_id": 0})
         if txn and not txn.get("processed"):
@@ -621,24 +627,27 @@ async def startup():
     await db.user_sessions.create_index("session_token")
     await db.templates.create_index("user_id")
     await db.gen_jobs.create_index("job_id")
-    # seed admin
-    admin_email = os.environ.get("ADMIN_EMAIL", "admin@sitegenie.com").lower()
-    admin_password = os.environ.get("ADMIN_PASSWORD", "admin123")
+    # seed admin (requires ADMIN_EMAIL + ADMIN_PASSWORD from env; no weak defaults)
+    admin_email = (os.environ.get("ADMIN_EMAIL") or "").lower().strip()
+    admin_password = os.environ.get("ADMIN_PASSWORD") or ""
     now = datetime.now(timezone.utc)
-    existing = await db.users.find_one({"email": admin_email})
-    if not existing:
-        await db.users.insert_one({
-            "user_id": f"user_{uuid.uuid4().hex[:12]}", "email": admin_email,
-            "name": "Admin", "password_hash": hash_password(admin_password), "picture": "",
-            "role": "admin", "plan_credits": 30, "extra_credits": 100,
-            "plan": "annual", "plan_name": "Annual", "subscription_status": "active",
-            "cancel_at_period_end": False,
-            "current_period_end": (now + timedelta(days=365)).isoformat(),
-            "next_credit_reset": (now + timedelta(days=CREDIT_RESET_DAYS)).isoformat(),
-            "created_at": now,
-        })
-    elif not verify_password(admin_password, existing.get("password_hash", "")):
-        await db.users.update_one({"email": admin_email}, {"$set": {"password_hash": hash_password(admin_password)}})
+    if admin_email and len(admin_password) >= 12:
+        existing = await db.users.find_one({"email": admin_email})
+        if not existing:
+            await db.users.insert_one({
+                "user_id": f"user_{uuid.uuid4().hex[:12]}", "email": admin_email,
+                "name": "Admin", "password_hash": hash_password(admin_password), "picture": "",
+                "role": "admin", "plan_credits": 30, "extra_credits": 100,
+                "plan": "annual", "plan_name": "Annual", "subscription_status": "active",
+                "cancel_at_period_end": False,
+                "current_period_end": (now + timedelta(days=365)).isoformat(),
+                "next_credit_reset": (now + timedelta(days=CREDIT_RESET_DAYS)).isoformat(),
+                "created_at": now,
+            })
+        elif not verify_password(admin_password, existing.get("password_hash", "")):
+            await db.users.update_one({"email": admin_email}, {"$set": {"password_hash": hash_password(admin_password)}})
+    else:
+        logger.warning("Admin seeding skipped: ADMIN_EMAIL and a >=12 char ADMIN_PASSWORD are required.")
     # backfill legacy credit model
     async for u in db.users.find({"extra_credits": {"$exists": False}}, {"_id": 0, "user_id": 1, "credits": 1}):
         await db.users.update_one({"user_id": u["user_id"]},
@@ -646,9 +655,10 @@ async def startup():
     asyncio.create_task(subscription_worker())
 
 app.include_router(api_router)
+_cors_origins = [o.strip() for o in os.environ.get("CORS_ORIGINS", "").split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=".*",
+    allow_origins=_cors_origins or ["http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

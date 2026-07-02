@@ -96,7 +96,7 @@ export default function TemplateView() {
             <pre className="w-full max-w-4xl bg-base border border-white/10 p-4 overflow-auto text-xs font-mono text-white/70">{tpl.html}</pre>
           ) : (
             <div className={`bg-white h-full ${view === "mobile" ? "w-[390px]" : "w-full max-w-6xl"} border border-white/10 transition-all duration-300`}>
-              <iframe data-testid="template-iframe" title="site" srcDoc={tpl.html} className="w-full h-full" />
+              <iframe data-testid="template-iframe" title="site" sandbox="allow-scripts" srcDoc={tpl.html} className="w-full h-full" />
             </div>
           )}
         </div>

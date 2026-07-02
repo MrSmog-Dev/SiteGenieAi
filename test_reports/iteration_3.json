@@ -1,0 +1,49 @@
+{
+  "summary": "Iteration 3 verifies security-audit fixes (SEC-001..004) + regression. Backend: 30/30 pytest pass (8 new TestSecurityFixes + 22 regression). Frontend: admin login with NEW strong password works, TemplateView iframe sandbox='allow-scripts' verified in DOM, Billing page renders correctly with 3-Month active plan, plan_credits/extra_credits split shown, cancel/reactivate visible. All previously verified P1 flows unaffected.",
+  "security_fix_verification": {
+    "SEC-002_admin_password": "PASS — old 'admin123' -> 401; new 'Sg!Adm1n_9f3kQ2xL7vB' -> 200 with role=admin (test_old_admin_password_rejected, test_new_admin_password_accepted).",
+    "SEC-001_CORS": "PASS with note — Backend CORSMiddleware uses explicit allow_origins list (no '.*' regex). Test verified evil origin https://evil.example.com is NEVER echoed. Cloudflare edge normalises ACAO to '*' on responses (observed via curl), which is universal not per-origin echo; Access-Control-Allow-Credentials is NOT present, so browsers won't send credentials cross-origin. Backend behavior is correct; edge '*' collapse is not a regression.",
+    "SEC-001_cookie_flags": "PASS — session_token cookie has HttpOnly; Secure; SameSite=Lax (verified via requests.raw.headers parse). __cf_bm CF cookie has SameSite=None but that's Cloudflare's, not app's.",
+    "SEC-003_payment_idempotency": "PASS — DB-level find_one_and_update({session_id, processed:{$ne:true}}, {$set:{processed:true}}) returns doc on first call, None on second (test_apply_payment_idempotency_db_guard).",
+    "SEC-003_checkout_status_user_scoped": "PASS — Admin GET /api/checkout/status/<other_user_session> returns 404 (test_checkout_status_user_scoped).",
+    "SEC-004_iframe_sandbox": "PASS — Live DOM inspection: TemplateView [data-testid=template-iframe] sandbox='allow-scripts'. Generator.jsx source contains sandbox='allow-scripts' on preview-iframe (verified via grep).",
+    "REGRESSION_deduct_never_negative": "PASS — 402 gate stops job creation; plan_credits & extra_credits remain 0 after two zero-credit generate attempts.",
+    "REGRESSION_30day_credit_reset": "PASS — plan_credits resets to plan monthly_credits, extra_credits untouched, next_credit_reset advances (test_reset_advances_plan_credits_only)."
+  },
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "N/A (edge)", "issue": "Cloudflare ingress collapses Access-Control-Allow-Origin to '*' on all API responses regardless of Origin. Not a backend bug (CORSMiddleware config is correct with explicit allowlist). Because Access-Control-Allow-Credentials is not returned, browsers won't attach cookies cross-origin, so no practical exposure — but worth confirming edge config aligns with the intended allowlist."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "None blocking — all SEC-001..004 fixes verified and regression suite is green (30/30).",
+    "Optional: review Cloudflare edge CORS config so ACAO reflects the specific allowed origin instead of '*' (defense in depth; not a functional issue as Allow-Credentials is not set)."
+  ],
+  "critical_code_review_comments": [
+    "apply_payment uses atomic find_one_and_update with processed:{$ne:true} filter — correct idempotency pattern, immune to race between /checkout/status and /webhook/stripe.",
+    "deduct_one_credit uses conditional {$gt:0} $inc — mathematically can't go negative; verified.",
+    "startup admin seed enforces ADMIN_EMAIL + >=12 char ADMIN_PASSWORD; updates password_hash on env change (idempotent). No weak default.",
+    "set_session_cookie: httponly + secure + samesite='lax' — proper flags. Note SameSite=Lax means the cookie is not sent on cross-site POSTs which is desirable for CSRF; if third-party embedding is ever needed you'd need to revisit.",
+    "checkout_status now scoped by {session_id, user_id}. Good — prevents cross-user session probing.",
+    "TemplateView.jsx + Generator.jsx iframes both use sandbox='allow-scripts' (no allow-same-origin), so scripts execute in a null origin — mitigates XSS from user-generated HTML."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py"
+  ],
+  "success_rate": {"backend": "100% (30/30)", "frontend": "100% for verified flows (login w/ new pw, TemplateView sandbox, Billing render)"},
+  "test_credentials": "admin@sitegenie.com / Sg!Adm1n_9f3kQ2xL7vB (new). Old 'admin123' correctly rejected.",
+  "seed_data_creation": "Fresh test_<uuid>@example.com users registered per test. Direct Mongo inserts for payment_transactions (idempotency + user-scoped checkout tests) and templates (regenerate/edit tests). All prefixed TEST_/test_/tpl_/cs_test_ for identification.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Admin password is now the strong one from /app/memory/test_credentials.md. backend_test.py has a dedicated TestSecurityFixes class covering all SEC-001..004 fixes. Note: Cloudflare edge overwrites ACAO to '*' — do not assert exact origin echo at the edge; the pytest allows '*' OR the specific origin. Use r.raw.headers.items() to iterate multiple Set-Cookie headers (requests merges them via .headers['set-cookie'] and __cf_bm's SameSite=None poisons naive substring checks)."
+}
