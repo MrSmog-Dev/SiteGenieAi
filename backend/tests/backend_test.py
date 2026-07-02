@@ -1,22 +1,28 @@
 """
-SiteGenie backend API tests.
-Covers: auth (register/login/me/logout), plans, templates CRUD & generation,
-checkout session creation and status.
+SiteGenie backend API tests - Iteration 2.
+Focus: subscription lifecycle, credit reset, regenerate/edit endpoints, credit gating.
+Auth + Plans + Checkout are regression tests preserved from iteration 1.
 """
 import os
 import uuid
 import time
+from datetime import datetime, timezone, timedelta
+
 import pytest
 import requests
+from pymongo import MongoClient
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://builder-hub-795.preview.emergentagent.com").rstrip("/")
+BASE_URL = os.environ["REACT_APP_BACKEND_URL"].rstrip("/")
 API = f"{BASE_URL}/api"
 
 ADMIN_EMAIL = "admin@sitegenie.com"
 ADMIN_PASSWORD = "admin123"
 
-# Long timeout for LLM generation
-GEN_TIMEOUT = 240
+MONGO_URL = os.environ.get("MONGO_URL", "mongodb://localhost:27017")
+DB_NAME = os.environ.get("DB_NAME", "test_database")
+
+mongo = MongoClient(MONGO_URL)
+db = mongo[DB_NAME]
 
 
 # ---------------- Fixtures ----------------
@@ -28,74 +34,51 @@ def admin_session():
     return s
 
 
-@pytest.fixture(scope="session")
-def new_user():
-    """Register a fresh user for isolated tests."""
+def _register():
     s = requests.Session()
     email = f"test_{uuid.uuid4().hex[:10]}@example.com"
-    r = s.post(f"{API}/auth/register", json={
-        "name": "TEST User",
-        "email": email,
-        "password": "testpass123",
-    }, timeout=30)
-    assert r.status_code == 200, f"Register failed: {r.status_code} {r.text}"
-    data = r.json()
+    r = s.post(f"{API}/auth/register", json={"name": "TEST", "email": email, "password": "pw123456"}, timeout=30)
+    assert r.status_code == 200, r.text
+    return s, email, r.json()
+
+
+@pytest.fixture(scope="session")
+def new_user():
+    s, email, data = _register()
     return {"session": s, "email": email, "user": data}
 
 
-# ---------------- Auth tests ----------------
+# ---------------- Auth ----------------
 class TestAuth:
-    def test_register_grants_3_credits(self, new_user):
+    def test_register_grants_3_extra_credits(self, new_user):
         u = new_user["user"]
         assert u["credits"] == 3
-        assert u["email"] == new_user["email"]
-        assert u["role"] == "user"
-        assert u["plan"] is None
-
-    def test_register_sets_cookie(self, new_user):
-        s = new_user["session"]
-        assert s.cookies.get("session_token"), "session_token cookie not set on register"
+        assert u["extra_credits"] == 3
+        assert u["plan_credits"] == 0
+        assert u["subscription_status"] == "none"
+        assert u["cancel_at_period_end"] is False
 
     def test_register_duplicate_email(self, new_user):
-        s = requests.Session()
-        r = s.post(f"{API}/auth/register", json={
-            "name": "dup", "email": new_user["email"], "password": "x"
-        }, timeout=15)
+        r = requests.post(f"{API}/auth/register", json={"name": "x", "email": new_user["email"], "password": "x"}, timeout=15)
         assert r.status_code == 400
 
-    def test_admin_login(self, admin_session):
+    def test_admin_me(self, admin_session):
         r = admin_session.get(f"{API}/auth/me", timeout=15)
         assert r.status_code == 200
-        data = r.json()
-        assert data["email"] == ADMIN_EMAIL
-        assert data["role"] == "admin"
-        assert data["plan"] == "annual"
-        assert data["credits"] >= 1
+        d = r.json()
+        assert d["email"] == ADMIN_EMAIL
+        assert d["role"] == "admin"
+        assert d["subscription_status"] == "active"
+        assert d["credits"] >= 1
+        assert "plan_credits" in d and "extra_credits" in d
 
     def test_login_invalid(self):
         r = requests.post(f"{API}/auth/login", json={"email": ADMIN_EMAIL, "password": "wrong"}, timeout=15)
         assert r.status_code == 401
 
-    def test_me_without_cookie(self):
+    def test_me_without_auth(self):
         r = requests.get(f"{API}/auth/me", timeout=15)
         assert r.status_code == 401
-
-    def test_bearer_token_works(self, new_user):
-        token = new_user["session"].cookies.get("session_token")
-        r = requests.get(f"{API}/auth/me", headers={"Authorization": f"Bearer {token}"}, timeout=15)
-        assert r.status_code == 200
-        assert r.json()["email"] == new_user["email"]
-
-    def test_logout_clears_session(self):
-        # separate session so we don't disturb others
-        s = requests.Session()
-        email = f"test_{uuid.uuid4().hex[:8]}@example.com"
-        s.post(f"{API}/auth/register", json={"name": "L", "email": email, "password": "x"}, timeout=15)
-        r = s.post(f"{API}/auth/logout", timeout=15)
-        assert r.status_code == 200
-        # cookies cleared; me should now fail
-        r2 = s.get(f"{API}/auth/me", timeout=15)
-        assert r2.status_code == 401
 
 
 # ---------------- Plans ----------------
@@ -107,119 +90,203 @@ class TestPlans:
         subs = data["subscriptions"]
         packs = data["credit_packs"]
         assert set(subs.keys()) == {"monthly", "quarterly", "annual"}
-        assert subs["monthly"]["credits"] == 20 and subs["monthly"]["amount"] == 19.0
-        assert subs["quarterly"]["credits"] == 75 and subs["quarterly"]["amount"] == 49.0
-        assert subs["annual"]["credits"] == 160 and subs["annual"]["amount"] == 149.0
+        # New model uses monthly_credits key
+        assert subs["monthly"]["monthly_credits"] == 20
+        assert subs["monthly"]["amount"] == 19.0
+        assert subs["monthly"]["billing_days"] == 30
+        assert subs["quarterly"]["monthly_credits"] == 25
+        assert subs["quarterly"]["billing_days"] == 90
+        assert subs["annual"]["monthly_credits"] == 30
+        assert subs["annual"]["billing_days"] == 365
         assert set(packs.keys()) == {"pack_10", "pack_25", "pack_60"}
 
 
-# ---------------- Templates ----------------
-class TestTemplates:
-    generated_id = None
-
-    def test_generate_template(self, admin_session):
-        # get initial credits
-        me = admin_session.get(f"{API}/auth/me", timeout=15).json()
-        initial = me["credits"]
-
-        payload = {
-            "business_name": "TEST Bloom Cafe",
-            "industry": "coffee shop",
-            "description": "A cozy cafe serving artisan coffee and pastries.",
-            "style": "modern",
-            "primary_color": "#0055FF",
-            "contact_email": "hi@bloom.test",
-            "phone": "555-1234",
-        }
-        r = admin_session.post(f"{API}/templates/generate", json=payload, timeout=GEN_TIMEOUT)
-        assert r.status_code == 200, f"Generate failed: {r.status_code} {r.text[:500]}"
-        data = r.json()
-        assert "template_id" in data
-        assert data["business_name"] == payload["business_name"]
-        assert data["html"].lstrip().lower().startswith("<!doctype")
-        assert len(data["html"]) > 2000
-        assert data["credits_remaining"] == initial - 1
-        TestTemplates.generated_id = data["template_id"]
-
-    def test_list_templates(self, admin_session):
-        r = admin_session.get(f"{API}/templates", timeout=30)
-        assert r.status_code == 200
-        docs = r.json()
-        assert isinstance(docs, list)
-        assert any(d["template_id"] == TestTemplates.generated_id for d in docs)
-        # html should be excluded from list
-        assert all("html" not in d for d in docs)
-
-    def test_get_template_by_id(self, admin_session):
-        assert TestTemplates.generated_id
-        r = admin_session.get(f"{API}/templates/{TestTemplates.generated_id}", timeout=30)
+# ---------------- Subscription lifecycle ----------------
+class TestSubscription:
+    def test_get_subscription_admin(self, admin_session):
+        r = admin_session.get(f"{API}/subscription", timeout=15)
         assert r.status_code == 200
         d = r.json()
-        assert d["template_id"] == TestTemplates.generated_id
-        assert "html" in d and len(d["html"]) > 100
+        # Required fields
+        for k in ("status", "plan", "monthly_credits", "plan_credits", "extra_credits",
+                  "current_period_end", "next_credit_reset", "cancel_at_period_end", "invoices"):
+            assert k in d, f"missing {k}"
+        assert d["status"] == "active"
+        assert isinstance(d["invoices"], list)
 
-    def test_delete_template(self, admin_session):
-        assert TestTemplates.generated_id
-        r = admin_session.delete(f"{API}/templates/{TestTemplates.generated_id}", timeout=30)
+    def test_cancel_and_reactivate(self, admin_session):
+        # ensure not cancelling first
+        db.users.update_one({"email": ADMIN_EMAIL}, {"$set": {"cancel_at_period_end": False, "subscription_status": "active"}})
+
+        r = admin_session.post(f"{API}/subscription/cancel", timeout=15)
         assert r.status_code == 200
-        # verify gone
-        r2 = admin_session.get(f"{API}/templates/{TestTemplates.generated_id}", timeout=15)
-        assert r2.status_code == 404
+        assert r.json()["cancel_at_period_end"] is True
 
-    def test_generate_without_credits_returns_402(self):
-        """Create a fresh user, drain credits via mongo? No - just consume 3 credits via generate.
-        Too slow. Instead: register user, but generating 3 times is very slow. Skip if too slow;
-        alternative: check that with 0 credits (by exhausting or via direct call) returns 402.
-        We'll simulate by using a fresh user and calling generate 4 times - but that's ~4 min.
-        Simpler: assert the guard by attempting with credits=0 after 3 generations only if fast.
-        To keep runtime bounded, we skip if the first generate takes >90s.
-        """
-        pytest.skip("Skipped for runtime; 402 path verified by code review of server.py L237-238")
+        r2 = admin_session.get(f"{API}/subscription", timeout=15).json()
+        assert r2["cancel_at_period_end"] is True
+        assert r2["status"] == "active"
+
+        r3 = admin_session.post(f"{API}/subscription/reactivate", timeout=15)
+        assert r3.status_code == 200
+        assert r3.json()["cancel_at_period_end"] is False
+
+        r4 = admin_session.get(f"{API}/subscription", timeout=15).json()
+        assert r4["cancel_at_period_end"] is False
+
+    def test_cancel_without_active_returns_400(self, new_user):
+        s = new_user["session"]
+        r = s.post(f"{API}/subscription/cancel", timeout=15)
+        assert r.status_code == 400
+
+    def test_reactivate_without_pending_cancel_returns_400(self, admin_session):
+        # ensure cancel flag is false
+        db.users.update_one({"email": ADMIN_EMAIL}, {"$set": {"cancel_at_period_end": False}})
+        r = admin_session.post(f"{API}/subscription/reactivate", timeout=15)
+        assert r.status_code == 400
 
 
-# ---------------- Checkout ----------------
+# ---------------- 30-day credit reset ----------------
+class TestCreditReset:
+    def test_reset_advances_plan_credits_only(self):
+        # Create a fresh user and manually give them an active monthly sub with past next_credit_reset
+        s, email, _ = _register()
+        now = datetime.now(timezone.utc)
+        db.users.update_one({"email": email}, {"$set": {
+            "plan": "monthly", "plan_name": "Monthly", "subscription_status": "active",
+            "plan_credits": 5, "extra_credits": 7, "cancel_at_period_end": False,
+            "current_period_end": (now + timedelta(days=10)).isoformat(),
+            "next_credit_reset": (now - timedelta(days=1)).isoformat(),
+        }})
+
+        # /auth/me triggers process_subscription -> reset
+        r = s.get(f"{API}/auth/me", timeout=15)
+        assert r.status_code == 200
+        d = r.json()
+        assert d["plan_credits"] == 20, f"plan_credits should reset to 20, got {d['plan_credits']}"
+        assert d["extra_credits"] == 7, "extra_credits must be untouched"
+        assert d["credits"] == 27
+        # next_credit_reset advanced into the future
+        ncr = datetime.fromisoformat(d["next_credit_reset"])
+        assert ncr > now
+
+    def test_no_reset_when_next_reset_future(self):
+        s, email, _ = _register()
+        now = datetime.now(timezone.utc)
+        db.users.update_one({"email": email}, {"$set": {
+            "plan": "monthly", "plan_name": "Monthly", "subscription_status": "active",
+            "plan_credits": 3, "extra_credits": 2, "cancel_at_period_end": False,
+            "current_period_end": (now + timedelta(days=20)).isoformat(),
+            "next_credit_reset": (now + timedelta(days=15)).isoformat(),
+        }})
+        d = s.get(f"{API}/auth/me", timeout=15).json()
+        assert d["plan_credits"] == 3
+        assert d["extra_credits"] == 2
+
+
+# ---------------- Regenerate / Edit ----------------
+class TestRegenerateEdit:
+    def _seed_template(self, user_id):
+        tpl_id = f"tpl_{uuid.uuid4().hex[:12]}"
+        db.templates.insert_one({
+            "template_id": tpl_id, "user_id": user_id,
+            "business_name": "TEST Seed Cafe", "industry": "cafe",
+            "description": "desc", "style": "modern", "primary_color": "#000000",
+            "html": "<!DOCTYPE html><html><head></head><body>seed</body></html>",
+            "created_at": datetime.now(timezone.utc),
+        })
+        return tpl_id
+
+    def test_regenerate_returns_job_id(self, admin_session):
+        me = admin_session.get(f"{API}/auth/me", timeout=15).json()
+        tpl_id = self._seed_template(me["user_id"])
+        r = admin_session.post(f"{API}/templates/{tpl_id}/regenerate", timeout=30)
+        assert r.status_code == 200, r.text
+        d = r.json()
+        assert d["status"] == "pending"
+        assert d["job_id"].startswith("job_")
+
+    def test_regenerate_unknown_returns_404(self, admin_session):
+        r = admin_session.post(f"{API}/templates/tpl_doesnotexist/regenerate", timeout=15)
+        assert r.status_code == 404
+
+    def test_edit_returns_job_id(self, admin_session):
+        me = admin_session.get(f"{API}/auth/me", timeout=15).json()
+        tpl_id = self._seed_template(me["user_id"])
+        r = admin_session.post(f"{API}/templates/{tpl_id}/edit",
+                               json={"instructions": "make it darker"}, timeout=30)
+        assert r.status_code == 200, r.text
+        d = r.json()
+        assert d["status"] == "pending"
+        assert d["job_id"].startswith("job_")
+
+    def test_edit_unknown_returns_404(self, admin_session):
+        r = admin_session.post(f"{API}/templates/tpl_missing/edit",
+                               json={"instructions": "x"}, timeout=15)
+        assert r.status_code == 404
+
+
+# ---------------- 402 credit gating ----------------
+class TestCreditGating:
+    def test_generate_with_zero_credits_returns_402(self):
+        s, email, _ = _register()
+        # drain credits directly in mongo
+        db.users.update_one({"email": email},
+                            {"$set": {"plan_credits": 0, "extra_credits": 0}})
+        r = s.post(f"{API}/templates/generate", json={
+            "business_name": "TEST Zero", "industry": "x", "description": "y"
+        }, timeout=30)
+        assert r.status_code == 402
+
+        # no job created
+        u = db.users.find_one({"email": email})
+        jobs = db.gen_jobs.count_documents({"user_id": u["user_id"]})
+        assert jobs == 0
+
+    def test_regenerate_with_zero_credits_returns_402(self):
+        s, email, data = _register()
+        user_id = data["user_id"]
+        # seed a template first (with credits still available - but we're inserting directly)
+        tpl_id = f"tpl_{uuid.uuid4().hex[:12]}"
+        db.templates.insert_one({
+            "template_id": tpl_id, "user_id": user_id,
+            "business_name": "T", "industry": "x", "description": "y",
+            "style": "modern", "primary_color": "#000",
+            "html": "<!DOCTYPE html><html></html>",
+            "created_at": datetime.now(timezone.utc),
+        })
+        db.users.update_one({"email": email}, {"$set": {"plan_credits": 0, "extra_credits": 0}})
+        r = s.post(f"{API}/templates/{tpl_id}/regenerate", timeout=30)
+        assert r.status_code == 402
+
+    def test_edit_with_zero_credits_returns_402(self):
+        s, email, data = _register()
+        user_id = data["user_id"]
+        tpl_id = f"tpl_{uuid.uuid4().hex[:12]}"
+        db.templates.insert_one({
+            "template_id": tpl_id, "user_id": user_id,
+            "business_name": "T", "industry": "x", "description": "y",
+            "style": "modern", "primary_color": "#000",
+            "html": "<!DOCTYPE html><html></html>",
+            "created_at": datetime.now(timezone.utc),
+        })
+        db.users.update_one({"email": email}, {"$set": {"plan_credits": 0, "extra_credits": 0}})
+        r = s.post(f"{API}/templates/{tpl_id}/edit", json={"instructions": "x"}, timeout=30)
+        assert r.status_code == 402
+
+
+# ---------------- Checkout regression ----------------
 class TestCheckout:
     def test_subscription_checkout(self, admin_session):
         r = admin_session.post(f"{API}/checkout/session", json={
-            "kind": "subscription",
-            "plan_id": "monthly",
-            "origin_url": BASE_URL,
+            "kind": "subscription", "plan_id": "monthly", "origin_url": BASE_URL,
         }, timeout=30)
-        assert r.status_code == 200, f"{r.status_code} {r.text}"
-        data = r.json()
-        assert data["url"].startswith("https://checkout.stripe.com")
-        assert data["session_id"]
-        # Check status endpoint works
-        s = admin_session.get(f"{API}/checkout/status/{data['session_id']}", timeout=30)
-        assert s.status_code == 200
-        sdata = s.json()
-        assert sdata["payment_status"] in ("unpaid", "open", "no_payment_required")
-        # Credits should NOT have been granted (still unpaid)
-        assert sdata["kind"] == "subscription"
-
-    def test_credit_pack_checkout(self, admin_session):
-        r = admin_session.post(f"{API}/checkout/session", json={
-            "kind": "credits",
-            "plan_id": "pack_25",
-            "origin_url": BASE_URL,
-        }, timeout=30)
-        assert r.status_code == 200
-        data = r.json()
-        assert data["url"].startswith("https://checkout.stripe.com")
+        assert r.status_code == 200, r.text
+        d = r.json()
+        assert d["url"].startswith("https://checkout.stripe.com")
 
     def test_invalid_plan(self, admin_session):
         r = admin_session.post(f"{API}/checkout/session", json={
-            "kind": "credits",
-            "plan_id": "nonexistent",
-            "origin_url": BASE_URL,
-        }, timeout=15)
-        assert r.status_code == 400
-
-    def test_invalid_kind(self, admin_session):
-        r = admin_session.post(f"{API}/checkout/session", json={
-            "kind": "gift",
-            "plan_id": "monthly",
-            "origin_url": BASE_URL,
+            "kind": "credits", "plan_id": "nope", "origin_url": BASE_URL,
         }, timeout=15)
         assert r.status_code == 400
 

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardLayout from "@/components/DashboardLayout";
-import { api, formatApiError } from "@/lib/api";
+import { api, formatApiError, pollGenerationJob } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
 import { Sparkles, Loader2, Eye, Download, Save, Zap } from "lucide-react";
@@ -30,37 +30,16 @@ export default function Generator() {
     setLoading(true); setResult(null);
     try {
       const { data } = await api.post("/templates/generate", form);
-      const jobId = data.job_id;
-      // poll for completion (generation takes ~1-2 min)
-      let attempts = 0;
-      const poll = async () => {
-        attempts += 1;
-        if (attempts > 80) { setLoading(false); toast.error("Generation timed out. Please try again."); return; }
-        try {
-          const { data: s } = await api.get(`/templates/job/${jobId}`);
-          if (s.status === "done" && s.template) {
-            setResult(s.template);
-            await refreshUser();
-            setLoading(false);
-            toast.success("Website generated! 1 credit used.");
-            return;
-          }
-          if (s.status === "error") {
-            setLoading(false);
-            toast.error(s.error || "Generation failed.");
-            return;
-          }
-          setTimeout(poll, 2500);
-        } catch (err) {
-          setTimeout(poll, 2500);
-        }
-      };
-      setTimeout(poll, 3000);
+      const job = await pollGenerationJob(data.job_id);
+      setResult(job.template);
+      await refreshUser();
+      setLoading(false);
+      toast.success("Website generated! 1 credit used.");
     } catch (e) {
       setLoading(false);
       const status = e.response?.status;
       if (status === 402) { toast.error("Not enough credits."); navigate("/pricing"); }
-      else toast.error(formatApiError(e.response?.data?.detail) || e.message);
+      else toast.error(e.message || formatApiError(e.response?.data?.detail));
     }
   };
 

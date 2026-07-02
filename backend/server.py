@@ -40,10 +40,11 @@ logger = logging.getLogger("sitegenie")
 
 # ---------------- Business config ----------------
 SUBSCRIPTION_PLANS = {
-    "monthly":   {"name": "Monthly",  "amount": 19.00,  "credits": 20,  "days": 30,  "interval": "month"},
-    "quarterly": {"name": "3-Month",  "amount": 49.00,  "credits": 75,  "days": 90,  "interval": "quarter"},
-    "annual":    {"name": "Annual",   "amount": 149.00, "credits": 160, "days": 365, "interval": "year"},
+    "monthly":   {"name": "Monthly",  "amount": 19.00,  "monthly_credits": 20, "billing_days": 30,  "interval": "month"},
+    "quarterly": {"name": "3-Month",  "amount": 49.00,  "monthly_credits": 25, "billing_days": 90,  "interval": "quarter"},
+    "annual":    {"name": "Annual",   "amount": 149.00, "monthly_credits": 30, "billing_days": 365, "interval": "year"},
 }
+CREDIT_RESET_DAYS = 30
 CREDIT_PACKS = {
     "pack_10": {"name": "Starter Pack", "amount": 9.00,  "credits": 10},
     "pack_25": {"name": "Growth Pack",  "amount": 19.00, "credits": 25},
@@ -78,6 +79,9 @@ class CheckoutInput(BaseModel):
     plan_id: str       # key in SUBSCRIPTION_PLANS or CREDIT_PACKS
     origin_url: str
 
+class EditInput(BaseModel):
+    instructions: str
+
 # ---------------- Auth helpers ----------------
 def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
@@ -88,17 +92,91 @@ def verify_password(plain: str, hashed: str) -> bool:
     except Exception:
         return False
 
+def parse_dt(v):
+    if not v:
+        return None
+    if isinstance(v, datetime):
+        return v if v.tzinfo else v.replace(tzinfo=timezone.utc)
+    dt = datetime.fromisoformat(v)
+    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+def total_credits(u: dict) -> int:
+    return int(u.get("plan_credits", 0)) + int(u.get("extra_credits", 0))
+
+async def deduct_one_credit(user_id: str):
+    u = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if int(u.get("plan_credits", 0)) > 0:
+        await db.users.update_one({"user_id": user_id}, {"$inc": {"plan_credits": -1}})
+    else:
+        await db.users.update_one({"user_id": user_id}, {"$inc": {"extra_credits": -1}})
+
+async def process_subscription(user: dict) -> dict:
+    """Lazy subscription lifecycle: migrate legacy credits, apply 30-day credit resets,
+    handle billing-period renewal (simulated) and cancellation."""
+    changed = {}
+    if "plan_credits" not in user or "extra_credits" not in user:
+        legacy = int(user.get("credits", 0))
+        user["extra_credits"] = int(user.get("extra_credits", legacy))
+        user["plan_credits"] = int(user.get("plan_credits", 0))
+        changed["extra_credits"] = user["extra_credits"]
+        changed["plan_credits"] = user["plan_credits"]
+
+    if user.get("subscription_status") == "active":
+        now = datetime.now(timezone.utc)
+        plan = SUBSCRIPTION_PLANS.get(user.get("plan"))
+        cpe = parse_dt(user.get("current_period_end"))
+        # billing period end -> renew or cancel
+        while plan and cpe and now >= cpe:
+            if user.get("cancel_at_period_end"):
+                user["subscription_status"] = "cancelled"
+                user["plan"] = None
+                user["plan_name"] = None
+                user["plan_credits"] = 0
+                changed.update(subscription_status="cancelled", plan=None, plan_name=None, plan_credits=0)
+                cpe = None
+                break
+            cpe = cpe + timedelta(days=plan["billing_days"])
+            user["current_period_end"] = cpe.isoformat()
+            changed["current_period_end"] = user["current_period_end"]
+            await db.payment_transactions.insert_one({
+                "session_id": f"renewal_{uuid.uuid4().hex[:12]}", "user_id": user["user_id"],
+                "amount": plan["amount"], "currency": "usd", "kind": "renewal",
+                "plan_id": user.get("plan"), "credits": plan["monthly_credits"],
+                "payment_status": "paid", "status": "complete", "processed": True,
+                "created_at": datetime.now(timezone.utc),
+            })
+        # 30-day credit resets
+        if user.get("subscription_status") == "active" and plan:
+            ncr = parse_dt(user.get("next_credit_reset"))
+            while ncr and now >= ncr:
+                user["plan_credits"] = plan["monthly_credits"]
+                ncr = ncr + timedelta(days=CREDIT_RESET_DAYS)
+                user["next_credit_reset"] = ncr.isoformat()
+                changed["plan_credits"] = user["plan_credits"]
+                changed["next_credit_reset"] = user["next_credit_reset"]
+
+    if changed:
+        await db.users.update_one({"user_id": user["user_id"]}, {"$set": changed})
+    return user
+
 def public_user(u: dict) -> dict:
+    plan = SUBSCRIPTION_PLANS.get(u.get("plan"))
     return {
         "user_id": u["user_id"],
         "email": u["email"],
         "name": u.get("name", ""),
         "picture": u.get("picture", ""),
         "role": u.get("role", "user"),
-        "credits": u.get("credits", 0),
+        "credits": total_credits(u),
+        "plan_credits": int(u.get("plan_credits", 0)),
+        "extra_credits": int(u.get("extra_credits", 0)),
         "plan": u.get("plan"),
         "plan_name": u.get("plan_name"),
-        "plan_expires_at": u.get("plan_expires_at"),
+        "monthly_credits": plan["monthly_credits"] if plan else None,
+        "subscription_status": u.get("subscription_status", "none"),
+        "current_period_end": u.get("current_period_end"),
+        "next_credit_reset": u.get("next_credit_reset"),
+        "cancel_at_period_end": bool(u.get("cancel_at_period_end", False)),
     }
 
 async def create_session(user_id: str) -> str:
@@ -136,6 +214,7 @@ async def get_current_user(request: Request) -> dict:
     user = await db.users.find_one({"user_id": session["user_id"]}, {"_id": 0})
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
+    user = await process_subscription(user)
     return user
 
 # ---------------- Auth endpoints ----------------
@@ -148,8 +227,10 @@ async def register(input: RegisterInput, response: Response):
     doc = {
         "user_id": user_id, "email": email, "name": input.name,
         "password_hash": hash_password(input.password), "picture": "",
-        "role": "user", "credits": 3, "plan": None, "plan_name": None,
-        "plan_expires_at": None, "created_at": datetime.now(timezone.utc),
+        "role": "user", "plan_credits": 0, "extra_credits": 3,
+        "plan": None, "plan_name": None, "subscription_status": "none",
+        "current_period_end": None, "next_credit_reset": None, "cancel_at_period_end": False,
+        "created_at": datetime.now(timezone.utc),
     }
     await db.users.insert_one(doc)
     token = await create_session(user_id)
@@ -164,6 +245,7 @@ async def login(input: LoginInput, response: Response):
         raise HTTPException(status_code=401, detail="Invalid email or password")
     token = await create_session(user["user_id"])
     set_session_cookie(response, token)
+    user = await process_subscription(user)
     return public_user(user)
 
 @api_router.post("/auth/google-session")
@@ -182,8 +264,10 @@ async def google_session(input: GoogleSessionInput, response: Response):
         user_id = f"user_{uuid.uuid4().hex[:12]}"
         user = {
             "user_id": user_id, "email": email, "name": data.get("name", ""),
-            "picture": data.get("picture", ""), "role": "user", "credits": 3,
-            "plan": None, "plan_name": None, "plan_expires_at": None,
+            "picture": data.get("picture", ""), "role": "user",
+            "plan_credits": 0, "extra_credits": 3,
+            "plan": None, "plan_name": None, "subscription_status": "none",
+            "current_period_end": None, "next_credit_reset": None, "cancel_at_period_end": False,
             "created_at": datetime.now(timezone.utc),
         }
         await db.users.insert_one(user)
@@ -191,6 +275,8 @@ async def google_session(input: GoogleSessionInput, response: Response):
         await db.users.update_one({"email": email}, {"$set": {"picture": data.get("picture", user.get("picture", ""))}})
     token = await create_session(user["user_id"])
     set_session_cookie(response, token)
+    user = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0})
+    user = await process_subscription(user)
     return public_user(user)
 
 @api_router.get("/auth/me")
@@ -234,59 +320,100 @@ def clean_html(text: str) -> str:
 
 import asyncio
 
-async def _run_generation(job_id: str, user_id: str, input: "GenerateInput"):
-    prompt = (
-        f"Business name: {input.business_name}\n"
-        f"Industry / type: {input.industry}\n"
-        f"Description: {input.description}\n"
-        f"Design style: {input.style}\n"
-        f"Primary brand color: {input.primary_color}\n"
-        f"Contact email: {input.contact_email}\n"
-        f"Phone: {input.phone}\n"
+def _build_prompt(fields: dict) -> str:
+    return (
+        f"Business name: {fields.get('business_name','')}\n"
+        f"Industry / type: {fields.get('industry','')}\n"
+        f"Description: {fields.get('description','')}\n"
+        f"Design style: {fields.get('style','modern')}\n"
+        f"Primary brand color: {fields.get('primary_color','#0055FF')}\n"
+        f"Contact email: {fields.get('contact_email','')}\n"
+        f"Phone: {fields.get('phone','')}\n"
         "Generate the complete website now."
     )
+
+async def _call_llm(prompt: str) -> str:
     chat = LlmChat(
         api_key=EMERGENT_LLM_KEY,
         session_id=f"gen_{uuid.uuid4().hex}",
         system_message=GEN_SYSTEM,
     ).with_model("anthropic", "claude-sonnet-4-6")
+    result = await chat.send_message(UserMessage(text=prompt))
+    return clean_html(result if isinstance(result, str) else str(result))
+
+async def _fail_job(job_id: str, e: Exception):
+    logger.exception("generation failed")
+    msg = str(e).lower()
+    if "budget" in msg or "quota" in msg or "insufficient" in msg:
+        err = "AI service is temporarily unavailable. Please try again shortly."
+    else:
+        err = "Generation failed. Please try again."
+    await db.gen_jobs.update_one({"job_id": job_id}, {"$set": {"status": "error", "error": err}})
+
+async def _run_generation(job_id: str, user_id: str, fields: dict, mode: str = "new", template_id: str = None):
     try:
-        result = await chat.send_message(UserMessage(text=prompt))
-    except Exception as e:
-        logger.exception("generation failed")
-        msg = str(e).lower()
-        if "budget" in msg or "quota" in msg or "insufficient" in msg:
-            err = "AI service is temporarily unavailable. Please try again shortly."
+        if mode == "edit":
+            existing = await db.templates.find_one({"template_id": template_id, "user_id": user_id}, {"_id": 0})
+            prompt = (
+                "Here is an existing complete HTML website document. Apply the requested changes and "
+                "return the FULL updated HTML document only (starting with <!DOCTYPE html>, no commentary).\n\n"
+                f"REQUESTED CHANGES:\n{fields.get('instructions','')}\n\n"
+                f"CURRENT HTML:\n{existing.get('html','')}"
+            )
         else:
-            err = "Generation failed. Please try again."
-        await db.gen_jobs.update_one({"job_id": job_id}, {"$set": {"status": "error", "error": err}})
+            prompt = _build_prompt(fields)
+        html = await _call_llm(prompt)
+    except Exception as e:
+        await _fail_job(job_id, e)
         return
 
-    html = clean_html(result if isinstance(result, str) else str(result))
-    template_id = f"tpl_{uuid.uuid4().hex[:12]}"
-    doc = {
-        "template_id": template_id, "user_id": user_id,
-        "business_name": input.business_name, "industry": input.industry,
-        "description": input.description, "style": input.style,
-        "primary_color": input.primary_color, "html": html,
-        "created_at": datetime.now(timezone.utc),
-    }
-    await db.templates.insert_one(doc)
-    await db.users.update_one({"user_id": user_id}, {"$inc": {"credits": -CREDIT_COST_PER_TEMPLATE}})
+    if mode == "new":
+        template_id = f"tpl_{uuid.uuid4().hex[:12]}"
+        await db.templates.insert_one({
+            "template_id": template_id, "user_id": user_id,
+            "business_name": fields.get("business_name"), "industry": fields.get("industry"),
+            "description": fields.get("description"), "style": fields.get("style"),
+            "primary_color": fields.get("primary_color"), "html": html,
+            "created_at": datetime.now(timezone.utc),
+        })
+    else:
+        await db.templates.update_one(
+            {"template_id": template_id, "user_id": user_id},
+            {"$set": {"html": html, "updated_at": datetime.now(timezone.utc)}},
+        )
+    await deduct_one_credit(user_id)
     await db.gen_jobs.update_one({"job_id": job_id},
                                  {"$set": {"status": "done", "template_id": template_id}})
 
-@api_router.post("/templates/generate")
-async def generate_template(input: GenerateInput, user: dict = Depends(get_current_user)):
-    if user.get("credits", 0) < CREDIT_COST_PER_TEMPLATE:
+async def _start_job(user: dict, fields: dict, mode: str = "new", template_id: str = None):
+    if total_credits(user) < CREDIT_COST_PER_TEMPLATE:
         raise HTTPException(status_code=402, detail="Not enough credits. Please purchase more.")
     job_id = f"job_{uuid.uuid4().hex[:12]}"
     await db.gen_jobs.insert_one({
         "job_id": job_id, "user_id": user["user_id"], "status": "pending",
-        "template_id": None, "error": None, "created_at": datetime.now(timezone.utc),
+        "template_id": template_id, "error": None, "created_at": datetime.now(timezone.utc),
     })
-    asyncio.create_task(_run_generation(job_id, user["user_id"], input))
+    asyncio.create_task(_run_generation(job_id, user["user_id"], fields, mode, template_id))
     return {"job_id": job_id, "status": "pending"}
+
+@api_router.post("/templates/generate")
+async def generate_template(input: GenerateInput, user: dict = Depends(get_current_user)):
+    return await _start_job(user, input.model_dump(), mode="new")
+
+@api_router.post("/templates/{template_id}/regenerate")
+async def regenerate_template(template_id: str, user: dict = Depends(get_current_user)):
+    tpl = await db.templates.find_one({"template_id": template_id, "user_id": user["user_id"]}, {"_id": 0})
+    if not tpl:
+        raise HTTPException(status_code=404, detail="Template not found")
+    fields = {k: tpl.get(k) for k in ("business_name", "industry", "description", "style", "primary_color")}
+    return await _start_job(user, fields, mode="regenerate", template_id=template_id)
+
+@api_router.post("/templates/{template_id}/edit")
+async def edit_template(template_id: str, input: EditInput, user: dict = Depends(get_current_user)):
+    tpl = await db.templates.find_one({"template_id": template_id, "user_id": user["user_id"]}, {"_id": 0})
+    if not tpl:
+        raise HTTPException(status_code=404, detail="Template not found")
+    return await _start_job(user, {"instructions": input.instructions}, mode="edit", template_id=template_id)
 
 @api_router.get("/templates/job/{job_id}")
 async def generation_status(job_id: str, user: dict = Depends(get_current_user)):
@@ -303,7 +430,7 @@ async def generation_status(job_id: str, user: dict = Depends(get_current_user))
                 "industry": tpl["industry"], "primary_color": tpl["primary_color"],
                 "html": tpl["html"],
             }
-            resp["credits_remaining"] = updated.get("credits", 0)
+            resp["credits_remaining"] = total_credits(updated)
     return resp
 
 @api_router.get("/templates")
@@ -346,12 +473,13 @@ async def create_checkout(input: CheckoutInput, request: Request, user: dict = D
         raise HTTPException(status_code=400, detail="Invalid plan")
 
     amount = float(pkg["amount"])
+    pkg_credits = int(pkg["monthly_credits"]) if input.kind == "subscription" else int(pkg["credits"])
     origin = input.origin_url.rstrip("/")
     success_url = f"{origin}/payment-return?session_id={{CHECKOUT_SESSION_ID}}"
     cancel_url = f"{origin}/pricing"
     metadata = {
         "user_id": user["user_id"], "kind": input.kind, "plan_id": input.plan_id,
-        "credits": str(pkg["credits"]),
+        "credits": str(pkg_credits),
     }
     stripe = get_stripe(request)
     req = CheckoutSessionRequest(amount=amount, currency="usd",
@@ -361,7 +489,7 @@ async def create_checkout(input: CheckoutInput, request: Request, user: dict = D
     await db.payment_transactions.insert_one({
         "session_id": session.session_id, "user_id": user["user_id"],
         "amount": amount, "currency": "usd", "kind": input.kind,
-        "plan_id": input.plan_id, "credits": pkg["credits"],
+        "plan_id": input.plan_id, "credits": pkg_credits,
         "payment_status": "initiated", "status": "open", "processed": False,
         "metadata": metadata, "created_at": datetime.now(timezone.utc),
     })
@@ -372,16 +500,26 @@ async def apply_payment(txn: dict):
     if txn.get("processed"):
         return
     user_id = txn["user_id"]
-    credits = int(txn.get("credits", 0))
-    update = {"$inc": {"credits": credits}}
-    if txn["kind"] == "subscription":
+    if txn["kind"] == "credits":
+        await db.users.update_one({"user_id": user_id}, {"$inc": {"extra_credits": int(txn.get("credits", 0))}})
+    elif txn["kind"] == "subscription":
         plan = SUBSCRIPTION_PLANS.get(txn["plan_id"])
         if plan:
-            update["$set"] = {
+            now = datetime.now(timezone.utc)
+            await db.users.update_one({"user_id": user_id}, {"$set": {
                 "plan": txn["plan_id"], "plan_name": plan["name"],
-                "plan_expires_at": (datetime.now(timezone.utc) + timedelta(days=plan["days"])).isoformat(),
-            }
-    await db.users.update_one({"user_id": user_id}, update)
+                "subscription_status": "active", "cancel_at_period_end": False,
+                "plan_credits": plan["monthly_credits"],
+                "current_period_end": (now + timedelta(days=plan["billing_days"])).isoformat(),
+                "next_credit_reset": (now + timedelta(days=CREDIT_RESET_DAYS)).isoformat(),
+                "subscription_started_at": now.isoformat(),
+            }})
+            await db.subscriptions.update_one(
+                {"user_id": user_id},
+                {"$set": {"user_id": user_id, "plan": txn["plan_id"], "status": "active",
+                          "started_at": now.isoformat()}},
+                upsert=True,
+            )
     await db.payment_transactions.update_one({"session_id": txn["session_id"]}, {"$set": {"processed": True}})
 
 @api_router.get("/checkout/status/{session_id}")
@@ -419,6 +557,58 @@ async def stripe_webhook(request: Request):
             await apply_payment(txn)
     return {"received": True}
 
+# ---------------- Subscription management ----------------
+@api_router.get("/subscription")
+async def get_subscription(user: dict = Depends(get_current_user)):
+    plan = SUBSCRIPTION_PLANS.get(user.get("plan"))
+    txns = await db.payment_transactions.find(
+        {"user_id": user["user_id"], "payment_status": "paid"}, {"_id": 0}
+    ).sort("created_at", -1).to_list(50)
+    for t in txns:
+        if isinstance(t.get("created_at"), datetime):
+            t["created_at"] = t["created_at"].isoformat()
+    return {
+        "status": user.get("subscription_status", "none"),
+        "plan": user.get("plan"),
+        "plan_name": user.get("plan_name"),
+        "amount": plan["amount"] if plan else None,
+        "billing_days": plan["billing_days"] if plan else None,
+        "monthly_credits": plan["monthly_credits"] if plan else None,
+        "plan_credits": int(user.get("plan_credits", 0)),
+        "extra_credits": int(user.get("extra_credits", 0)),
+        "current_period_end": user.get("current_period_end"),
+        "next_credit_reset": user.get("next_credit_reset"),
+        "cancel_at_period_end": bool(user.get("cancel_at_period_end", False)),
+        "invoices": txns,
+    }
+
+@api_router.post("/subscription/cancel")
+async def cancel_subscription(user: dict = Depends(get_current_user)):
+    if user.get("subscription_status") != "active":
+        raise HTTPException(status_code=400, detail="No active subscription")
+    await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"cancel_at_period_end": True}})
+    await db.subscriptions.update_one({"user_id": user["user_id"]}, {"$set": {"cancel_at_period_end": True}})
+    return {"success": True, "cancel_at_period_end": True}
+
+@api_router.post("/subscription/reactivate")
+async def reactivate_subscription(user: dict = Depends(get_current_user)):
+    if user.get("subscription_status") != "active" or not user.get("cancel_at_period_end"):
+        raise HTTPException(status_code=400, detail="Nothing to reactivate")
+    await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"cancel_at_period_end": False}})
+    await db.subscriptions.update_one({"user_id": user["user_id"]}, {"$set": {"cancel_at_period_end": False}})
+    return {"success": True, "cancel_at_period_end": False}
+
+async def subscription_worker():
+    """Periodically process active subscriptions for credit resets and renewals."""
+    while True:
+        try:
+            cursor = db.users.find({"subscription_status": "active"}, {"_id": 0})
+            async for u in cursor:
+                await process_subscription(u)
+        except Exception:
+            logger.exception("subscription_worker error")
+        await asyncio.sleep(3600)
+
 # ---------------- startup ----------------
 @api_router.get("/")
 async def root():
@@ -430,20 +620,30 @@ async def startup():
     await db.users.create_index("user_id", unique=True)
     await db.user_sessions.create_index("session_token")
     await db.templates.create_index("user_id")
+    await db.gen_jobs.create_index("job_id")
     # seed admin
     admin_email = os.environ.get("ADMIN_EMAIL", "admin@sitegenie.com").lower()
     admin_password = os.environ.get("ADMIN_PASSWORD", "admin123")
+    now = datetime.now(timezone.utc)
     existing = await db.users.find_one({"email": admin_email})
     if not existing:
         await db.users.insert_one({
             "user_id": f"user_{uuid.uuid4().hex[:12]}", "email": admin_email,
             "name": "Admin", "password_hash": hash_password(admin_password), "picture": "",
-            "role": "admin", "credits": 100, "plan": "annual", "plan_name": "Annual",
-            "plan_expires_at": (datetime.now(timezone.utc) + timedelta(days=365)).isoformat(),
-            "created_at": datetime.now(timezone.utc),
+            "role": "admin", "plan_credits": 30, "extra_credits": 100,
+            "plan": "annual", "plan_name": "Annual", "subscription_status": "active",
+            "cancel_at_period_end": False,
+            "current_period_end": (now + timedelta(days=365)).isoformat(),
+            "next_credit_reset": (now + timedelta(days=CREDIT_RESET_DAYS)).isoformat(),
+            "created_at": now,
         })
     elif not verify_password(admin_password, existing.get("password_hash", "")):
         await db.users.update_one({"email": admin_email}, {"$set": {"password_hash": hash_password(admin_password)}})
+    # backfill legacy credit model
+    async for u in db.users.find({"extra_credits": {"$exists": False}}, {"_id": 0, "user_id": 1, "credits": 1}):
+        await db.users.update_one({"user_id": u["user_id"]},
+                                  {"$set": {"extra_credits": int(u.get("credits", 0)), "plan_credits": 0}})
+    asyncio.create_task(subscription_worker())
 
 app.include_router(api_router)
 app.add_middleware(

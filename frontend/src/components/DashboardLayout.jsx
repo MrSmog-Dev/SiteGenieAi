@@ -6,7 +6,7 @@ const nav = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/generate", label: "Generate", icon: Sparkles },
   { to: "/templates", label: "My Templates", icon: LayoutTemplate },
-  { to: "/pricing", label: "Billing & Credits", icon: CreditCard },
+  { to: "/billing", label: "Billing", icon: CreditCard },
 ];
 
 export default function DashboardLayout({ children }) {

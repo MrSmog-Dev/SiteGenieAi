@@ -12,6 +12,7 @@ import Generator from "@/pages/Generator";
 import MyTemplates from "@/pages/MyTemplates";
 import TemplateView from "@/pages/TemplateView";
 import Pricing from "@/pages/Pricing";
+import Billing from "@/pages/Billing";
 import PaymentReturn from "@/pages/PaymentReturn";
 
 function AppRouter() {
@@ -25,6 +26,7 @@ function AppRouter() {
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/pricing" element={<Pricing />} />
+      <Route path="/billing" element={<ProtectedRoute><Billing /></ProtectedRoute>} />
       <Route path="/payment-return" element={<PaymentReturn />} />
       <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/generate" element={<ProtectedRoute><Generator /></ProtectedRoute>} />

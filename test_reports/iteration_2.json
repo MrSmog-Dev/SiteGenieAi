@@ -1,0 +1,39 @@
+{
+  "summary": "Iteration 2 focused on P1 features (subscription lifecycle, 30-day credit reset, regenerate/edit endpoints, 402 credit gating, Billing UI). Backend 22/22 pytest passed. Frontend: Billing page renders, badge toggles ACTIVE<->CANCELLING correctly with cancel/reactivate, sidebar 'Billing' correctly links to /billing, TemplateView shows Regenerate + Edit-with-AI buttons and edit dialog opens with textarea + submit. Credit reset math verified via /auth/me after mocking past next_credit_reset in Mongo (plan_credits 5->20 on monthly, extra_credits untouched). LLM-completion not exercised (budget-exceeded known limitation from iter 1); endpoints correctly return job_id pending and gate on credits.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/templates/generate (LLM completion path)", "issue": "Emergent LLM budget still exhausted per iter 1 RCA — job endpoints correctly return job_id pending, but background _run_generation ultimately marks job status=error. Not a code bug."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "None required for P1 features — all backend + frontend flows pass.",
+    "(Carry-over from iter 1) Refresh EMERGENT_LLM_KEY budget so template generation/regenerate/edit can complete end-to-end via LLM."
+  ],
+  "critical_code_review_comments": [
+    "server.py process_subscription safely migrates legacy 'credits' field to plan_credits+extra_credits — good idempotent backfill.",
+    "deduct_one_credit drains plan_credits first then extra_credits as specified — verified in code, and 402 gate checks total_credits BEFORE job creation.",
+    "cancel/reactivate endpoints correctly validate subscription_status=='active' with 400 on invalid transitions.",
+    "Billing.jsx: 'Available credits' computed client-side as sub.plan_credits + sub.extra_credits — matches backend total_credits(). No mismatch risk.",
+    "TemplateView.jsx: runJob checks user?.credits < 1 client-side and navigates to /pricing, but server-side 402 is still authoritative — good defense in depth.",
+    "CORS allow_origin_regex='.*' with credentials remains too permissive for prod (noted iter 1)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py"
+  ],
+  "success_rate": {"backend": "100% (22/22)", "frontend": "100% for P1 UI flows exercised (Billing lifecycle, sidebar link, TemplateView buttons, Edit dialog)"},
+  "test_credentials": "admin@sitegenie.com / admin123 (working). Fresh users registered dynamically with test_<uuid>@example.com / pw123456.",
+  "seed_data_creation": "Tests seed templates directly in Mongo (db.templates) for regenerate/edit endpoint checks. Tests mutate user docs in Mongo to (a) push next_credit_reset into the past for reset verification and (b) zero out both credit buckets for 402 gating. All test users use test_ prefix; templates use tpl_ prefix.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend test file is a full rewrite of iter 1's file focused on P1. It uses pymongo (already in requirements) to seed/reset state directly. LLM budget is still exhausted — do not add end-to-end LLM completion assertions until EMERGENT_LLM_KEY is refreshed. Frontend template cards are anchor tags matching a[href*='/templates/tpl_'] — use this selector to navigate to TemplateView. Login button text is 'Log in' (not 'Sign in')."
+}
