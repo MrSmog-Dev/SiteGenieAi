@@ -1,0 +1,127 @@
+{
+  "theme": "dark",
+  "archetype": "4",
+  "archetype_name": "Swiss & High-Contrast",
+  "typography": {
+    "headings": {
+      "font_family": "Outfit, sans-serif",
+      "weights": ["300", "500", "700"],
+      "strategy": "Swiss Brutalist - radical weight contrast (e.g., Light vs Bold). Tracking tight for large text."
+    },
+    "body": {
+      "font_family": "Manrope, sans-serif",
+      "weights": ["400", "500"],
+      "strategy": "Clean, highly legible sans for dense data and controls."
+    },
+    "mono": {
+      "font_family": "IBM Plex Mono, monospace",
+      "weights": ["400"],
+      "strategy": "For credit numbers, AI generation prompts, and technical data points."
+    }
+  },
+  "colors": {
+    "background": {
+      "base": "#0A0A0C",
+      "surface_1": "#121217",
+      "surface_2": "#1A1A24"
+    },
+    "text": {
+      "primary": "#FFFFFF",
+      "secondary": "#A1A1AA",
+      "muted": "#71717A",
+      "inverse": "#0A0A0C"
+    },
+    "primary": {
+      "default": "#0055FF",
+      "hover": "#3377FF",
+      "foreground": "#FFFFFF"
+    },
+    "accent": {
+      "default": "#FF3366",
+      "hover": "#FF6688",
+      "foreground": "#FFFFFF",
+      "purpose": "Used specifically for Credit low-balance warnings or premium AI feature triggers."
+    },
+    "border": {
+      "default": "rgba(255, 255, 255, 0.1)",
+      "hover": "rgba(255, 255, 255, 0.2)"
+    }
+  },
+  "spacing_and_layout": {
+    "marketing": {
+      "grid_mode": "TETRIS",
+      "strategy": "Asymmetrical Bento grids (grid-cols-1 md:grid-cols-12), gap-8 to gap-12, high negative space. Use generous padding (p-12 to p-24) for sections."
+    },
+    "dashboard": {
+      "grid_mode": "CONTROL ROOM",
+      "strategy": "Dense grid (grid-cols-1 md:grid-cols-3 lg:grid-cols-4), tight gaps (gap-4 or gap-6). Cards have p-6."
+    },
+    "components": {
+      "radius": "rounded-none",
+      "borders": "1px solid rgba(255,255,255,0.1) for structure. Grid borders exposed."
+    }
+  },
+  "surfaces": {
+    "header": "Glassmorphism: bg-black/60 backdrop-blur-xl border-b border-white/10",
+    "dashboard_cards": "Flat background (surface_1), 1px border-white/10, no shadow. Hover: border-white/30, slight lift.",
+    "pricing_cards": "The 'Tracing Beam' effect. Neon border accents on the recommended tier.",
+    "modals": "Glassmorphism overlay, solid surface_2 content box, 1px border."
+  },
+  "motion_and_interactions": {
+    "hover_states": "Text colors explicitly shift to white. Backgrounds shift to surface_2.",
+    "transitions": "transition-all duration-300 ease-out",
+    "marketing_animations": "Scroll-triggered staggered reveals using framer-motion. Parallax on hero images."
+  },
+  "pages_and_features": {
+    "landing_page": {
+      "hero": "Outcome-led. Headline explicitly states 'Generate Websites with AI'. Microcopy segmentation. Heavy dark background with subtle abstract light rays. Primary CTA + Social proof directly below.",
+      "features": "Scroll-triggered. Bento grid layout.",
+      "pricing": "Hybrid pricing pattern. Clear base subscription + explicit credit mapping (e.g., '1 Credit = 1 Template'). Recommended plan highlighted."
+    },
+    "dashboard": {
+      "layout": "Sidebar navigation + top header. High contrast data.",
+      "credit_display": "Prominent real-time burn indicator for credits. Add-on purchase button adjacent.",
+      "generator_ui": "Split view: Chat/Prompt input on the left (mono font), live preview skeleton on the right."
+    }
+  },
+  "media": {
+    "images": [
+      {
+        "category": "hero_background",
+        "url": "https://images.unsplash.com/photo-1546497974-b213c9efb599?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzB8MHwxfHNlYXJjaHwxfHxhYnN0cmFjdCUyMHBoeXNpY3MlMjBsaWdodCUyMHJheXN8ZW58MHx8fHwxNzgyMDE4NjUyfDA&ixlib=rb-4.1.0&q=85",
+        "description": "Abstract light rays for hero background overlay. Use with low opacity (10-20%) and blend modes to avoid competing with text.",
+        "usage": "Landing page hero section background"
+      },
+      {
+        "category": "dashboard_preview",
+        "url": "https://images.unsplash.com/photo-1551288049-bebda4e38f71",
+        "description": "Graphs and analytics on a screen.",
+        "usage": "Landing page feature section - dashboard preview"
+      },
+      {
+        "category": "generator_preview",
+        "url": "https://images.unsplash.com/photo-1634084462412-b54873c0a56d",
+        "description": "Website template mockup showing the modern way to build for the web.",
+        "usage": "Landing page feature section - AI generation preview"
+      },
+      {
+        "category": "abstract_tech",
+        "url": "https://images.pexels.com/photos/27141316/pexels-photo-27141316.jpeg",
+        "description": "Futuristic digital interface and data points.",
+        "usage": "Marketing page or Auth page background"
+      }
+    ]
+  },
+  "accessibility_and_testing": {
+    "testing_attributes": "All interactive elements (buttons, inputs, links, tabs) MUST have data-testid attributes (e.g., data-testid='generate-template-btn').",
+    "contrast": "Ensure pure white text on the #0A0A0C background. Action colors must maintain 4.5:1 ratio."
+  },
+  "instructions_to_main_agent": [
+    "Install and configure 'lucide-react' for icons.",
+    "Use 'framer-motion' for hero and bento grid animations.",
+    "Build the dashboard using pure Tailwind CSS for layout, leveraging Shadcn UI strictly for complex interactive components (Dialog, Select, Tabs).",
+    "Do not use Shadcn 'Card' for the marketing layout, use raw HTML/Tailwind to allow for asymmetry.",
+    "Ensure the credit purchasing flow is clear and distinct from the main subscription tiers.",
+    "Apply 'rounded-none' or 'rounded-sm' max to all components for the Swiss Brutalist feel."
+  ]
+}
