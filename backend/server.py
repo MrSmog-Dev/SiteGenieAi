@@ -418,7 +418,7 @@ async def _call_llm(prompt: str) -> str:
         api_key=EMERGENT_LLM_KEY,
         session_id=f"gen_{uuid.uuid4().hex}",
         system_message=GEN_SYSTEM,
-    ).with_model("anthropic", "claude-sonnet-4-6")
+    ).with_model("anthropic", "claude-haiku-4-5")
     result = await chat.send_message(UserMessage(text=prompt))
     return clean_html(result if isinstance(result, str) else str(result))
 
