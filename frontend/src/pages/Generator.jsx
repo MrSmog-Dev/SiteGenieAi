@@ -30,14 +30,38 @@ export default function Generator() {
     setLoading(true); setResult(null);
     try {
       const { data } = await api.post("/templates/generate", form);
-      setResult(data);
-      await refreshUser();
-      toast.success("Website generated! 1 credit used.");
+      const jobId = data.job_id;
+      // poll for completion (generation takes ~1-2 min)
+      let attempts = 0;
+      const poll = async () => {
+        attempts += 1;
+        if (attempts > 80) { setLoading(false); toast.error("Generation timed out. Please try again."); return; }
+        try {
+          const { data: s } = await api.get(`/templates/job/${jobId}`);
+          if (s.status === "done" && s.template) {
+            setResult(s.template);
+            await refreshUser();
+            setLoading(false);
+            toast.success("Website generated! 1 credit used.");
+            return;
+          }
+          if (s.status === "error") {
+            setLoading(false);
+            toast.error(s.error || "Generation failed.");
+            return;
+          }
+          setTimeout(poll, 2500);
+        } catch (err) {
+          setTimeout(poll, 2500);
+        }
+      };
+      setTimeout(poll, 3000);
     } catch (e) {
+      setLoading(false);
       const status = e.response?.status;
       if (status === 402) { toast.error("Not enough credits."); navigate("/pricing"); }
       else toast.error(formatApiError(e.response?.data?.detail) || e.message);
-    } finally { setLoading(false); }
+    }
   };
 
   const download = () => {

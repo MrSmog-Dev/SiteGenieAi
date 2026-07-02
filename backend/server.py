@@ -232,11 +232,9 @@ def clean_html(text: str) -> str:
         text = text[idx:]
     return text.strip()
 
-@api_router.post("/templates/generate")
-async def generate_template(input: GenerateInput, user: dict = Depends(get_current_user)):
-    if user.get("credits", 0) < CREDIT_COST_PER_TEMPLATE:
-        raise HTTPException(status_code=402, detail="Not enough credits. Please purchase more.")
+import asyncio
 
+async def _run_generation(job_id: str, user_id: str, input: "GenerateInput"):
     prompt = (
         f"Business name: {input.business_name}\n"
         f"Industry / type: {input.industry}\n"
@@ -252,33 +250,61 @@ async def generate_template(input: GenerateInput, user: dict = Depends(get_curre
         session_id=f"gen_{uuid.uuid4().hex}",
         system_message=GEN_SYSTEM,
     ).with_model("anthropic", "claude-sonnet-4-6")
-
     try:
         result = await chat.send_message(UserMessage(text=prompt))
     except Exception as e:
         logger.exception("generation failed")
-        raise HTTPException(status_code=500, detail=f"Generation failed: {e}")
+        msg = str(e).lower()
+        if "budget" in msg or "quota" in msg or "insufficient" in msg:
+            err = "AI service is temporarily unavailable. Please try again shortly."
+        else:
+            err = "Generation failed. Please try again."
+        await db.gen_jobs.update_one({"job_id": job_id}, {"$set": {"status": "error", "error": err}})
+        return
 
     html = clean_html(result if isinstance(result, str) else str(result))
-
     template_id = f"tpl_{uuid.uuid4().hex[:12]}"
     doc = {
-        "template_id": template_id, "user_id": user["user_id"],
+        "template_id": template_id, "user_id": user_id,
         "business_name": input.business_name, "industry": input.industry,
         "description": input.description, "style": input.style,
         "primary_color": input.primary_color, "html": html,
         "created_at": datetime.now(timezone.utc),
     }
     await db.templates.insert_one(doc)
-    await db.users.update_one({"user_id": user["user_id"]},
-                              {"$inc": {"credits": -CREDIT_COST_PER_TEMPLATE}})
-    updated = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0})
-    return {
-        "template_id": template_id, "business_name": input.business_name,
-        "industry": input.industry, "primary_color": input.primary_color,
-        "html": html, "created_at": doc["created_at"].isoformat(),
-        "credits_remaining": updated.get("credits", 0),
-    }
+    await db.users.update_one({"user_id": user_id}, {"$inc": {"credits": -CREDIT_COST_PER_TEMPLATE}})
+    await db.gen_jobs.update_one({"job_id": job_id},
+                                 {"$set": {"status": "done", "template_id": template_id}})
+
+@api_router.post("/templates/generate")
+async def generate_template(input: GenerateInput, user: dict = Depends(get_current_user)):
+    if user.get("credits", 0) < CREDIT_COST_PER_TEMPLATE:
+        raise HTTPException(status_code=402, detail="Not enough credits. Please purchase more.")
+    job_id = f"job_{uuid.uuid4().hex[:12]}"
+    await db.gen_jobs.insert_one({
+        "job_id": job_id, "user_id": user["user_id"], "status": "pending",
+        "template_id": None, "error": None, "created_at": datetime.now(timezone.utc),
+    })
+    asyncio.create_task(_run_generation(job_id, user["user_id"], input))
+    return {"job_id": job_id, "status": "pending"}
+
+@api_router.get("/templates/job/{job_id}")
+async def generation_status(job_id: str, user: dict = Depends(get_current_user)):
+    job = await db.gen_jobs.find_one({"job_id": job_id, "user_id": user["user_id"]}, {"_id": 0})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    resp = {"status": job["status"], "error": job.get("error")}
+    if job["status"] == "done" and job.get("template_id"):
+        tpl = await db.templates.find_one({"template_id": job["template_id"]}, {"_id": 0})
+        updated = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0})
+        if tpl:
+            resp["template"] = {
+                "template_id": tpl["template_id"], "business_name": tpl["business_name"],
+                "industry": tpl["industry"], "primary_color": tpl["primary_color"],
+                "html": tpl["html"],
+            }
+            resp["credits_remaining"] = updated.get("credits", 0)
+    return resp
 
 @api_router.get("/templates")
 async def list_templates(user: dict = Depends(get_current_user)):
