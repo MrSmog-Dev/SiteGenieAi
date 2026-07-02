@@ -1,0 +1,37 @@
+{
+  "summary": "Rate limiting feature verification (login brute-force + generation) plus core regression. 8/8 new tests pass in test_rate_limiting.py; full 30/30 existing backend_test.py still green. Total 38/38.",
+  "feature_verification": {
+    "login_brute_force_ip_email": "PASS - 5 wrong from IP_A -> all 401; 6th -> 429; correct pw on same IP -> 429 (locked); correct pw on IP_B -> 200.",
+    "successful_login_clears_counter": "PASS - 3 wrong (401) then 1 correct (200) then 4 more wrong all still 401 (counter cleared).",
+    "generation_rate_limit_15_per_5min": "PASS - first 15 POST /api/templates/generate -> 200 (job_id); 16th -> 429.",
+    "generation_limit_is_per_user": "PASS - user B's first generate returns 200 while user A is 429-locked.",
+    "regression_admin_login_and_cookie": "PASS - admin login 200, Set-Cookie session_token has HttpOnly + Secure + SameSite=Lax.",
+    "regression_old_admin_password": "PASS - 'admin123' -> 401.",
+    "regression_subscription_cancel_reactivate": "PASS.",
+    "regression_402_zero_credit_gating": "PASS.",
+    "regression_list_templates_and_auth_me": "PASS."
+  },
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_rate_limiting.py",
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/iter4_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "client_ip() correctly picks first X-Forwarded-For value; behind ingress this is required.",
+    "login lockout key is composite ip:email - correct scoping (different IPs unaffected, different emails from same IP unaffected).",
+    "clear_login_attempts on successful auth correctly resets the counter for that ip:email tuple.",
+    "check_rate_limit uses count_documents then insert_one - technically a small race window under high concurrency, but acceptable given TTL cleanup and low-cardinality abuse pattern. Consider atomic upsert with $inc if strict correctness is needed at scale.",
+    "TTL index on rate_events.ts is created with expireAfterSeconds using generation window (300+60); login_attempts uses LOGIN_WINDOW_SECONDS+60. Correct.",
+    "Generation rate limit is checked in _start_job BEFORE credit deduction / job doc insertion - so a 429 does not consume credits. Verified via 402 test still passing."
+  ],
+  "updated_files": ["/app/backend/tests/test_rate_limiting.py"],
+  "success_rate": {"backend": "100% (38/38 = 8 new + 30 regression)"},
+  "test_credentials": "admin@sitegenie.com / Sg!Adm1n_9f3kQ2xL7vB (from /app/memory/test_credentials.md).",
+  "seed_data_creation": "Fresh test_<uuid>@example.com users per test; each isolated with a unique 10.x.x.x X-Forwarded-For IP so scenarios do not cross-contaminate. login_attempts and rate_events cleaned up in-test and via module fixture teardown; admin login_attempts and all rate_events wiped post-run.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Rate limiting = per-(ip:email) for login, per-user_id for generation. Use unique X-Forwarded-For IPs per scenario and clear login_attempts/rate_events between tests to avoid cross-contamination (test file already does this). LLM budget is exhausted so generate job_id start is 200 but background job may fail - assertions only check the START call HTTP code as instructed."
+}

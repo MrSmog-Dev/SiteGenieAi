@@ -103,6 +103,37 @@ def parse_dt(v):
 def total_credits(u: dict) -> int:
     return int(u.get("plan_credits", 0)) + int(u.get("extra_credits", 0))
 
+# ---------------- Rate limiting ----------------
+LOGIN_MAX_ATTEMPTS = 5
+LOGIN_WINDOW_SECONDS = 15 * 60
+GEN_MAX_PER_WINDOW = 15
+GEN_WINDOW_SECONDS = 5 * 60
+
+def client_ip(request: Request) -> str:
+    xff = request.headers.get("x-forwarded-for")
+    if xff:
+        return xff.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+async def check_rate_limit(key: str, max_count: int, window_seconds: int):
+    now = datetime.now(timezone.utc)
+    window_start = now - timedelta(seconds=window_seconds)
+    count = await db.rate_events.count_documents({"key": key, "ts": {"$gte": window_start}})
+    if count >= max_count:
+        raise HTTPException(status_code=429, detail="Too many requests. Please slow down and try again shortly.")
+    await db.rate_events.insert_one({"key": key, "ts": now})
+
+async def login_is_locked(identifier: str) -> bool:
+    window_start = datetime.now(timezone.utc) - timedelta(seconds=LOGIN_WINDOW_SECONDS)
+    count = await db.login_attempts.count_documents({"identifier": identifier, "ts": {"$gte": window_start}})
+    return count >= LOGIN_MAX_ATTEMPTS
+
+async def record_failed_login(identifier: str):
+    await db.login_attempts.insert_one({"identifier": identifier, "ts": datetime.now(timezone.utc)})
+
+async def clear_login_attempts(identifier: str):
+    await db.login_attempts.delete_many({"identifier": identifier})
+
 async def deduct_one_credit(user_id: str):
     r = await db.users.update_one(
         {"user_id": user_id, "plan_credits": {"$gt": 0}}, {"$inc": {"plan_credits": -1}})
@@ -238,11 +269,16 @@ async def register(input: RegisterInput, response: Response):
     return public_user(doc)
 
 @api_router.post("/auth/login")
-async def login(input: LoginInput, response: Response):
+async def login(input: LoginInput, request: Request, response: Response):
     email = input.email.lower()
+    identifier = f"{client_ip(request)}:{email}"
+    if await login_is_locked(identifier):
+        raise HTTPException(status_code=429, detail="Too many failed attempts. Please try again in 15 minutes.")
     user = await db.users.find_one({"email": email})
     if not user or not user.get("password_hash") or not verify_password(input.password, user["password_hash"]):
+        await record_failed_login(identifier)
         raise HTTPException(status_code=401, detail="Invalid email or password")
+    await clear_login_attempts(identifier)
     token = await create_session(user["user_id"])
     set_session_cookie(response, token)
     user = await process_subscription(user)
@@ -388,6 +424,7 @@ async def _run_generation(job_id: str, user_id: str, fields: dict, mode: str = "
 async def _start_job(user: dict, fields: dict, mode: str = "new", template_id: str = None):
     if total_credits(user) < CREDIT_COST_PER_TEMPLATE:
         raise HTTPException(status_code=402, detail="Not enough credits. Please purchase more.")
+    await check_rate_limit(f"gen:{user['user_id']}", GEN_MAX_PER_WINDOW, GEN_WINDOW_SECONDS)
     job_id = f"job_{uuid.uuid4().hex[:12]}"
     await db.gen_jobs.insert_one({
         "job_id": job_id, "user_id": user["user_id"], "status": "pending",
@@ -627,6 +664,9 @@ async def startup():
     await db.user_sessions.create_index("session_token")
     await db.templates.create_index("user_id")
     await db.gen_jobs.create_index("job_id")
+    await db.rate_events.create_index("ts", expireAfterSeconds=GEN_WINDOW_SECONDS + 60)
+    await db.login_attempts.create_index("ts", expireAfterSeconds=LOGIN_WINDOW_SECONDS + 60)
+    await db.login_attempts.create_index("identifier")
     # seed admin (requires ADMIN_EMAIL + ADMIN_PASSWORD from env; no weak defaults)
     admin_email = (os.environ.get("ADMIN_EMAIL") or "").lower().strip()
     admin_password = os.environ.get("ADMIN_PASSWORD") or ""
