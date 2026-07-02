@@ -38,6 +38,13 @@ An online store that creates website templates for businesses that don't have a 
 - Stripe: /checkout/session, /checkout/status/{id}, /webhook/stripe, payment_transactions.
 - Admin seed: admin@sitegenie.com / admin123.
 
+## Implemented — P1 (2026-07-02, iter 2)
+- Template Regenerate (fresh design, same details) + Edit-with-AI (natural-language change instructions). Each costs 1 credit. Async job pattern reused.
+- Two-bucket credit model: plan_credits (resets to plan allowance every 30 days) + extra_credits (packs, never reset). Deduction: plan first, then extra.
+- Subscription lifecycle: active/cancelled status, auto-renew (simulated), 30-day credit reset, cancel + reactivate. Lazy processing in get_current_user + hourly background worker.
+- Billing page (/billing): plan status, dates, credit breakdown, cancel/reactivate, payment history.
+- Plans updated to per-30-day allowances: Monthly 20/30d, 3-Month 25/30d, Annual 30/30d.
+
 ## Backlog / Remaining
 - P1: Regenerate/edit an existing template; custom section prompts.
 - P1: Real recurring Stripe subscriptions (currently one-time checkouts that grant plan+credits with expiry).
