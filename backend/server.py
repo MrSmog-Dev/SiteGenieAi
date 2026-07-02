@@ -882,7 +882,7 @@ async def subscription_worker():
     """Periodically process active subscriptions for credit resets and renewals."""
     while True:
         try:
-            cursor = db.users.find({"subscription_status": "active"}, {"_id": 0})
+            cursor = db.users.find({"subscription_status": "active"}, {"_id": 0}).limit(2000)
             async for u in cursor:
                 await process_subscription(u)
         except Exception:
@@ -936,6 +936,7 @@ _cors_origins = [o.strip() for o in os.environ.get("CORS_ORIGINS", "").split(","
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins or ["http://localhost:3000"],
+    allow_origin_regex=r"https://.*\.emergentagent\.com",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
