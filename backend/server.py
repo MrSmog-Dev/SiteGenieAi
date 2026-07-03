@@ -628,6 +628,51 @@ async def delete_template(template_id: str, user: dict = Depends(get_current_use
     await db.templates.delete_one({"template_id": template_id, "user_id": user["user_id"]})
     return {"success": True}
 
+# ---------------- Publish / hosting ----------------
+def slugify(text: str) -> str:
+    s = re.sub(r"[^a-z0-9]+", "-", (text or "site").lower().strip()).strip("-")
+    return s[:40] or "site"
+
+async def unique_slug(business_name: str) -> str:
+    base = slugify(business_name)
+    for _ in range(5):
+        candidate = f"{base}-{uuid.uuid4().hex[:6]}"
+        if not await db.templates.find_one({"slug": candidate}):
+            return candidate
+    return f"{base}-{uuid.uuid4().hex[:12]}"
+
+@api_router.post("/templates/{template_id}/publish")
+async def publish_template(template_id: str, user: dict = Depends(get_current_user)):
+    tpl = await db.templates.find_one({"template_id": template_id, "user_id": user["user_id"]}, {"_id": 0})
+    if not tpl:
+        raise HTTPException(status_code=404, detail="Template not found")
+    slug = tpl.get("slug") or await unique_slug(tpl.get("business_name", "site"))
+    await db.templates.update_one(
+        {"template_id": template_id, "user_id": user["user_id"]},
+        {"$set": {"published": True, "slug": slug, "published_at": datetime.now(timezone.utc)}})
+    return {"published": True, "slug": slug}
+
+@api_router.post("/templates/{template_id}/unpublish")
+async def unpublish_template(template_id: str, user: dict = Depends(get_current_user)):
+    res = await db.templates.update_one(
+        {"template_id": template_id, "user_id": user["user_id"]},
+        {"$set": {"published": False}})
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Template not found")
+    return {"published": False}
+
+@api_router.get("/public/site/{slug}")
+async def public_site(slug: str):
+    tpl = await db.templates.find_one({"slug": slug, "published": True}, {"_id": 0})
+    if not tpl:
+        raise HTTPException(status_code=404, detail="Site not found or no longer published")
+    return {
+        "business_name": tpl.get("business_name", ""),
+        "industry": tpl.get("industry", ""),
+        "primary_color": tpl.get("primary_color", "#0055FF"),
+        "html": tpl.get("html", ""),
+    }
+
 # ---------------- Payments ----------------
 def get_stripe(request: Request) -> StripeCheckout:
     host_url = str(request.base_url)
@@ -990,6 +1035,7 @@ async def startup():
     await db.users.create_index("user_id", unique=True)
     await db.user_sessions.create_index("session_token")
     await db.templates.create_index("user_id")
+    await db.templates.create_index("slug", unique=True, sparse=True)
     await db.gen_jobs.create_index("job_id")
     await db.rate_events.create_index("ts", expireAfterSeconds=GEN_WINDOW_SECONDS + 60)
     await db.login_attempts.create_index("ts", expireAfterSeconds=LOGIN_WINDOW_SECONDS + 60)

@@ -14,6 +14,7 @@ import TemplateView from "@/pages/TemplateView";
 import Pricing from "@/pages/Pricing";
 import Billing from "@/pages/Billing";
 import PaymentReturn from "@/pages/PaymentReturn";
+import PublicSite from "@/pages/PublicSite";
 
 function AppRouter() {
   const location = useLocation();
@@ -28,6 +29,7 @@ function AppRouter() {
       <Route path="/pricing" element={<Pricing />} />
       <Route path="/billing" element={<ProtectedRoute><Billing /></ProtectedRoute>} />
       <Route path="/payment-return" element={<PaymentReturn />} />
+      <Route path="/s/:slug" element={<PublicSite />} />
       <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/generate" element={<ProtectedRoute><Generator /></ProtectedRoute>} />
       <Route path="/templates" element={<ProtectedRoute><MyTemplates /></ProtectedRoute>} />

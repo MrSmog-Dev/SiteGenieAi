@@ -51,11 +51,16 @@ An online store that creates website templates for businesses that don't have a 
 - Security audit fixes: CORS allowlist, SameSite=Lax cookie, strong admin password, payment idempotency, iframe sandbox, credit floor.
 - REWORKED credit system (usage-based currency): cost per AI op = max(1, round((prompt+output chars/4)/3000)). Plans: Monthly $20/50cr, 3-Month $49/120cr, Annual $149/UNLIMITED. plan_credits (30d reset) + extra_credits (packs). 402 block at 0 credits (non-unlimited); packs pack_25/60/150. New users get 15 free credits.
 
+## Implemented — Publish / Hosting (2026-07-03)
+- Each template can be PUBLISHED to a shareable public URL `/s/{slug}` (no login needed). Slug = slugified business name + short hex, stable across re-publish. Backend: POST /api/templates/{id}/publish, POST /api/templates/{id}/unpublish, public GET /api/public/site/{slug} (returns html+meta only when published, else 404, ownership-guarded). templates gain `published`, `slug` (unique sparse index), `published_at`.
+- Frontend: public full-viewport iframe page `PublicSite.jsx` (sandboxed, graceful not-found); TemplateView "Publish/Live" button + Share dialog (copy link, open, unpublish); MyTemplates "Live" badge on published cards. Edits/regenerations update the live site automatically (html updated in place).
+- Verified: /app/backend/tests/test_publish_flow.py (publish, public fetch, stable slug, unpublish→404, unknown slug 404, ownership guard) + frontend smoke (public page renders, share dialog shows live URL).
+
 ## Backlog / Remaining
 - P1: Regenerate/edit an existing template; custom section prompts.
 - P1: Real recurring Stripe subscriptions (currently one-time checkouts that grant plan+credits with expiry).
 - P2: Auto-expire plan + monthly credit reset job.
-- P2: Custom domain / hosting/publish option.
+- P2: Custom domain / hosting/publish option. ✅ DONE (2026-07-03 — shareable /s/{slug} public URLs). Remaining: custom domain mapping.
 - P2: More export formats (zip with assets), template thumbnails via screenshot.
 - P2: Cheaper/faster model option (gemini-3-flash / claude-haiku) toggle to stretch credits.
 

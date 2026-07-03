@@ -4,7 +4,7 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { api, pollGenerationJob } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
-import { ArrowLeft, Download, Copy, Monitor, Smartphone, Code, RefreshCw, Wand2, Loader2, X } from "lucide-react";
+import { ArrowLeft, Download, Copy, Monitor, Smartphone, Code, RefreshCw, Wand2, Loader2, X, Globe, Share2, Check, ExternalLink } from "lucide-react";
 
 export default function TemplateView() {
   const { id } = useParams();
@@ -17,6 +17,11 @@ export default function TemplateView() {
   const [busyLabel, setBusyLabel] = useState("");
   const [editOpen, setEditOpen] = useState(false);
   const [instructions, setInstructions] = useState("");
+  const [shareOpen, setShareOpen] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const publicUrl = tpl?.slug ? `${window.location.origin}/s/${tpl.slug}` : "";
 
   const load = () => api.get(`/templates/${id}`).then(({ data }) => setTpl(data)).catch(() => { toast.error("Not found"); navigate("/templates"); });
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
@@ -54,6 +59,30 @@ export default function TemplateView() {
   };
   const copy = () => { navigator.clipboard.writeText(tpl.html); toast.success("HTML copied to clipboard"); };
 
+  const publish = async () => {
+    setPublishing(true);
+    try {
+      const { data } = await api.post(`/templates/${id}/publish`);
+      setTpl((t) => ({ ...t, published: true, slug: data.slug }));
+      toast.success("Your site is live!");
+    } catch (e) { toast.error("Could not publish. Please try again."); }
+    finally { setPublishing(false); }
+  };
+  const unpublish = async () => {
+    setPublishing(true);
+    try {
+      await api.post(`/templates/${id}/unpublish`);
+      setTpl((t) => ({ ...t, published: false }));
+      toast.success("Site unpublished.");
+    } catch (e) { toast.error("Could not unpublish. Please try again."); }
+    finally { setPublishing(false); }
+  };
+  const copyLink = () => {
+    navigator.clipboard.writeText(publicUrl);
+    setCopied(true); setTimeout(() => setCopied(false), 1800);
+    toast.success("Public link copied");
+  };
+
   if (!tpl) return <DashboardLayout><div className="p-10 font-mono text-white/40">Loading…</div></DashboardLayout>;
 
   return (
@@ -82,6 +111,10 @@ export default function TemplateView() {
             </div>
             <button data-testid="view-code-btn" onClick={() => setShowCode((s) => !s)} className={`flex items-center gap-2 text-sm px-3 py-2 border transition-colors duration-300 ${showCode ? "border-brand text-brand" : "border-white/15 hover:border-white/40"}`}><Code className="w-4 h-4" /> Code</button>
             <button data-testid="copy-btn" onClick={copy} className="flex items-center gap-2 text-sm border border-white/15 hover:border-white/40 px-3 py-2 transition-colors duration-300"><Copy className="w-4 h-4" /></button>
+            <button data-testid="publish-btn" onClick={() => setShareOpen(true)}
+              className={`flex items-center gap-2 text-sm px-3 py-2 border transition-colors duration-300 ${tpl.published ? "border-neon text-neon" : "border-white/15 hover:border-white/40"}`}>
+              {tpl.published ? <><span className="w-2 h-2 rounded-full bg-neon animate-pulse" /> Live</> : <><Globe className="w-4 h-4" /> Publish</>}
+            </button>
             <button data-testid="download-btn" onClick={download} className="flex items-center gap-2 text-sm bg-brand hover:bg-brand-hover px-3 py-2 transition-colors duration-300"><Download className="w-4 h-4" /> Download</button>
           </div>
         </div>
@@ -119,6 +152,52 @@ export default function TemplateView() {
                 <Wand2 className="w-4 h-4" /> Apply changes
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {shareOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/70 backdrop-blur-sm" onClick={() => setShareOpen(false)}>
+          <div className="w-full max-w-lg bg-surface2 border border-white/10 p-6" onClick={(e) => e.stopPropagation()} data-testid="share-dialog">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-display text-xl font-bold flex items-center gap-2"><Share2 className="w-5 h-5 text-neon" /> Share your website</h2>
+              <button onClick={() => setShareOpen(false)} className="text-white/50 hover:text-white"><X className="w-5 h-5" /></button>
+            </div>
+
+            {tpl.published ? (
+              <>
+                <div className="flex items-center gap-2 text-sm text-neon mb-3">
+                  <span className="w-2 h-2 rounded-full bg-neon animate-pulse" /> Your site is live
+                </div>
+                <p className="text-white/50 text-sm mb-3">Anyone with this link can view your site. Edits and regenerations go live automatically.</p>
+                <div className="flex items-stretch gap-2">
+                  <input data-testid="public-url-input" readOnly value={publicUrl}
+                    className="flex-1 bg-surface1 border border-white/10 px-3 py-2 text-sm font-mono text-white/80 outline-none truncate" />
+                  <button data-testid="copy-link-btn" onClick={copyLink}
+                    className="flex items-center gap-2 text-sm bg-brand hover:bg-brand-hover px-3 py-2 transition-colors duration-300">
+                    {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />} {copied ? "Copied" : "Copy"}
+                  </button>
+                </div>
+                <div className="flex items-center justify-between mt-5">
+                  <button data-testid="unpublish-btn" onClick={unpublish} disabled={publishing}
+                    className="text-sm text-white/50 hover:text-neon transition-colors duration-300 disabled:opacity-50">
+                    {publishing ? "Working…" : "Unpublish"}
+                  </button>
+                  <a data-testid="open-public-btn" href={publicUrl} target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-sm border border-white/15 hover:border-white/40 px-4 py-2 transition-colors duration-300">
+                    <ExternalLink className="w-4 h-4" /> Open site
+                  </a>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-white/50 text-sm mb-5">Publish your site to get a shareable public link. No download needed — send it to anyone and they'll see your live website instantly.</p>
+                <button data-testid="publish-confirm-btn" onClick={publish} disabled={publishing}
+                  className="w-full flex items-center justify-center gap-2 bg-neon hover:bg-neon-hover px-4 py-3 transition-colors duration-300 disabled:opacity-50">
+                  {publishing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Globe className="w-4 h-4" />} Publish site
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}
