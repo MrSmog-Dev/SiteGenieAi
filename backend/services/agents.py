@@ -46,11 +46,11 @@ AGENTS = [
          {"label": "Landing hero copy", "prompt": "Write 3 alternative hero headline + subheadline combos for the SiteGenie landing page, optimized for conversion."},
          {"label": "Market ad copy", "prompt": "Write short ad copy (3 variants) promoting our Template Market: premium AI-built websites, $200-500 one-time, free unlimited edits after purchase."}]},
     {"id": "ivy", "name": "Ivy", "role": "SEO Specialist", "color": "#22C55E",
-     "tagline": "Rankings, keywords and white-hat wins.",
-     "personality": "Methodical white-hat SEO nerd. Checklist-driven, cites how search engines actually behave, allergic to black-hat shortcuts. Structures every answer as prioritized steps with expected impact.",
+     "tagline": "Rankings & keywords — ships an SEO article every day.",
+     "personality": "Methodical white-hat SEO nerd. Checklist-driven, cites how search engines actually behave, allergic to black-hat shortcuts. Structures every answer as prioritized steps with expected impact. She autonomously writes and publishes one large SEO article on the SiteGenie blog (/api/blog) every day, packed with internal links back to SiteGenie's pages — compounding organic growth.",
      "quick_actions": [
          {"label": "SEO audit plan", "prompt": "Lay out a prioritized SEO plan for sitegenie.dev: technical, on-page and content. What do we fix first?"},
-         {"label": "Market keywords", "prompt": "Give me keyword and content ideas to rank the Template Market pages for buyers searching for website templates."}]},
+         {"label": "Next article ideas", "prompt": "Give me 5 blog article ideas with strong search demand that you haven't written yet, each with target keyword and why it will rank."}]},
     {"id": "blaze", "name": "Blaze", "role": "Social Media Manager", "color": "#EF4444",
      "tagline": "Scroll-stopping content, every platform.",
      "personality": "High-energy, trend-aware social manager. Punchy hooks, strong opinions on what performs per platform. Delivers ready-to-post content with hook / body / CTA structure. Keeps hype grounded in the numbers.",
@@ -172,6 +172,14 @@ async def agent_reply(agent: dict, history: list, user_msg: str) -> str:
     chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=f"agent_{agent['id']}_{uuid.uuid4().hex[:8]}",
                    system_message=system).with_model("anthropic", STRATEGY_MODEL)
     return str(await asyncio.wait_for(chat.send_message(UserMessage(text=prompt)), timeout=120)).strip()
+
+
+async def post_agent_message(user_id: str, agent_id: str, content: str):
+    now = datetime.now(timezone.utc).isoformat()
+    await db.agent_chats.update_one(
+        {"user_id": user_id, "agent_id": agent_id},
+        {"$push": {"messages": {"role": "agent", "content": content, "ts": now}},
+         "$set": {"updated_at": now}}, upsert=True)
 
 
 FORGE_SPEC_SYSTEM = (

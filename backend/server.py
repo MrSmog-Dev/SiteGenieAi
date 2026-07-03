@@ -26,6 +26,7 @@ from routes.subscriptions import router as subscriptions_router
 from routes.market import router as market_router
 from routes.agents import router as agents_router
 from routes.leads import router as leads_router
+from routes.blog import router as blog_router
 
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
@@ -44,6 +45,7 @@ api_router.include_router(subscriptions_router)
 api_router.include_router(market_router)
 api_router.include_router(agents_router)
 api_router.include_router(leads_router)
+api_router.include_router(blog_router)
 
 
 @app.on_event("startup")
@@ -108,6 +110,9 @@ async def startup():
         await db.users.update_one({"user_id": u["user_id"]},
                                   {"$set": {"extra_credits": int(u.get("credits", 0)), "plan_credits": 0}})
     asyncio.create_task(subscription_worker())
+    from services.automation import automation_loop, ensure_automation_state
+    await ensure_automation_state()
+    asyncio.create_task(automation_loop())
 
 
 app.include_router(api_router)

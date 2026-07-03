@@ -1,3 +1,5 @@
+import asyncio
+
 from fastapi import APIRouter, HTTPException, Depends
 
 from config import GOOGLE_PLACES_API_KEY
@@ -66,7 +68,18 @@ async def update_lead(lead_id: str, input: LeadStatusInput, user: dict = Depends
     res = await db.leads.update_one({"lead_id": lead_id}, {"$set": {"status": input.status}})
     if res.matched_count == 0:
         raise HTTPException(status_code=404, detail="Lead not found")
-    return {"lead_id": lead_id, "status": input.status}
+    demo_triggered = False
+    if input.status == "contacted":
+        lead = await db.leads.find_one({"lead_id": lead_id}, {"_id": 0, "demo_status": 1})
+        if (lead or {}).get("demo_status") not in ("queued", "building", "ready"):
+            from datetime import datetime, timezone
+            await db.leads.update_one({"lead_id": lead_id},
+                                      {"$set": {"demo_status": "queued",
+                                                "updated_at": datetime.now(timezone.utc).isoformat()}})
+            from services.automation import run_lead_demo
+            asyncio.create_task(run_lead_demo(lead_id))
+            demo_triggered = True
+    return {"lead_id": lead_id, "status": input.status, "demo_triggered": demo_triggered}
 
 
 @router.delete("/leads/{lead_id}")

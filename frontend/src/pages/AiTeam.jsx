@@ -5,7 +5,7 @@ import { RexLeadPanel } from "@/components/RexLeadPanel";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
-import { Send, Loader2, Trash2, Hammer, Sparkles, X, Crosshair } from "lucide-react";
+import { Send, Loader2, Trash2, Hammer, Sparkles, X, Crosshair, BookOpen, PenLine } from "lucide-react";
 
 export default function AiTeam() {
   const { user } = useAuth();
@@ -18,6 +18,7 @@ export default function AiTeam() {
   const [forgeJob, setForgeJob] = useState(null);
   const [showForge, setShowForge] = useState(false);
   const [showRex, setShowRex] = useState(false);
+  const [ivyWriting, setIvyWriting] = useState(false);
   const scrollRef = useRef(null);
 
   const isOwner = !!user && (user.role === "owner" || user.role === "admin");
@@ -32,13 +33,15 @@ export default function AiTeam() {
     api.get("/agents").then(({ data }) => setAgents(data)).catch(() => {});
   }, [isOwner]);
 
-  useEffect(() => {
+  const loadChat = useCallback((silent = false) => {
     if (!isOwner || !activeId) return;
-    setMessages(null);
+    if (!silent) setMessages(null);
     api.get(`/agents/${activeId}/chat`)
       .then(({ data }) => setMessages(data.messages))
-      .catch(() => setMessages([]));
+      .catch(() => { if (!silent) setMessages([]); });
   }, [activeId, isOwner]);
+
+  useEffect(() => { loadChat(); }, [loadChat]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -64,6 +67,19 @@ export default function AiTeam() {
     if (!window.confirm(`Clear your conversation with ${active?.name}?`)) return;
     await api.delete(`/agents/${activeId}/chat`).catch(() => {});
     setMessages([]);
+  };
+
+  const ivyWrite = async () => {
+    setIvyWriting(true);
+    try {
+      await api.post("/agents/ivy/blog");
+      toast.info("Ivy is writing today's article (~1–2 min). She'll drop the link in this chat.");
+      setTimeout(() => loadChat(true), 75000);
+      setTimeout(() => { loadChat(true); setIvyWriting(false); }, 150000);
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Ivy couldn't start writing.");
+      setIvyWriting(false);
+    }
   };
 
   const pollForge = useCallback((jobId) => {
@@ -92,6 +108,7 @@ export default function AiTeam() {
           <div className="p-5 border-b border-white/10">
             <h1 className="font-display font-bold text-lg">AI Team</h1>
             <p className="text-white/40 text-xs mt-1">Your autonomous staff of 12</p>
+            <p data-testid="automation-status" className="text-[10px] font-mono text-emerald-300/70 mt-2 uppercase tracking-wider">● Automation on — daily briefing · daily article · weekly template</p>
           </div>
           {agents.map((a) => (
             <button key={a.id} data-testid={`agent-item-${a.id}`} onClick={() => setActiveId(a.id)}
@@ -140,6 +157,18 @@ export default function AiTeam() {
                   className="flex items-center gap-2 text-sm border border-red-400/50 text-red-300 hover:border-red-300 px-3 py-2 transition-colors duration-300">
                   <Crosshair className="w-4 h-4" /> Lead Hunter
                 </button>
+              )}
+              {active.id === "ivy" && (
+                <>
+                  <a data-testid="ivy-view-blog" href="/api/blog" target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-sm border border-white/15 hover:border-green-300 hover:text-green-300 px-3 py-2 transition-colors duration-300">
+                    <BookOpen className="w-4 h-4" /> View blog
+                  </a>
+                  <button data-testid="ivy-write-blog" onClick={ivyWrite} disabled={ivyWriting}
+                    className="flex items-center gap-2 text-sm border border-green-400/50 text-green-300 hover:border-green-300 px-3 py-2 transition-colors duration-300 disabled:opacity-50">
+                    {ivyWriting ? <Loader2 className="w-4 h-4 animate-spin" /> : <PenLine className="w-4 h-4" />} Write article now
+                  </button>
+                </>
               )}
               <button data-testid="clear-chat-btn" onClick={clearChat} title="Clear conversation"
                 className="p-2 text-white/40 hover:text-neon transition-colors duration-300">

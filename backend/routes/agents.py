@@ -64,6 +64,14 @@ async def forge_build(input: ForgeBuildInput, user: dict = Depends(get_current_u
     return {"job_id": job_id, "status": "queued"}
 
 
+@router.post("/agents/ivy/blog")
+async def ivy_write_blog(user: dict = Depends(get_current_user)):
+    _require_owner(user)
+    from services.blog import run_ivy_blog
+    asyncio.create_task(run_ivy_blog(user["user_id"]))
+    return {"status": "writing"}
+
+
 @router.get("/agents/{agent_id}/chat")
 async def get_agent_chat(agent_id: str, user: dict = Depends(get_current_user)):
     _require_owner(user)

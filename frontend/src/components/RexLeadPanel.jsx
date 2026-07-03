@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
-import { Crosshair, Globe, Loader2, X, Trash2, Flame, Search, KeyRound, Star, Phone } from "lucide-react";
+import { Crosshair, Globe, Loader2, X, Trash2, Flame, Search, KeyRound, Star, Phone, Rocket } from "lucide-react";
 
 const STATUS_COLORS = { new: "text-white/60", contacted: "text-sky-300", won: "text-emerald-300", lost: "text-white/30" };
 
@@ -21,6 +21,12 @@ export const RexLeadPanel = ({ onClose }) => {
     loadLeads();
     api.get("/leads/hunt/status").then(({ data }) => setConfigured(data.places_configured)).catch(() => setConfigured(false));
   }, []);
+
+  useEffect(() => {
+    if (!leads || !leads.some((l) => ["queued", "building"].includes(l.demo_status))) return;
+    const t = setInterval(loadLeads, 15000);
+    return () => clearInterval(t);
+  }, [leads]);
 
   const scan = async (urlOverride) => {
     const url = (urlOverride || scanUrl).trim();
@@ -71,7 +77,7 @@ export const RexLeadPanel = ({ onClose }) => {
       <div className="px-6 py-4">
         <div className="flex items-center justify-between">
           <p className="text-sm text-red-200/90 flex items-center gap-2">
-            <Crosshair className="w-4 h-4" /> Rex's Lead Hunter — scan any business website (0–100, ≤65 = lead, ≤40 = HOT) or hunt businesses with 15+ reviews and no website.
+            <Crosshair className="w-4 h-4" /> Rex's Lead Hunter — scan any business website (0–100, ≤65 = lead, ≤40 = HOT) or hunt businesses with 15+ reviews and no website. Mark a lead Contacted and Forge auto-builds a pitch demo site.
           </p>
           <button onClick={onClose} className="text-white/40 hover:text-white p-1" data-testid="rex-panel-close"><X className="w-4 h-4" /></button>
         </div>
@@ -177,6 +183,20 @@ export const RexLeadPanel = ({ onClose }) => {
                       {l.website ? <a href={l.website} target="_blank" rel="noopener noreferrer" className="underline hover:text-white/70 truncate">{l.website.replace(/^https?:\/\//, "")}</a> : null}
                     </div>
                   </div>
+                  {(l.demo_status === "queued" || l.demo_status === "building") && (
+                    <span data-testid={`lead-demo-building-${l.lead_id}`} className="flex items-center gap-1 text-[11px] text-amber-300 font-mono shrink-0">
+                      <Loader2 className="w-3 h-3 animate-spin" /> Demo building…
+                    </span>
+                  )}
+                  {l.demo_status === "ready" && l.demo_slug && (
+                    <a data-testid={`lead-demo-${l.lead_id}`} href={`${window.location.origin}/api/p/${l.demo_slug}`} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-[11px] font-mono text-emerald-300 border border-emerald-400/30 hover:border-emerald-300 px-2 py-1 shrink-0 transition-colors duration-300">
+                      <Rocket className="w-3 h-3" /> Demo
+                    </a>
+                  )}
+                  {l.demo_status === "error" && (
+                    <span className="text-[11px] text-red-400 font-mono shrink-0">Demo failed</span>
+                  )}
                   <select data-testid={`lead-status-${l.lead_id}`} value={l.status} onChange={(e) => setStatus(l, e.target.value)}
                     className={`bg-surface2 border border-white/10 text-xs px-2 py-1.5 outline-none ${STATUS_COLORS[l.status] || ""}`}>
                     <option value="new">New</option>
