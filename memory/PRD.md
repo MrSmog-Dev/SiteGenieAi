@@ -70,7 +70,13 @@ An online store that creates website templates for businesses that don't have a 
 - P2: Publish/hosting. ✅ DONE. Remaining: **custom domain mapping** (needs DNS + per-domain TLS/ingress — not feasible in this env; delivered vanity slugs as the practical equivalent).
 - P2: More export formats. ✅ ZIP done. (image/asset bundling N/A — sites use hosted assets.)
 - P2: Cheaper/faster model toggle. ✅ DONE (Economy mode).
-- P3 (new idea): auto-generated branded OG card image per published site (currently reuses the site's hero image).
+- P3 (new idea): auto-generated branded OG card image per published site. ✅ DONE (2026-07-03).
+
+## Implemented — Branded OG card (P3, 2026-07-03)
+- GET /api/og/{slug}.png renders a deterministic 1200x630 branded social card with Pillow (brand-color gradient + glow, accent bar, industry label, auto-fit/wrapped business name, SiteGenie wordmark with bolt). No LLM cost, exact text.
+- /api/p/{slug} og:image now points to the branded card (replaces hero-image reuse); og:url + og:image built from X-Forwarded-Host + X-Forwarded-Proto so absolute URLs use the real PUBLIC domain (ingress rewrites Host to an internal cluster host). twitter:card=summary_large_image.
+- Fonts: Liberation Sans (system). Pillow already pinned in requirements.txt.
+- Verified: tests/test_phase3.py (og:image→/api/og/{slug}.png, card PNG 200/image-png, 404) + visual check of the card via public URL.
 
 ## Notes
 - LLM budget: each generation costs ~$0.12. Ensure Universal Key has adequate balance

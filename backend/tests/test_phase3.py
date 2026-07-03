@@ -36,11 +36,19 @@ def main():
         body = r.text
         assert 'property="og:title" content="Meta &amp; Co"' in body, "og:title missing/unescaped"
         assert 'og:description' in body and 'delightful widgets' in body, "og:description missing"
-        assert f'property="og:image" content="{html_lib.escape(hero_img)}"' in body, "og:image (hero) missing"
+        assert 'property="og:image" content="' in body and '/api/og/meta-co-seed.png' in body, "og:image (card) missing"
         assert 'twitter:card" content="summary_large_image"' in body, "twitter large card missing"
         assert r.headers.get("content-security-policy") == "connect-src 'none'", r.headers.get("content-security-policy")
         assert "<h1>Meta Co</h1>" in body, "site body missing"
         print("SEO /p page OK (og:title/desc/image + CSP + body)")
+
+        # branded OG card image renders
+        r = pc.get(f"{API}/og/meta-co-seed.png")
+        assert r.status_code == 200 and "image/png" in r.headers.get("content-type", ""), ("og png", r.status_code)
+        assert int(r.headers.get("content-length", len(r.content))) > 5000, "og png too small"
+        print("branded OG card PNG OK (", len(r.content), "bytes )")
+        assert pc.get(f"{API}/og/nope-nope.png").status_code == 404
+        print("OG card 404 OK")
 
         # unknown slug -> 404 html
         r = pc.get(f"{API}/p/nope-nope")

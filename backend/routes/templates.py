@@ -13,6 +13,8 @@ from database import db
 from models import GenerateInput, EditInput, SlugInput
 from security import get_current_user, total_credits, user_is_unlimited, parse_dt
 from services.llm import _start_job
+from services.og_image import render_og_png
+from starlette.concurrency import run_in_threadpool
 
 router = APIRouter()
 
@@ -178,6 +180,13 @@ _NOT_FOUND_HTML = (
 )
 
 
+def _public_base(request: Request) -> str:
+    host = (request.headers.get("x-forwarded-host") or request.headers.get("host")
+            or request.url.netloc).split(",")[0].strip()
+    proto = (request.headers.get("x-forwarded-proto") or request.url.scheme or "https").split(",")[0].strip()
+    return f"{proto}://{host}"
+
+
 def _inject_social_meta(doc_html: str, *, business_name: str, description: str, industry: str,
                         url: str, image: str) -> str:
     title = html_lib.escape(business_name or "Website")
@@ -217,18 +226,31 @@ async def public_page(slug: str, request: Request):
     if not tpl:
         return HTMLResponse(_NOT_FOUND_HTML, status_code=404)
     doc_html = tpl.get("html", "")
-    m = re.search(r'https://images\.unsplash\.com/[^\s"\'()]+', doc_html)
-    image = m.group(0) if m else ""
+    base = _public_base(request)
     out = _inject_social_meta(
         doc_html,
         business_name=tpl.get("business_name", ""),
         description=tpl.get("description", ""),
         industry=tpl.get("industry", ""),
-        url=str(request.url),
-        image=image,
+        url=f"{base}/api/p/{slug}",
+        image=f"{base}/api/og/{slug}.png",
     )
     # Block generated scripts from calling back to our API (mitigates same-origin abuse).
     return HTMLResponse(out, headers={"Content-Security-Policy": "connect-src 'none'"})
+
+
+@router.get("/og/{slug}.png")
+async def og_card(slug: str):
+    """Auto-generated branded 1200x630 social preview card for a published site."""
+    tpl = await db.templates.find_one({"slug": slug, "published": True},
+                                      {"_id": 0, "business_name": 1, "industry": 1, "primary_color": 1})
+    if not tpl:
+        raise HTTPException(status_code=404, detail="Not found")
+    png = await run_in_threadpool(
+        render_og_png, tpl.get("business_name", ""), tpl.get("industry", ""),
+        tpl.get("primary_color", "#0055FF"))
+    return Response(content=png, media_type="image/png",
+                    headers={"Cache-Control": "public, max-age=300"})
 
 
 @router.get("/templates/{template_id}/download-zip")
