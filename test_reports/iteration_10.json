@@ -1,0 +1,33 @@
+{
+  "summary": "E2E browser test: Landing chat → sessionStorage brief → login (owner) → Generator (brief pre-filled) → generate → publish → public /api/p/{slug} view. Economy mode (Haiku single-pass) fully passed. Quality mode (Haiku+Sonnet 2-pass) HUNG for 7+ minutes on the Sonnet build call and never returned — this is the biggest concern to re-verify.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "POST /api/templates/generate (quality mode)", "issue": "Sonnet 4.6 build call hangs. First test run started 13:58:05, still no completion 7+ minutes later. No error thrown, no timeout enforced in _call_llm. Frontend polls up to 6.5 min but even that isn't enough when the model call itself never returns. Contradicts main-agent-observed 90s curl run — likely intermittent Sonnet latency/hang. Recommend adding an explicit request timeout on _call_llm and surfacing the error as job status='error' so UI can react.", "priority": "HIGH"}
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Login with pending brief", "issue": "Login redirects to /dashboard even when sg_pending_brief is present in sessionStorage. The login page shows the 'Your website brief is saved — log in and I'll drop you into the build' banner, but the user is dropped on /dashboard, not /generate. They must manually navigate to /generate for the pre-fill to trigger. Landing→Register→auth flow probably has the same gap.", "affected_selectors": ["login-submit", "login-brief-banner"]}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Investigate the Sonnet 4.6 hang in quality mode. Add an explicit LLM request timeout in services/llm.py::_call_llm and mark job status='error' on timeout so UI stops spinning. Consider retrying with a shorter prompt or falling back to economy if the second-pass hangs.",
+    "Wire post-login redirect (Login.jsx / Register.jsx) to /generate when sessionStorage.sg_pending_brief exists, so the promised 'drop straight into build' actually happens instead of landing on /dashboard."
+  ],
+  "critical_code_review_comments": [
+    "services/llm.py::_call_llm has no request/response timeout — a stuck upstream call blocks the background job indefinitely and never transitions to error state.",
+    "frontend pollGenerationJob caps at 130*3s=390s. If the backend job stalls beyond that, the client shows a generic error but the job document may still be 'processing' forever."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (frontend-only scope)", "frontend": "~85% (economy path 100%, quality path failed to complete)"},
+  "test_credentials": "Owner: neobeyondlegacy2@gmail.com / SoloLeveling21! (unlimited, confirmed ∞ credits, cost=0 after gen).",
+  "seed_data_creation": "Published a test template with slug 'testbrew-cafe-c5169c' via the E2E flow. Safe to leave — owner-owned.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Landing chat brief writes to sessionStorage under key 'sg_pending_brief' (NOT localStorage as the review note said). Redirect to /register on submit while logged out preserves it. Login flow lands on /dashboard, so to test pre-fill you must navigate to /generate after login. Economy mode reliably completes in ~30-60s and is the best path for E2E validation. Quality mode is currently unreliable — I saw a >7min Sonnet hang while the main agent saw ~90s curl completion — treat it as flaky. Verified endpoints in-browser: POST /api/auth/login, POST /api/templates/generate, GET /api/templates/job/{id}, POST /api/templates/{id}/publish, GET /api/p/{slug} (200, correct <title>, og:title, og:image=/api/og/{slug}.png).",
+  "rca of the issue": "Sonnet build call in quality mode appears to hang with no timeout in services/llm.py::_call_llm. Reproduction: log in as owner, POST /api/templates/generate with quality='quality' — Haiku brief returns in ~50s, but the follow-up Sonnet call does not return within 7+ minutes and no error is emitted. Mitigation: add asyncio.wait_for/httpx timeout inside _call_llm (e.g. 180s) and _fail_job on TimeoutError so the UI can gracefully surface it."
+}
