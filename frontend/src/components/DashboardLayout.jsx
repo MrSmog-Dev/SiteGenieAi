@@ -1,11 +1,12 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { LayoutDashboard, Sparkles, LayoutTemplate, CreditCard, LogOut, Zap } from "lucide-react";
+import { LayoutDashboard, Sparkles, LayoutTemplate, CreditCard, LogOut, Zap, Store } from "lucide-react";
 
 const nav = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/generate", label: "Generate", icon: Sparkles },
   { to: "/templates", label: "My Templates", icon: LayoutTemplate },
+  { to: "/market", label: "Market", icon: Store },
   { to: "/billing", label: "Billing", icon: CreditCard },
 ];
 

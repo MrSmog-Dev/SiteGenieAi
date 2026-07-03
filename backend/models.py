@@ -51,5 +51,13 @@ class SlugInput(BaseModel):
     slug: str
 
 
+class MarketListInput(BaseModel):
+    template_id: str
+
+
+class MarketCheckoutInput(BaseModel):
+    origin_url: str
+
+
 class DomainInput(BaseModel):
     domain: str

@@ -34,7 +34,8 @@ async def regenerate_template(template_id: str, user: dict = Depends(get_current
     fields = {k: tpl.get(k) for k in ("business_name", "industry", "description", "style",
                                       "primary_color", "contact_email", "phone",
                                       "target_audience", "key_services", "brand_keywords", "pages", "quality")}
-    return await _start_job(user, fields, mode="regenerate", template_id=template_id)
+    return await _start_job(user, fields, mode="regenerate", template_id=template_id,
+                            free=bool(tpl.get("purchased")))
 
 
 @router.post("/templates/{template_id}/edit")
@@ -42,7 +43,8 @@ async def edit_template(template_id: str, input: EditInput, user: dict = Depends
     tpl = await db.templates.find_one({"template_id": template_id, "user_id": user["user_id"]}, {"_id": 0})
     if not tpl:
         raise HTTPException(status_code=404, detail="Template not found")
-    return await _start_job(user, {"instructions": input.instructions}, mode="edit", template_id=template_id)
+    return await _start_job(user, {"instructions": input.instructions}, mode="edit", template_id=template_id,
+                            free=bool(tpl.get("purchased")))
 
 
 @router.get("/templates/job/{job_id}")

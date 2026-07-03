@@ -1,0 +1,56 @@
+{
+  "summary": "Comprehensive testing of the Template Market feature (backend + frontend). 17/17 pytest cases pass; frontend E2E validated /market public page, buy→login redirect, owner sidebar Market nav, delist controls, template sell/delist buttons, landing nav-market-link, and buyer register→Buy→Stripe checkout redirect ($280). Fulfillment simulated via direct service call (Stripe test checkout cannot be auto-completed) — post-fulfillment endpoints (/api/templates, /api/market/owned, purchased edit bypass, download-zip, 409 double-purchase) all verified.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_market.py",
+    "/app/test_reports/pytest/market_results.xml"
+  ],
+  "tests_executed": {
+    "backend": [
+      "GET /api/market returns Lumen Studio ($280, Professional) with all required fields, html/metrics excluded",
+      "GET /api/market/{id}/preview returns HTML with CSP header (no auth)",
+      "Preview with count=1 + browser UA (bots blocked by user-agent regex)",
+      "GET /api/market/{bad}/preview -> 404",
+      "POST /api/market/list as non-owner -> 403",
+      "POST /api/market/list as owner creates listing (heuristic pricing, price in $200-500), duplicate -> 409, DELETE cleans up (active:false)",
+      "DELETE /api/market/{id} as non-owner -> 403",
+      "POST /api/market/{id}/checkout unauthenticated -> 401/403",
+      "POST /api/market/{id}/checkout as buyer returns Stripe url + session_id; payment_transactions row created (kind=market_purchase)",
+      "POST /api/market/{bad}/checkout -> 404",
+      "GET /api/market/purchase/status/{session_id} returns market_id/amount",
+      "Direct fulfill_market_purchase copies template with purchased=true, purchased_market_id set; /api/templates shows purchased=true; /api/market/owned maps mkt_id->tpl_id; second checkout for same market returns 409",
+      "POST /api/templates/{purchased_tid}/edit with 0 credits does NOT return 402 (returns 200 + job_id) — free-edits bypass verified",
+      "POST /api/templates/{normal_tid}/edit with 0 credits returns 402 (sanity: gate still works for non-purchased)",
+      "GET /api/templates/{purchased_tid}/download-zip returns valid zip (PK signature, content-type application/zip)"
+    ],
+    "frontend": [
+      "/market loads public (no auth), hero copy 'Premium websites, ready to own.', Lumen Studio card with data-testid price-{id}=$280, buy-{id}, preview-{id}",
+      "Buy click while logged out shows toast + redirects to /login",
+      "Owner login (neobeyondlegacy2@gmail.com) -> Dashboard shows sidebar 'Market' with data-testid=nav-market",
+      "Owner template view (/templates/tpl_...) shows sell-market-btn or delist-market-btn depending on listing state",
+      "Owner sees delist-{market_id} trash button on /market",
+      "Landing page has data-testid=nav-market-link (Template Market)",
+      "New buyer register -> /market -> Buy button redirects to Stripe checkout showing US$280.00 (Sandbox mode)"
+    ]
+  },
+  "action_items": [],
+  "critical_code_review_comments": [
+    "market.py line 47: MongoDB projection mixes inclusion+exclusion which is fine for the {'template_id':1,'purchased_market_id':1} case but exclusion of _id is explicitly set — ok.",
+    "market_preview injects raw stored HTML with CSP connect-src 'none' — good defense against callbacks from generated JS.",
+    "fulfill_market_purchase does NOT copy analytics fields (views_total, slug, published) — intentional (fresh copy), but if listing.summary/highlights/rationale/tier were useful in buyer's view they are dropped (only GEN_FIELDS copied). Consider whether buyer should see the pricing narrative — not required by spec.",
+    "market_checkout stores the txn AFTER creating the Stripe session. If insert_one fails but session was created, the buyer could pay for something that never gets fulfilled (session_id unknown to status endpoint). Low risk but worth logging.",
+    "TemplateView shows 'Owned · Free edits' badge only when tpl.purchased is truthy — depends on the buyer's /api/templates/{id} response including purchased. Verified included via find_one without projection filter.",
+    "priced_by='heuristic' as expected due to LLM budget exhaustion; pricing agent gracefully falls back — good.",
+    "Owner's regenerate on a purchased template also passes free=True — correct per requirements."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_market.py (new)"
+  ],
+  "success_rate": {"backend": "100% (17/17)", "frontend": "100% (7/7 key flows)"},
+  "test_credentials": "Owner: neobeyondlegacy2@gmail.com / SoloLeveling21! (works). Buyers registered dynamically (TEST_buyer_*@example.com).",
+  "seed_data_creation": "Test inserts one purchased template + one non-purchased template into `templates` collection for the dynamically registered buyer; zeroes buyer credits. A test payment_transactions row is inserted to invoke fulfill_market_purchase directly. No existing production data (Lumen Studio mkt_544d65d7cb12) was modified/delisted.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend Market tests live at /app/backend/tests/test_market.py — safe to re-run. They dynamically pick an unlisted owner template to list+delist so they won't collide with existing listings. Stripe test-card checkout cannot be auto-completed by playwright reliably; fulfillment path is instead verified by directly calling services.market.fulfill_market_purchase which is the same code path apply_payment invokes on paid webhook."
+}

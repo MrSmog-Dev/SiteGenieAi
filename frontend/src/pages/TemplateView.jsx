@@ -4,7 +4,7 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { api, formatApiError, pollGenerationJob } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
-import { ArrowLeft, Download, Copy, Monitor, Smartphone, Code, RefreshCw, Wand2, Loader2, X, Globe, Share2, Check, ExternalLink, ChevronDown, FileArchive, FileCode, BarChart2, ShieldCheck, Clock } from "lucide-react";
+import { ArrowLeft, Download, Copy, Monitor, Smartphone, Code, RefreshCw, Wand2, Loader2, X, Globe, Share2, Check, ExternalLink, ChevronDown, FileArchive, FileCode, BarChart2, ShieldCheck, Clock, Store } from "lucide-react";
 
 export default function TemplateView() {
   const { id } = useParams();
@@ -28,6 +28,10 @@ export default function TemplateView() {
   const [savingDomain, setSavingDomain] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [domainInfo, setDomainInfo] = useState(null);
+  const [listing, setListing] = useState(null);
+  const [listingBusy, setListingBusy] = useState(false);
+
+  const isOwnerUser = !!user && (user.role === "owner" || user.role === "admin");
 
   const publicUrl = tpl?.slug ? `${window.location.origin}/api/p/${tpl.slug}` : "";
   const appHost = window.location.hostname;
@@ -40,15 +44,42 @@ export default function TemplateView() {
   }).catch(() => { toast.error("Not found"); navigate("/templates"); });
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
 
+  useEffect(() => {
+    if (!isOwnerUser) return;
+    api.get("/market/mine")
+      .then(({ data }) => setListing(data.find((l) => l.source_template_id === id) || null))
+      .catch(() => {});
+  }, [id, isOwnerUser]);
+
+  const sellOnMarket = async () => {
+    setListingBusy(true);
+    try {
+      const { data } = await api.post("/market/list", { template_id: id });
+      setListing(data);
+      toast.success(`Listed on the Market at $${data.price_usd} — priced by the AI pricing agent (${data.tier}).`);
+    } catch (e) {
+      if (e.response?.status === 409) toast.error("This template is already listed on the Market.");
+      else toast.error(formatApiError(e.response?.data?.detail));
+    } finally { setListingBusy(false); }
+  };
+  const delistFromMarket = async () => {
+    if (!window.confirm("Remove this template from the Market?")) return;
+    try {
+      await api.delete(`/market/${listing.market_id}`);
+      setListing(null);
+      toast.success("Removed from the Market.");
+    } catch (e) { toast.error("Could not remove listing."); }
+  };
+
   const runJob = async (promise, label) => {
-    if ((user?.credits ?? 0) < 1 && !user?.unlimited) { toast.error("You're out of credits. Purchase a credit pack to continue."); navigate("/pricing"); return; }
+    if (!tpl?.purchased && (user?.credits ?? 0) < 1 && !user?.unlimited) { toast.error("You're out of credits. Purchase a credit pack to continue."); navigate("/pricing"); return; }
     setBusy(true); setBusyLabel(label);
     try {
       const { data } = await promise;
       const job = await pollGenerationJob(data.job_id);
       setTpl((t) => ({ ...t, html: job.template.html }));
       await refreshUser();
-      toast.success(job.unlimited ? `${label} complete!` : `${label} complete! ${job.cost} credits used.`);
+      toast.success(job.unlimited || !job.cost ? `${label} complete!` : `${label} complete! ${job.cost} credits used.`);
     } catch (e) {
       const status = e.response?.status;
       if (status === 402) { toast.error("Not enough credits."); navigate("/pricing"); }
@@ -167,11 +198,27 @@ export default function TemplateView() {
           <div className="flex items-center gap-3 min-w-0">
             <button onClick={() => navigate("/templates")} data-testid="back-btn" className="p-2 border border-white/15 hover:border-white/40 transition-colors duration-300"><ArrowLeft className="w-4 h-4" /></button>
             <div className="min-w-0">
-              <h1 className="font-display font-bold truncate">{tpl.business_name}</h1>
+              <div className="flex items-center gap-2 min-w-0">
+                <h1 className="font-display font-bold truncate">{tpl.business_name}</h1>
+                {tpl.purchased && (
+                  <span data-testid="owned-free-edits-badge" className="shrink-0 text-[10px] font-mono uppercase tracking-wider bg-amber-400 text-black px-2 py-0.5">Owned · Free edits</span>
+                )}
+              </div>
               <p className="text-white/40 text-xs truncate">{tpl.industry}</p>
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
+            {isOwnerUser && !tpl.purchased && (listing ? (
+              <button data-testid="delist-market-btn" onClick={delistFromMarket}
+                className="flex items-center gap-2 text-sm border border-amber-400/50 text-amber-300 hover:border-amber-300 px-3 py-2 transition-colors duration-300">
+                <Store className="w-4 h-4" /> On Market · ${listing.price_usd}
+              </button>
+            ) : (
+              <button data-testid="sell-market-btn" onClick={sellOnMarket} disabled={listingBusy || busy}
+                className="flex items-center gap-2 text-sm border border-white/15 hover:border-amber-300 hover:text-amber-300 px-3 py-2 transition-colors duration-300 disabled:opacity-50">
+                {listingBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Store className="w-4 h-4" />} Sell on Market
+              </button>
+            ))}
             <button data-testid="regenerate-btn" onClick={regenerate} disabled={busy}
               className="flex items-center gap-2 text-sm border border-white/15 hover:border-brand hover:text-brand px-3 py-2 transition-colors duration-300 disabled:opacity-50">
               <RefreshCw className={`w-4 h-4 ${busy && busyLabel === "Regenerate" ? "animate-spin" : ""}`} /> Regenerate
@@ -242,7 +289,7 @@ export default function TemplateView() {
               <h2 className="font-display text-xl font-bold flex items-center gap-2"><Wand2 className="w-5 h-5 text-neon" /> Edit with AI</h2>
               <button onClick={() => setEditOpen(false)} className="text-white/50 hover:text-white"><X className="w-5 h-5" /></button>
             </div>
-            <p className="text-white/50 text-sm mb-3">Describe the changes and AI will revise your site. Credits are spent based on the work done.</p>
+            <p className="text-white/50 text-sm mb-3">{tpl.purchased ? "You own this template — AI edits are free and unlimited." : "Describe the changes and AI will revise your site. Credits are spent based on the work done."}</p>
             <textarea data-testid="edit-instructions" rows={4} value={instructions} onChange={(e) => setInstructions(e.target.value)}
               className="w-full bg-surface1 border border-white/10 focus:border-neon px-4 py-3 outline-none transition-colors duration-300 text-white"
               placeholder="e.g. Make the hero darker, add a pricing section, change the tagline to..." />

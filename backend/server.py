@@ -23,6 +23,7 @@ from routes.plans import router as plans_router
 from routes.templates import router as templates_router
 from routes.payments import router as payments_router
 from routes.subscriptions import router as subscriptions_router
+from routes.market import router as market_router
 
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
@@ -38,6 +39,7 @@ api_router.include_router(plans_router)
 api_router.include_router(templates_router)
 api_router.include_router(payments_router)
 api_router.include_router(subscriptions_router)
+api_router.include_router(market_router)
 
 
 @app.on_event("startup")
@@ -49,6 +51,8 @@ async def startup():
     await db.templates.create_index("slug", unique=True, sparse=True)
     await db.templates.create_index("custom_domain", unique=True, sparse=True)
     await db.gen_jobs.create_index("job_id")
+    await db.market_listings.create_index("market_id", unique=True)
+    await db.market_listings.create_index("active")
     await db.rate_events.create_index("ts", expireAfterSeconds=GEN_WINDOW_SECONDS + 60)
     await db.login_attempts.create_index("ts", expireAfterSeconds=LOGIN_WINDOW_SECONDS + 60)
     await db.login_attempts.create_index("identifier")

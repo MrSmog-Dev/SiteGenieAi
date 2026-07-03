@@ -148,7 +148,7 @@ async def _fail_job(job_id: str, e: Exception):
     await db.gen_jobs.update_one({"job_id": job_id}, {"$set": {"status": "error", "error": err}})
 
 
-async def _run_generation(job_id: str, user_id: str, fields: dict, mode: str = "new", template_id: str = None):
+async def _run_generation(job_id: str, user_id: str, fields: dict, mode: str = "new", template_id: str = None, free: bool = False):
     cost_inputs = []
     try:
         if mode == "edit":
@@ -201,7 +201,7 @@ async def _run_generation(job_id: str, user_id: str, fields: dict, mode: str = "
             {"$set": {"html": html, "updated_at": datetime.now(timezone.utc)}},
         )
     user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
-    charged = 0 if user_is_unlimited(user) else cost
+    charged = 0 if free or user_is_unlimited(user) else cost
     if charged:
         await deduct_credits(user_id, charged)
     await db.gen_jobs.update_one({"job_id": job_id},
@@ -209,8 +209,8 @@ async def _run_generation(job_id: str, user_id: str, fields: dict, mode: str = "
                                            "cost": charged, "mode": mode}})
 
 
-async def _start_job(user: dict, fields: dict, mode: str = "new", template_id: str = None):
-    if not user_is_unlimited(user) and total_credits(user) <= 0:
+async def _start_job(user: dict, fields: dict, mode: str = "new", template_id: str = None, free: bool = False):
+    if not free and not user_is_unlimited(user) and total_credits(user) <= 0:
         raise HTTPException(status_code=402, detail="You're out of credits. Purchase a credit pack to keep building.")
     if not is_owner(user):
         await check_rate_limit(f"gen:{user['user_id']}", GEN_MAX_PER_WINDOW, GEN_WINDOW_SECONDS)
@@ -219,5 +219,5 @@ async def _start_job(user: dict, fields: dict, mode: str = "new", template_id: s
         "job_id": job_id, "user_id": user["user_id"], "status": "pending",
         "template_id": template_id, "error": None, "created_at": datetime.now(timezone.utc),
     })
-    asyncio.create_task(_run_generation(job_id, user["user_id"], fields, mode, template_id))
+    asyncio.create_task(_run_generation(job_id, user["user_id"], fields, mode, template_id, free))
     return {"job_id": job_id, "status": "pending"}

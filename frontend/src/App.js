@@ -16,6 +16,8 @@ import Billing from "@/pages/Billing";
 import PaymentReturn from "@/pages/PaymentReturn";
 import PublicSite from "@/pages/PublicSite";
 import DomainSite from "@/pages/DomainSite";
+import Market from "@/pages/Market";
+import MarketSuccess from "@/pages/MarketSuccess";
 
 const backendHost = (() => {
   try { return new URL(process.env.REACT_APP_BACKEND_URL).hostname; } catch (e) { return window.location.hostname; }
@@ -35,6 +37,8 @@ function AppRouter() {
       <Route path="/pricing" element={<Pricing />} />
       <Route path="/billing" element={<ProtectedRoute><Billing /></ProtectedRoute>} />
       <Route path="/payment-return" element={<PaymentReturn />} />
+      <Route path="/market" element={<Market />} />
+      <Route path="/market/success" element={<ProtectedRoute><MarketSuccess /></ProtectedRoute>} />
       <Route path="/s/:slug" element={<PublicSite />} />
       <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/generate" element={<ProtectedRoute><Generator /></ProtectedRoute>} />

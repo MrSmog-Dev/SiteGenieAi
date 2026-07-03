@@ -44,7 +44,7 @@ export default function MyTemplates() {
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {templates.map((t) => (
               <div key={t.template_id} data-testid={`template-card-${t.template_id}`} className="border border-white/10 hover:border-white/30 bg-surface1 transition-colors duration-300 group">
-                <SiteThumb id={t.template_id} color={t.primary_color} published={t.published} />
+                <SiteThumb id={t.template_id} color={t.primary_color} published={t.published} purchased={t.purchased} />
                 <div className="p-5">
                   <h3 className="font-display font-semibold truncate">{t.business_name}</h3>
                   <p className="text-white/40 text-xs mt-1">{t.industry}</p>
@@ -74,7 +74,7 @@ export default function MyTemplates() {
   );
 }
 
-function SiteThumb({ id, color, published }) {
+function SiteThumb({ id, color, published, purchased }) {
   const [html, setHtml] = useState(null);
   const ref = useRef(null);
   useEffect(() => {
@@ -99,6 +99,9 @@ function SiteThumb({ id, color, published }) {
         <div className="w-full h-full flex items-center justify-center" style={{ background: color || "#0055FF" }}>
           <LayoutTemplate className="w-8 h-8 text-white/80" />
         </div>
+      )}
+      {purchased && (
+        <span data-testid={`owned-badge-${id}`} className="absolute top-2 left-2 text-[10px] font-mono uppercase tracking-wider bg-amber-400 text-black px-2 py-1 z-10">Owned</span>
       )}
       {published && (
         <span data-testid={`live-badge-${id}`} className="absolute top-2 right-2 flex items-center gap-1 text-[10px] font-mono uppercase tracking-wider bg-black/60 backdrop-blur-sm text-neon px-2 py-1 z-10">

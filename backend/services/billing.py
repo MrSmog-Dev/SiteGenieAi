@@ -14,6 +14,7 @@ from config import (
     STRIPE_API_KEY, SUBSCRIPTION_PLANS, CREDIT_RESET_DAYS, use_native_stripe, logger,
 )
 from security import process_subscription
+from services.market import fulfill_market_purchase
 
 
 # ---------------- Emergent-proxied one-time checkout ----------------
@@ -35,6 +36,8 @@ async def apply_payment(txn: dict):
     user_id = claimed["user_id"]
     if claimed["kind"] == "credits":
         await db.users.update_one({"user_id": user_id}, {"$inc": {"extra_credits": int(claimed.get("credits", 0))}})
+    elif claimed["kind"] == "market_purchase":
+        await fulfill_market_purchase(claimed)
     elif claimed["kind"] == "subscription":
         plan = SUBSCRIPTION_PLANS.get(claimed["plan_id"])
         if plan:
