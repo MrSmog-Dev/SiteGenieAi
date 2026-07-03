@@ -1,0 +1,39 @@
+{
+  "summary": "Tested new AI Team feature (12 owner-only agents + Forge builder) end-to-end. 9/10 backend tests pass; frontend fully functional. Blocking issue: Forge build reproducibly fails because the Sonnet site-HTML call in run_forge_build times out at 240s with no fallback.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "POST /api/agents/forge/build (background job)", "issue": "Forge job reliably fails at the 'building' step. services/agents.py:195 calls _call_llm(_build_site_prompt(...), GEN_BUILD_SYSTEM, BUILD_MODEL) directly with BUILD_MODEL='claude-sonnet-4-6'. services/llm.py wraps every call in asyncio.wait_for(..., timeout=LLM_CALL_TIMEOUT_S=240). Sonnet HTML generation regularly exceeds 240s and raises TimeoutError, killing the job. The regular generation flow (services/llm.py lines 163-178) has a Sonnet->Haiku fallback on TimeoutError, but run_forge_build does not — so Forge has no safety net. Reproduced twice in a row (jobs forge_f0f90663b8 and forge_aaa93325c8 both errored ~4:50 into build). Backend log clearly shows: 'forge build failed ... TimeoutError' at services/agents.py:195.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "run_forge_build error handling (services/agents.py:205-207)", "issue": "On failure, only str(e) is stored. For asyncio TimeoutError str(e) is '' so DB doc has {status: 'error', error: ''} and the UI toast/status is empty. Store repr(e) or e.__class__.__name__ + ': ' + str(e)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Sidebar / AiTeam.jsx", "issues": ["DashboardLayout.jsx and AiTeam.jsx both treat role==='admin' as 'owner' (isOwner = role==='owner' || role==='admin'), so an admin user sees the 'AI Team' nav and reaches /team, but the backend gates every /api/agents endpoint via security.is_owner (owner-only). Result: admin sees empty roster + toast errors. Either broaden backend gate to admin, or tighten frontend to owner-only."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_ai_team.py", "/app/test_reports/pytest/ai_team_results.xml"],
+  "action_items": [
+    "Fix Forge build timeout: wrap the Sonnet site-build in try/except asyncio.TimeoutError with a Haiku fallback (mirror services/llm.py:163-178), or raise LLM_CALL_TIMEOUT_S for BUILD_MODEL calls, or split the HTML build into smaller Sonnet calls.",
+    "Store meaningful error text in agent_jobs when the build fails (repr(e) instead of str(e)).",
+    "Decide policy for admin role vs owner on /team: either allow admin in backend (is_owner) or exclude admin in DashboardLayout.jsx + AiTeam.jsx (currently frontend lets admin in, backend blocks them)."
+  ],
+  "critical_code_review_comments": [
+    "run_forge_build has no timeout/fallback safety net — a single slow Sonnet call bricks the whole job.",
+    "Empty error strings stored in agent_jobs make debugging impossible from UI.",
+    "Owner/admin role divergence between frontend gate and backend gate.",
+    "services/agents.py file is fine size-wise; no DRY violations spotted."
+  ],
+  "updated_files": ["/app/backend/tests/test_ai_team.py"],
+  "success_rate": {"backend": "90% (9/10)", "frontend": "100% (owner nav, roster of 12, chat, quick actions, Forge panel open, clear chat, non-owner gating + redirect all pass)"},
+  "test_credentials": "Owner: neobeyondlegacy2@gmail.com / SoloLeveling21! (worked). Non-owner: freshly registered TEST_aiteam_* users.",
+  "seed_data_creation": "Created ~2 disposable non-owner accounts (test_aiteam_*@example.com) during registration flow tests. No templates or Market listings were left orphaned by Forge (all Forge jobs errored before reaching create_listing).",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend tests live in /app/backend/tests/test_ai_team.py. Run with: cd /app/backend && python -m pytest tests/test_ai_team.py -v -o 'addopts=' --junitxml=/app/test_reports/pytest/ai_team_results.xml. TestForge.test_forge_build_flow polls up to 6 minutes; leave headroom. Chat tests (Haiku) return in a few seconds — no need to change timeouts. Owner sees AI Team nav; non-owner should not (verified). If Forge is fixed, expect a new market listing to appear on GET /api/market with price_usd in 200-500 and tier field set. Do NOT delist any existing seeded Market listings — seed_market.py is running in background."
+  ,
+  "rca of the issue": "Forge build error root cause: services/agents.py run_forge_build → line 195 → services/llm.py _call_llm with BUILD_MODEL (claude-sonnet-4-6) inside asyncio.wait_for(timeout=240). Sonnet's full-site HTML generation for a Forge template consistently exceeds 240s → asyncio.TimeoutError → caught in run_forge_build's outer except → job marked 'error' with empty message (str(TimeoutError())=''). The main /api/templates generation path (services/llm.py:163-178) already handles this by catching TimeoutError from Sonnet and retrying with Haiku — Forge lacks this fallback. Reproduction: POST /api/agents/forge/build as owner with any non-trivial brief; poll GET /api/agents/jobs/{id} — reaches status='building', then flips to status='error' at ~4-5 min. Mitigation: mirror the fallback pattern from services/llm.py inside run_forge_build's building step."
+}

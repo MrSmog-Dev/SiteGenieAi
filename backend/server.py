@@ -24,6 +24,7 @@ from routes.templates import router as templates_router
 from routes.payments import router as payments_router
 from routes.subscriptions import router as subscriptions_router
 from routes.market import router as market_router
+from routes.agents import router as agents_router
 
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
@@ -40,6 +41,7 @@ api_router.include_router(templates_router)
 api_router.include_router(payments_router)
 api_router.include_router(subscriptions_router)
 api_router.include_router(market_router)
+api_router.include_router(agents_router)
 
 
 @app.on_event("startup")

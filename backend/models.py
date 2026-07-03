@@ -59,5 +59,13 @@ class MarketCheckoutInput(BaseModel):
     origin_url: str
 
 
+class AgentChatInput(BaseModel):
+    message: str
+
+
+class ForgeBuildInput(BaseModel):
+    brief: str
+
+
 class DomainInput(BaseModel):
     domain: str

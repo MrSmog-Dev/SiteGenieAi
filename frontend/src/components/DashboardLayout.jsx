@@ -1,6 +1,6 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { LayoutDashboard, Sparkles, LayoutTemplate, CreditCard, LogOut, Zap, Store } from "lucide-react";
+import { LayoutDashboard, Sparkles, LayoutTemplate, CreditCard, LogOut, Zap, Store, Bot } from "lucide-react";
 
 const nav = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -14,6 +14,9 @@ export default function DashboardLayout({ children }) {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  const items = user && (user.role === "owner" || user.role === "admin")
+    ? [...nav, { to: "/team", label: "AI Team", icon: Bot }]
+    : nav;
 
   return (
     <div className="min-h-screen bg-base text-white flex">
@@ -28,7 +31,7 @@ export default function DashboardLayout({ children }) {
           </Link>
         </div>
         <nav className="flex-1 p-3 space-y-1">
-          {nav.map((item) => {
+          {items.map((item) => {
             const active = location.pathname === item.to;
             const Icon = item.icon;
             return (
