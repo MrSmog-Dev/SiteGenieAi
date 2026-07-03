@@ -1,0 +1,1520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Verdant & Vine — Bespoke Garden Design</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    /* ── RESET & BASE ─────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; font-size: 16px; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #F5F3F0;
+      color: #3A3A3A;
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+    img { display: block; max-width: 100%; height: auto; }
+    a { color: #2F6B4F; text-decoration: none; transition: color 200ms ease; }
+    a:hover { color: #1F4A37; }
+    a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
+      outline: 2px solid #2F6B4F;
+      outline-offset: 3px;
+    }
+
+    /* ── CSS VARIABLES ────────────────────────────────────────── */
+    :root {
+      --green:       #2F6B4F;
+      --green-dark:  #1F4A37;
+      --green-deep:  #163626;
+      --cream:       #F5F3F0;
+      --sage:        #A8B8A0;
+      --charcoal:    #3A3A3A;
+      --taupe:       #8B8680;
+      --moss:        #D4E0D3;
+      --white:       #FFFFFF;
+      --section-pad: clamp(60px, 8vw, 100px);
+    }
+
+    /* ── UTILITY ──────────────────────────────────────────────── */
+    .container {
+      width: 90%;
+      max-width: 1160px;
+      margin-inline: auto;
+    }
+    .container--narrow { max-width: 780px; }
+
+    .section-label {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--sage);
+      margin-bottom: 1rem;
+    }
+    .section-headline {
+      font-family: 'Lora', serif;
+      font-size: clamp(2rem, 4vw, 2.8rem);
+      font-weight: 700;
+      color: var(--green);
+      line-height: 1.2;
+      margin-bottom: 1.2rem;
+    }
+    .section-intro {
+      font-size: clamp(1rem, 1.4vw, 1.125rem);
+      color: var(--taupe);
+      max-width: 620px;
+      line-height: 1.7;
+    }
+
+    /* ── SCROLL REVEAL ────────────────────────────────────────── */
+    .reveal {
+      opacity: 0;
+      transform: translateY(28px);
+      transition: opacity 0.65s ease, transform 0.65s ease;
+    }
+    .reveal.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .reveal { opacity: 1; transform: none; transition: none; }
+    }
+
+    /* ── DECORATIVE VINE DIVIDER ──────────────────────────────── */
+    .vine-divider {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    .vine-divider::before, .vine-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--moss);
+    }
+    .vine-divider svg { flex-shrink: 0; }
+
+    /* ── NAVIGATION ───────────────────────────────────────────── */
+    #nav {
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      background: rgba(245, 243, 240, 0.96);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-bottom: 1px solid rgba(168, 184, 160, 0.3);
+      transition: box-shadow 300ms ease;
+    }
+    #nav.scrolled { box-shadow: 0 2px 20px rgba(47, 107, 79, 0.08); }
+    .nav-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 72px;
+    }
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      text-decoration: none;
+    }
+    .nav-logo-mark {
+      width: 36px;
+      height: 36px;
+      flex-shrink: 0;
+    }
+    .nav-logo-text {
+      font-family: 'Lora', serif;
+      font-weight: 700;
+      font-size: 1.2rem;
+      color: var(--green);
+      letter-spacing: -0.01em;
+    }
+    .nav-logo-text span { font-style: italic; font-weight: 400; }
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 2.2rem;
+      list-style: none;
+    }
+    .nav-links a {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--charcoal);
+      letter-spacing: 0.02em;
+      transition: color 200ms;
+      position: relative;
+    }
+    .nav-links a::after {
+      content: '';
+      position: absolute;
+      bottom: -3px;
+      left: 0; right: 0;
+      height: 1px;
+      background: var(--green);
+      transform: scaleX(0);
+      transition: transform 200ms ease;
+      transform-origin: left;
+    }
+    .nav-links a:hover { color: var(--green); }
+    .nav-links a:hover::after { transform: scaleX(1); }
+    .nav-cta {
+      font-family: 'Lora', serif;
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--cream) !important;
+      background: var(--green);
+      padding: 0.6rem 1.4rem;
+      border-radius: 2px;
+      transition: background 200ms, transform 200ms !important;
+    }
+    .nav-cta::after { display: none !important; }
+    .nav-cta:hover { background: var(--green-dark) !important; transform: translateY(1px); }
+
+    /* Mobile Nav */
+    .nav-toggle {
+      display: none;
+      flex-direction: column;
+      justify-content: space-between;
+      width: 28px;
+      height: 20px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0;
+    }
+    .nav-toggle span {
+      display: block;
+      width: 100%;
+      height: 2px;
+      background: var(--charcoal);
+      border-radius: 2px;
+      transition: transform 300ms, opacity 300ms;
+    }
+    .nav-toggle.open span:nth-child(1) { transform: translateY(9px) rotate(45deg); }
+    .nav-toggle.open span:nth-child(2) { opacity: 0; }
+    .nav-toggle.open span:nth-child(3) { transform: translateY(-9px) rotate(-45deg); }
+
+    .nav-mobile {
+      display: none;
+      position: absolute;
+      top: 72px;
+      left: 0; right: 0;
+      background: rgba(245, 243, 240, 0.98);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--moss);
+      padding: 1.5rem 0;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+    }
+    .nav-mobile.open { display: flex; }
+    .nav-mobile a {
+      width: 100%;
+      text-align: center;
+      padding: 0.9rem 1rem;
+      font-family: 'Inter', sans-serif;
+      font-size: 1rem;
+      font-weight: 500;
+      color: var(--charcoal);
+      border-bottom: 1px solid rgba(168, 184, 160, 0.2);
+      transition: background 200ms, color 200ms;
+    }
+    .nav-mobile a:hover { background: var(--moss); color: var(--green); }
+    .nav-mobile a.mob-cta {
+      margin-top: 1rem;
+      font-family: 'Lora', serif;
+      font-size: 0.85rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      font-weight: 600;
+      color: var(--cream);
+      background: var(--green);
+      border: none;
+    }
+    .nav-mobile a.mob-cta:hover { background: var(--green-dark); }
+
+    @media (max-width: 860px) {
+      .nav-links { display: none; }
+      .nav-toggle { display: flex; }
+    }
+
+    /* ── HERO ─────────────────────────────────────────────────── */
+    #hero {
+      position: relative;
+      min-height: 100svh;
+      display: flex;
+      align-items: center;
+      overflow: hidden;
+    }
+    .hero-bg {
+      position: absolute;
+      inset: 0;
+      background-image: url('https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1800&auto=format&fit=crop&q=80');
+      background-size: cover;
+      background-position: center 40%;
+      transform: scale(1.04);
+      animation: heroZoom 12s ease-out forwards;
+    }
+    @keyframes heroZoom {
+      from { transform: scale(1.04); }
+      to   { transform: scale(1.00); }
+    }
+    .hero-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        105deg,
+        rgba(22, 54, 38, 0.78) 0%,
+        rgba(31, 74, 55, 0.55) 50%,
+        rgba(47, 107, 79, 0.20) 100%
+      );
+    }
+    .hero-content {
+      position: relative;
+      z-index: 2;
+      max-width: 720px;
+      padding: clamp(2rem, 6vw, 5rem) 0;
+      animation: heroFadeIn 0.9s ease 0.2s both;
+    }
+    @keyframes heroFadeIn {
+      from { opacity: 0; transform: translateY(24px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .hero-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.6rem;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: rgba(212, 224, 211, 0.9);
+      margin-bottom: 1.4rem;
+    }
+    .hero-eyebrow::before {
+      content: '';
+      display: block;
+      width: 32px;
+      height: 1px;
+      background: rgba(168, 184, 160, 0.8);
+    }
+    .hero-headline {
+      font-family: 'Lora', serif;
+      font-size: clamp(2.8rem, 6.5vw, 5rem);
+      font-weight: 700;
+      color: #FFFFFF;
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+      margin-bottom: 1.6rem;
+    }
+    .hero-headline em {
+      font-style: italic;
+      color: rgba(212, 224, 211, 1);
+    }
+    .hero-sub {
+      font-family: 'Inter', sans-serif;
+      font-size: clamp(1rem, 1.6vw, 1.2rem);
+      font-weight: 400;
+      color: rgba(245, 243, 240, 0.88);
+      max-width: 540px;
+      line-height: 1.7;
+      margin-bottom: 2.4rem;
+    }
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.6rem;
+      font-family: 'Lora', serif;
+      font-size: 0.85rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--cream);
+      background: var(--green);
+      border: none;
+      padding: 1rem 2.2rem;
+      border-radius: 2px;
+      cursor: pointer;
+      transition: background 200ms ease, transform 200ms ease, box-shadow 200ms ease;
+      text-decoration: none;
+    }
+    .btn-primary:hover {
+      background: var(--green-dark);
+      transform: translateY(2px);
+      box-shadow: 0 6px 24px rgba(31, 74, 55, 0.35);
+      color: var(--cream);
+    }
+    .btn-primary svg { transition: transform 200ms; }
+    .btn-primary:hover svg { transform: translateX(3px); }
+    .hero-scroll {
+      position: absolute;
+      bottom: 2.5rem;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.4rem;
+      opacity: 0.65;
+      animation: scrollBounce 2.5s infinite ease-in-out;
+    }
+    .hero-scroll span {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.65rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--cream);
+    }
+    @keyframes scrollBounce {
+      0%, 100% { transform: translateX(-50%) translateY(0); }
+      50%       { transform: translateX(-50%) translateY(6px); }
+    }
+
+    /* ── SERVICES ─────────────────────────────────────────────── */
+    #services {
+      padding: var(--section-pad) 0;
+      background: var(--cream);
+    }
+    .services-header {
+      margin-bottom: clamp(3rem, 5vw, 4.5rem);
+    }
+    .services-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 2px;
+    }
+    .service-card {
+      position: relative;
+      overflow: hidden;
+      background: var(--white);
+      border: 1px solid rgba(168, 184, 160, 0.4);
+      transition: transform 280ms ease, box-shadow 280ms ease;
+    }
+    .service-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 40px rgba(47, 107, 79, 0.1);
+      z-index: 1;
+    }
+    .service-img {
+      width: 100%;
+      height: 240px;
+      object-fit: cover;
+      display: block;
+      transition: transform 500ms ease;
+    }
+    .service-card:hover .service-img { transform: scale(1.03); }
+    .service-img-wrap { overflow: hidden; position: relative; }
+    .service-img-wrap::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to bottom, transparent 50%, rgba(22, 54, 38, 0.25) 100%);
+      pointer-events: none;
+    }
+    .service-body { padding: 2rem 2rem 2.4rem; }
+    .service-number {
+      font-family: 'Lora', serif;
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.15em;
+      color: var(--sage);
+      margin-bottom: 0.6rem;
+    }
+    .service-title {
+      font-family: 'Lora', serif;
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--green);
+      margin-bottom: 0.9rem;
+      line-height: 1.3;
+    }
+    .service-desc {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.9rem;
+      color: var(--charcoal);
+      line-height: 1.7;
+    }
+    .service-accent {
+      display: block;
+      width: 32px;
+      height: 2px;
+      background: var(--sage);
+      margin-top: 1.4rem;
+      transition: width 300ms ease;
+    }
+    .service-card:hover .service-accent { width: 56px; background: var(--green); }
+
+    /* ── ABOUT ────────────────────────────────────────────────── */
+    #about {
+      padding: var(--section-pad) 0;
+      background: #ECEBE7;
+    }
+    .about-inner {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: clamp(3rem, 6vw, 6rem);
+      align-items: center;
+    }
+    .about-images {
+      position: relative;
+    }
+    .about-img-main {
+      width: 100%;
+      aspect-ratio: 4/5;
+      object-fit: cover;
+      border-radius: 2px;
+      display: block;
+    }
+    .about-img-accent {
+      position: absolute;
+      bottom: -2.5rem;
+      right: -2rem;
+      width: 52%;
+      aspect-ratio: 1;
+      object-fit: cover;
+      border: 5px solid #ECEBE7;
+      border-radius: 2px;
+      box-shadow: 0 8px 32px rgba(47, 107, 79, 0.15);
+    }
+    .about-text { padding-right: 0; }
+    .about-headline {
+      font-family: 'Lora', serif;
+      font-size: clamp(1.9rem, 3.5vw, 2.6rem);
+      font-weight: 700;
+      color: var(--green);
+      line-height: 1.2;
+      margin-bottom: 1.6rem;
+    }
+    .about-body p {
+      font-size: clamp(0.9rem, 1.2vw, 1rem);
+      color: var(--charcoal);
+      line-height: 1.78;
+      margin-bottom: 1.2rem;
+    }
+    .about-body p:last-child { margin-bottom: 0; }
+    .about-stats {
+      display: flex;
+      gap: 2.5rem;
+      margin-top: 2.5rem;
+      padding-top: 2rem;
+      border-top: 1px solid rgba(168, 184, 160, 0.4);
+    }
+    .stat-item { }
+    .stat-number {
+      font-family: 'Lora', serif;
+      font-size: 2.2rem;
+      font-weight: 700;
+      color: var(--green);
+      line-height: 1;
+    }
+    .stat-label {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.78rem;
+      font-weight: 500;
+      color: var(--taupe);
+      letter-spacing: 0.05em;
+      margin-top: 0.3rem;
+    }
+
+    @media (max-width: 768px) {
+      .about-inner { grid-template-columns: 1fr; }
+      .about-images { margin-bottom: 3rem; }
+      .about-img-accent { right: 0; }
+      .about-stats { gap: 1.5rem; }
+    }
+
+    /* ── TESTIMONIALS ─────────────────────────────────────────── */
+    #testimonials {
+      padding: var(--section-pad) 0;
+      background: var(--green-deep);
+    }
+    .testimonials-header { margin-bottom: 3.5rem; }
+    .testimonials-header .section-label { color: rgba(168, 184, 160, 0.7); }
+    .testimonials-header .section-headline { color: var(--cream); }
+    .testimonials-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.5rem;
+    }
+    .testimonial-card {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(168, 184, 160, 0.2);
+      padding: 2.4rem 2.2rem 2.2rem;
+      border-radius: 2px;
+      position: relative;
+      transition: background 280ms ease, transform 280ms ease;
+      display: flex;
+      flex-direction: column;
+    }
+    .testimonial-card:hover {
+      background: rgba(255, 255, 255, 0.09);
+      transform: translateY(-3px);
+    }
+    .testimonial-quote-mark {
+      font-family: 'Lora', serif;
+      font-size: 4rem;
+      line-height: 1;
+      color: rgba(168, 184, 160, 0.25);
+      position: absolute;
+      top: 1.2rem;
+      left: 1.8rem;
+      pointer-events: none;
+      user-select: none;
+    }
+    .testimonial-img {
+      width: 100%;
+      height: 180px;
+      object-fit: cover;
+      border-radius: 1px;
+      margin-bottom: 1.6rem;
+      opacity: 0.85;
+    }
+    .testimonial-text {
+      font-family: 'Lora', serif;
+      font-size: clamp(0.9rem, 1.2vw, 0.97rem);
+      font-style: italic;
+      color: rgba(245, 243, 240, 0.88);
+      line-height: 1.8;
+      flex: 1;
+      margin-bottom: 1.8rem;
+    }
+    .testimonial-author {
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+      padding-top: 1.2rem;
+      border-top: 1px solid rgba(168, 184, 160, 0.18);
+    }
+    .author-name {
+      font-family: 'Lora', serif;
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--moss);
+    }
+    .author-role {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.75rem;
+      color: rgba(168, 184, 160, 0.65);
+      letter-spacing: 0.04em;
+    }
+
+    /* ── FAQ ──────────────────────────────────────────────────── */
+    #faq {
+      padding: var(--section-pad) 0;
+      background: var(--cream);
+    }
+    .faq-layout {
+      display: grid;
+      grid-template-columns: 1fr 1.8fr;
+      gap: clamp(3rem, 6vw, 6rem);
+      align-items: start;
+    }
+    .faq-sticky-col {
+      position: sticky;
+      top: 100px;
+    }
+    .faq-side-headline {
+      font-family: 'Lora', serif;
+      font-size: clamp(1.6rem, 3vw, 2.2rem);
+      font-weight: 700;
+      color: var(--green);
+      line-height: 1.25;
+      margin-bottom: 1.2rem;
+    }
+    .faq-side-text {
+      font-size: 0.9rem;
+      color: var(--taupe);
+      line-height: 1.7;
+    }
+    .faq-side-img {
+      width: 100%;
+      aspect-ratio: 3/4;
+      object-fit: cover;
+      margin-top: 2rem;
+      border-radius: 2px;
+      opacity: 0.85;
+    }
+    .faq-list { display: flex; flex-direction: column; gap: 0; }
+    .faq-item {
+      border-bottom: 1px solid rgba(168, 184, 160, 0.35);
+    }
+    .faq-item:first-child { border-top: 1px solid rgba(168, 184, 160, 0.35); }
+    .faq-question {
+      width: 100%;
+      background: none;
+      border: none;
+      text-align: left;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 1.5rem 0;
+      cursor: pointer;
+      font-family: 'Lora', serif;
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--charcoal);
+      line-height: 1.4;
+      transition: color 200ms;
+    }
+    .faq-question:hover { color: var(--green); }
+    .faq-question.active { color: var(--green); }
+    .faq-icon {
+      flex-shrink: 0;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      border: 1.5px solid var(--sage);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 200ms, border-color 200ms, transform 300ms;
+      margin-top: 0.1rem;
+    }
+    .faq-question.active .faq-icon {
+      background: var(--green);
+      border-color: var(--green);
+      transform: rotate(45deg);
+    }
+    .faq-icon svg { display: block; }
+    .faq-answer {
+      overflow: hidden;
+      max-height: 0;
+      transition: max-height 400ms cubic-bezier(0.4, 0, 0.2, 1), padding 300ms ease;
+    }
+    .faq-answer.open { max-height: 500px; }
+    .faq-answer-inner {
+      padding-bottom: 1.5rem;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.93rem;
+      color: var(--charcoal);
+      line-height: 1.75;
+    }
+
+    @media (max-width: 768px) {
+      .faq-layout { grid-template-columns: 1fr; }
+      .faq-sticky-col { position: static; }
+      .faq-side-img { display: none; }
+    }
+
+    /* ── CONTACT ──────────────────────────────────────────────── */
+    #contact {
+      padding: var(--section-pad) 0;
+      background: linear-gradient(160deg, #ECEBE7 0%, #F5F3F0 60%);
+      position: relative;
+      overflow: hidden;
+    }
+    #contact::before {
+      content: '';
+      position: absolute;
+      top: -120px;
+      right: -180px;
+      width: 500px;
+      height: 500px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(47, 107, 79, 0.06) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .contact-layout {
+      display: grid;
+      grid-template-columns: 1fr 1.5fr;
+      gap: clamp(3rem, 6vw, 6rem);
+      align-items: start;
+    }
+    .contact-info { }
+    .contact-headline {
+      font-family: 'Lora', serif;
+      font-size: clamp(1.8rem, 3vw, 2.4rem);
+      font-weight: 700;
+      color: var(--green);
+      line-height: 1.2;
+      margin-bottom: 1.2rem;
+    }
+    .contact-sub {
+      font-size: 0.95rem;
+      color: var(--charcoal);
+      line-height: 1.75;
+      margin-bottom: 2.5rem;
+    }
+    .contact-detail {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.9rem;
+      margin-bottom: 1.3rem;
+    }
+    .contact-detail-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: var(--moss);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 0.1rem;
+    }
+    .contact-detail-text {}
+    .contact-detail-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--taupe);
+      margin-bottom: 0.1rem;
+    }
+    .contact-detail-value {
+      font-size: 0.93rem;
+      color: var(--charcoal);
+      font-weight: 500;
+    }
+    .contact-detail-value a { color: var(--green); }
+    .contact-detail-value a:hover { color: var(--green-dark); text-decoration: underline; }
+
+    /* Form */
+    .contact-form-wrap {
+      background: var(--white);
+      border: 1px solid rgba(168, 184, 160, 0.4);
+      padding: clamp(2rem, 4vw, 3rem);
+      border-radius: 2px;
+      box-shadow: 0 4px 40px rgba(47, 107, 79, 0.06);
+    }
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.2rem;
+    }
+    .form-group {
+      margin-bottom: 1.4rem;
+    }
+    .form-group label {
+      display: block;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.78rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--charcoal);
+      margin-bottom: 0.4rem;
+    }
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      width: 100%;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.93rem;
+      color: var(--charcoal);
+      background: var(--cream);
+      border: 1.5px solid rgba(168, 184, 160, 0.5);
+      padding: 0.75rem 1rem;
+      border-radius: 2px;
+      transition: border-color 200ms, background 200ms;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+      border-color: var(--green);
+      background: var(--moss);
+      outline: none;
+    }
+    .form-group select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238B8680' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 0.9rem center;
+      padding-right: 2.5rem;
+      cursor: pointer;
+    }
+    .form-group textarea { min-height: 120px; resize: vertical; line-height: 1.6; }
+    .form-submit {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.6rem;
+      font-family: 'Lora', serif;
+      font-size: 0.85rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--cream);
+      background: var(--green);
+      border: none;
+      padding: 1.1rem 2rem;
+      border-radius: 2px;
+      cursor: pointer;
+      transition: background 200ms, transform 200ms, box-shadow 200ms;
+      margin-top: 0.5rem;
+    }
+    .form-submit:hover {
+      background: var(--green-dark);
+      transform: translateY(2px);
+      box-shadow: 0 6px 24px rgba(31, 74, 55, 0.3);
+    }
+    .form-success {
+      display: none;
+      background: var(--moss);
+      border: 1px solid var(--sage);
+      padding: 1.4rem 1.6rem;
+      border-radius: 2px;
+      margin-top: 1.5rem;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.93rem;
+      color: var(--green-dark);
+      line-height: 1.6;
+      animation: successSlide 400ms cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+    }
+    @keyframes successSlide {
+      from { opacity: 0; transform: translateY(-12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .form-success.visible { display: block; }
+
+    @media (max-width: 768px) {
+      .contact-layout { grid-template-columns: 1fr; }
+      .form-row { grid-template-columns: 1fr; }
+    }
+
+    /* ── FOOTER ───────────────────────────────────────────────── */
+    #footer {
+      background: var(--green-deep);
+      padding: 4rem 0 2rem;
+    }
+    .footer-inner {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr;
+      gap: 3rem;
+      padding-bottom: 3rem;
+      border-bottom: 1px solid rgba(168, 184, 160, 0.15);
+      margin-bottom: 2rem;
+    }
+    .footer-brand {}
+    .footer-logo {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      margin-bottom: 1.2rem;
+      text-decoration: none;
+    }
+    .footer-logo-text {
+      font-family: 'Lora', serif;
+      font-weight: 700;
+      font-size: 1.15rem;
+      color: var(--cream);
+    }
+    .footer-logo-text span { font-style: italic; font-weight: 400; }
+    .footer-tagline {
+      font-size: 0.87rem;
+      color: rgba(168, 184, 160, 0.6);
+      line-height: 1.65;
+      max-width: 300px;
+    }
+    .footer-col-title {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--sage);
+      margin-bottom: 1rem;
+    }
+    .footer-links { list-style: none; display: flex; flex-direction: column; gap: 0.55rem; }
+    .footer-links a {
+      font-size: 0.87rem;
+      color: rgba(212, 224, 211, 0.6);
+      transition: color 200ms;
+    }
+    .footer-links a:hover { color: var(--moss); }
+    .footer-bottom {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.8rem;
+    }
+    .footer-copy {
+      font-size: 0.78rem;
+      color: rgba(168, 184, 160, 0.4);
+    }
+    .footer-copy a { color: rgba(168, 184, 160, 0.5); }
+    .footer-copy a:hover { color: var(--sage); }
+
+    @media (max-width: 680px) {
+      .footer-inner { grid-template-columns: 1fr; gap: 2rem; }
+      .footer-bottom { flex-direction: column; align-items: flex-start; }
+    }
+
+    /* ── MISC / BAND ──────────────────────────────────────────── */
+    .band {
+      background: var(--green);
+      padding: 2.8rem 0;
+      text-align: center;
+    }
+    .band p {
+      font-family: 'Lora', serif;
+      font-size: clamp(1rem, 2vw, 1.3rem);
+      font-style: italic;
+      color: rgba(245, 243, 240, 0.88);
+      max-width: 640px;
+      margin-inline: auto;
+      line-height: 1.65;
+    }
+    .band strong {
+      color: var(--moss);
+      font-style: normal;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── NAVIGATION ──────────────────────────────────────────────── -->
+<header id="nav" role="banner">
+  <nav class="container nav-inner" aria-label="Main navigation">
+    <a href="#hero" class="nav-logo" aria-label="Verdant & Vine — Home">
+      <svg class="nav-logo-mark" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <circle cx="18" cy="18" r="17" stroke="#2F6B4F" stroke-width="1.5" fill="none"/>
+        <path d="M18 28 C18 28 10 22 10 15 C10 10.5 13.5 8 18 8 C22.5 8 26 10.5 26 15 C26 22 18 28 18 28Z" fill="#2F6B4F" opacity="0.15"/>
+        <path d="M18 28 C18 28 10 22 10 15 C10 10.5 13.5 8 18 8" stroke="#2F6B4F" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+        <path d="M18 28 C18 28 26 22 26 15 C26 10.5 22.5 8 18 8" stroke="#2F6B4F" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+        <line x1="18" y1="8" x2="18" y2="28" stroke="#A8B8A0" stroke-width="1" stroke-dasharray="2 2"/>
+        <path d="M14 14 C14 14 16 16 18 14 C20 12 22 14 22 14" stroke="#2F6B4F" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+        <path d="M13 19 C13 19 15.5 21 18 19 C20.5 17 23 19 23 19" stroke="#A8B8A0" stroke-width="1" fill="none" stroke-linecap="round"/>
+      </svg>
+      <span class="nav-logo-text">Verdant <span>& Vine</span></span>
+    </a>
+    <ul class="nav-links" role="list">
+      <li><a href="#services">Our Work</a></li>
+      <li><a href="#about">About</a></li>
+      <li><a href="#testimonials">Clients</a></li>
+      <li><a href="#faq">FAQ</a></li>
+      <li><a href="#contact" class="nav-cta">Let's Talk</a></li>
+    </ul>
+    <button class="nav-toggle" aria-label="Open navigation menu" aria-expanded="false" id="navToggle">
+      <span></span><span></span><span></span>
+    </button>
+  </nav>
+  <nav class="nav-mobile" id="navMobile" aria-label="Mobile navigation">
+    <a href="#services" class="mob-link">Our Work</a>
+    <a href="#about" class="mob-link">About</a>
+    <a href="#testimonials" class="mob-link">Clients</a>
+    <a href="#faq" class="mob-link">FAQ</a>
+    <a href="#contact" class="mob-cta">Let's Discuss Your Garden</a>
+  </nav>
+</header>
+
+<!-- ── HERO ────────────────────────────────────────────────────── -->
+<section id="hero" aria-label="Hero — Where Landscape Becomes Home">
+  <div class="hero-bg" role="img" aria-label="A beautifully designed garden at golden hour with architectural planting"></div>
+  <div class="hero-overlay" aria-hidden="true"></div>
+  <div class="container">
+    <div class="hero-content">
+      <p class="hero-eyebrow">Verdant &amp; Vine — Bespoke Garden Design</p>
+      <h1 class="hero-headline">Where Landscape<br><em>Becomes Home</em></h1>
+      <p class="hero-sub">Verdant &amp; Vine designs and tends bespoke gardens for modern homes—spaces that reflect who you are, invite you outside, and grow more beautiful with intention.</p>
+      <a href="#contact" class="btn-primary">
+        Let's Discuss Your Garden
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+      </a>
+    </div>
+  </div>
+  <div class="hero-scroll" aria-hidden="true">
+    <span>Explore</span>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(245,243,240,0.8)" stroke-width="1.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+  </div>
+</section>
+
+<!-- ── QUOTE BAND ───────────────────────────────────────────────── -->
+<div class="band">
+  <p>"Design without horticulture is pretty renderings; horticulture without design is a <strong>beautiful accident</strong>."</p>
+</div>
+
+<!-- ── SERVICES ────────────────────────────────────────────────── -->
+<section id="services" aria-labelledby="services-heading">
+  <div class="container">
+    <header class="services-header reveal">
+      <p class="section-label">What We Do</p>
+      <h2 class="section-headline" id="services-heading">Our Work</h2>
+      <p class="section-intro">Four disciplines, one seamless partnership—from the first sketch to the hundredth bloom.</p>
+    </header>
+    <div class="services-grid">
+      <article class="service-card reveal">
+        <div class="service-img-wrap">
+          <img class="service-img"
+               src="https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=800&auto=format&fit=crop&q=80"
+               alt="Detailed garden design plan with architectural planting layout" loading="lazy" />
+        </div>
+        <div class="service-body">
+          <p class="service-number">01</p>
+          <h3 class="service-title">Garden Design</h3>
+          <p class="service-desc">From initial vision to detailed planting plan, we craft gardens rooted in your home's architecture, your lifestyle, and the land itself. Every garden is original—a bespoke response to light, soil, climate, and desire.</p>
+          <span class="service-accent" aria-hidden="true"></span>
+        </div>
+      </article>
+      <article class="service-card reveal" style="transition-delay: 0.1s">
+        <div class="service-img-wrap">
+          <img class="service-img"
+               src="https://images.unsplash.com/photo-1592150621744-aca64f48394a?w=800&auto=format&fit=crop&q=80"
+               alt="Craftspeople installing a beautifully designed garden with hardscape and planting" loading="lazy" />
+        </div>
+        <div class="service-body">
+          <p class="service-number">02</p>
+          <h3 class="service-title">Installation &amp; Build</h3>
+          <p class="service-desc">We oversee every detail of your garden's creation: site preparation, hardscape, planting, and finishing. Your design becomes reality in the hands of craftspeople who understand our vision and yours.</p>
+          <span class="service-accent" aria-hidden="true"></span>
+        </div>
+      </article>
+      <article class="service-card reveal" style="transition-delay: 0.2s">
+        <div class="service-img-wrap">
+          <img class="service-img"
+               src="https://images.unsplash.com/photo-1466692476868-aef1dfb1e735?w=800&auto=format&fit=crop&q=80"
+               alt="A well-tended garden in autumn transition with structural planting" loading="lazy" />
+        </div>
+        <div class="service-body">
+          <p class="service-number">03</p>
+          <h3 class="service-title">Seasonal Stewardship</h3>
+          <p class="service-desc">Gardens are living work. Through spring renewal, summer vigor, autumn transition, and winter structure, our seasonal maintenance ensures your garden matures intentionally, staying healthy, beautiful, and true to its design.</p>
+          <span class="service-accent" aria-hidden="true"></span>
+        </div>
+      </article>
+      <article class="service-card reveal" style="transition-delay: 0.3s">
+        <div class="service-img-wrap">
+          <img class="service-img"
+               src="https://images.unsplash.com/photo-1444492696363-e3c36b9f24ef?w=800&auto=format&fit=crop&q=80"
+               alt="Garden consultation — a designer reviewing plants and layout with a homeowner" loading="lazy" />
+        </div>
+        <div class="service-body">
+          <p class="service-number">04</p>
+          <h3 class="service-title">Garden Consultations</h3>
+          <p class="service-desc">Uncertain whether a full redesign is right for you? We offer focused design consultations to assess existing gardens, refine specific areas, or answer key horticultural and aesthetic questions.</p>
+          <span class="service-accent" aria-hidden="true"></span>
+        </div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ── ABOUT ────────────────────────────────────────────────────── -->
+<section id="about" aria-labelledby="about-heading">
+  <div class="container">
+    <div class="about-inner">
+      <div class="about-images reveal">
+        <img class="about-img-main"
+             src="https://images.unsplash.com/photo-1585320806297-9794b3e4eeae?w=900&auto=format&fit=crop&q=80"
+             alt="A Verdant & Vine landscape designer working thoughtfully in a beautiful garden setting" loading="lazy" />
+        <img class="about-img-accent"
+             src="https://images.unsplash.com/photo-1530048906183-bb4be8c2b2c6?w=500&auto=format&fit=crop&q=80"
+             alt="Close detail of architectural planting and foliage texture in a designed garden" loading="lazy" />
+      </div>
+      <div class="about-text reveal" style="transition-delay: 0.15s">
+        <p class="section-label">Our Story</p>
+        <h2 class="about-headline" id="about-heading">Built on Soil<br>and Stories</h2>
+        <div class="about-body">
+          <p>Verdant &amp; Vine was born from a simple observation: the most memorable homes feel whole—where the interior aesthetics, lifestyle, and outdoor space speak the same language. Too often, gardens are treated as afterthoughts: the last thing homeowners think about, or worse, delegated to whoever's available. We saw homeowners craving something different—a garden that felt as intentional as their home itself.</p>
+          <p>Founded by a landscape architect and a plantsperson, Verdant &amp; Vine began with two core convictions: that gardens should be designed with rigor (not sentiment), and that long-term maintenance matters as much as the grand unveiling. A beautiful rendering is one thing; a thriving, gorgeous garden three years later is another.</p>
+          <p>Over the past decade, we've worked with hundreds of homeowners, from small urban courtyards to sprawling suburban escapes. We've learned that the best gardens emerge from genuine partnership—where we listen deeply, understand how you live, design with constraint and intention, and then stick around to tend what we've created. Your garden isn't a project we complete; it's a space we steward.</p>
+          <p>Today, Verdant &amp; Vine is a close team of designers, horticulturists, and craftspeople united by one belief: that thoughtfully designed, expertly maintained gardens change how we feel at home. We're grateful for the homeowners who've trusted us with theirs.</p>
+        </div>
+        <div class="about-stats">
+          <div class="stat-item">
+            <p class="stat-number">10+</p>
+            <p class="stat-label">Years in practice</p>
+          </div>
+          <div class="stat-item">
+            <p class="stat-number">250+</p>
+            <p class="stat-label">Gardens stewarded</p>
+          </div>
+          <div class="stat-item">
+            <p class="stat-number">4</p>
+            <p class="stat-label">Seasons, always</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── TESTIMONIALS ─────────────────────────────────────────────── -->
+<section id="testimonials" aria-labelledby="testimonials-heading">
+  <div class="container">
+    <header class="testimonials-header reveal">
+      <p class="section-label">Client Voices</p>
+      <h2 class="section-headline" id="testimonials-heading">What Our Clients Say</h2>
+    </header>
+    <div class="testimonials-grid">
+
+      <article class="testimonial-card reveal">
+        <span class="testimonial-quote-mark" aria-hidden="true">&ldquo;</span>
+        <img class="testimonial-img"
+             src="https://images.unsplash.com/photo-1600585154526-990dced4db0d?w=700&auto=format&fit=crop&q=80"
+             alt="A beautifully designed backyard garden two years after installation, looking mature and lush" loading="lazy" />
+        <blockquote class="testimonial-text">
+          "We spent three years talking about redoing our backyard—it was a blank slate of grass, and we had no idea how to approach it. We met with a few generic landscapers who just showed us pictures of other people's gardens. Verdant &amp; Vine understood our house, our lifestyle, what we actually wanted to use the space for. The design made sense immediately. What's struck us most is that two years later, the garden looks even better than when it was installed. That's because they still maintain it. It's not abandoned after they left. It feels genuinely partnered."
+        </blockquote>
+        <footer class="testimonial-author">
+          <p class="author-name">Meredith &amp; James Chen</p>
+          <p class="author-role">Homeowners — Portland, OR</p>
+        </footer>
+      </article>
+
+      <article class="testimonial-card reveal" style="transition-delay: 0.12s">
+        <span class="testimonial-quote-mark" aria-hidden="true">&ldquo;</span>
+        <img class="testimonial-img"
+             src="https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=700&auto=format&fit=crop&q=80"
+             alt="A refined modern garden composition with architectural lines that complement the home's design" loading="lazy" />
+        <blockquote class="testimonial-text">
+          "As an architect, I'm particular about proportion and detail. I was nervous hiring a landscape firm—I didn't want 'plants and mulch.' Verdant &amp; Vine speaks my language. The spatial composition, the material choices, the way the garden respects the house's lines—it all felt crafted. They welcomed my input but also weren't afraid to push back with expertise. The result is something I'm genuinely proud to show people."
+        </blockquote>
+        <footer class="testimonial-author">
+          <p class="author-name">David Rutherford</p>
+          <p class="author-role">Architect &amp; Homeowner — Seattle, WA</p>
+        </footer>
+      </article>
+
+      <article class="testimonial-card reveal" style="transition-delay: 0.24s">
+        <span class="testimonial-quote-mark" aria-hidden="true">&ldquo;</span>
+        <img class="testimonial-img"
+             src="https://images.unsplash.com/photo-1588880331179-bc9b93a8cb5e?w=700&auto=format&fit=crop&q=80"
+             alt="An overgrown garden transformed into a serene, ordered outdoor sanctuary" loading="lazy" />
+        <blockquote class="testimonial-text">
+          "We moved into our home during winter. By spring, we realized our yard was completely overgrown and chaotic—honestly overwhelming. We called Verdant &amp; Vine for a consultation, expecting they'd recommend tearing it all out. Instead, they identified what was worth keeping, simplified the planting scheme, and created a plan that brought order and actual peace to the space. The seasonal maintenance visits are now my favorite appointment. They understand the garden and they understand us."
+        </blockquote>
+        <footer class="testimonial-author">
+          <p class="author-name">Patricia Williams</p>
+          <p class="author-role">Homeowner — Boston, MA</p>
+        </footer>
+      </article>
+
+    </div>
+  </div>
+</section>
+
+<!-- ── FAQ ──────────────────────────────────────────────────────── -->
+<section id="faq" aria-labelledby="faq-heading">
+  <div class="container">
+    <div class="faq-layout">
+      <div class="faq-sticky-col reveal">
+        <p class="section-label">Common Questions</p>
+        <h2 class="faq-side-headline" id="faq-heading">Questions We Hear</h2>
+        <p class="faq-side-text">Honest answers to the things homeowners ask most. If yours isn't here, we'd love to hear from you directly.</p>
+        <img class="faq-side-img"
+             src="https://images.unsplash.com/photo-1524247108137-732e0f642303?w=600&auto=format&fit=crop&q=80"
+             alt="A quiet, well-designed garden corner with architectural plants and natural light" loading="lazy" />
+      </div>
+      <div class="faq-list reveal" style="transition-delay: 0.1s" role="list">
+
+        <div class="faq-item" role="listitem">
+          <button class="faq-question" aria-expanded="false" aria-controls="faq-answer-1" id="faq-btn-1">
+            How does the design process work? How long does it take?
+            <span class="faq-icon" aria-hidden="true">
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><line x1="5" y1="1" x2="5" y2="9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="1" y1="5" x2="9" y2="5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </span>
+          </button>
+          <div class="faq-answer" id="faq-answer-1" role="region" aria-labelledby="faq-btn-1">
+            <p class="faq-answer-inner">We begin with a detailed consultation—visiting your home, understanding your vision, learning how you live and entertain, and assessing the site's light, soil, and existing conditions. We'll develop a design concept (usually 2–3 weeks), present options, and refine based on your feedback. The full design process, from initial brief to finished planting plan, typically takes 4–8 weeks. We move thoughtfully, not hastily.</p>
+          </div>
+        </div>
+
+        <div class="faq-item" role="listitem">
+          <button class="faq-question" aria-expanded="false" aria-controls="faq-answer-2" id="faq-btn-2">
+            I have an existing garden I'd like to improve. Do you redesign, or just maintain?
+            <span class="faq-icon" aria-hidden="true">
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><line x1="5" y1="1" x2="5" y2="9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="1" y1="5" x2="9" y2="5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </span>
+          </button>
+          <div class="faq-answer" id="faq-answer-2" role="region" aria-labelledby="faq-btn-2">
+            <p class="faq-answer-inner">We do both. Many clients work with us for "garden editing"—a focused redesign of specific zones or a thoughtful simplification of an overgrown space. Sometimes the most elegant solution is refinement, not replacement. We'll assess what's working and what isn't, then recommend whether that means fresh design, strategic renovation, or enhanced maintenance. There's no one answer; it depends on your home, your goals, and your budget.</p>
+          </div>
+        </div>
+
+        <div class="faq-item" role="listitem">
+          <button class="faq-question" aria-expanded="false" aria-controls="faq-answer-3" id="faq-btn-3">
+            What kind of plants do you typically use?
+            <span class="faq-icon" aria-hidden="true">
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><line x1="5" y1="1" x2="5" y2="9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="1" y1="5" x2="9" y2="5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </span>
+          </button>
+          <div class="faq-answer" id="faq-answer-3" role="region" aria-labelledby="faq-btn-3">
+            <p class="faq-answer-inner">We choose plants based on your site's specific conditions (light, soil, water availability) and your garden's design intent. We favor plants that are regionally appropriate, pest-resistant, and beautiful across seasons. We're not doctrinaire about native-only or exotic-only; rather, we build palettes that thrive in your climate and look intentional year-round. Our designs tend toward restrained, architectural plant choices rather than high-density color displays.</p>
+          </div>
+        </div>
+
+        <div class="faq-item" role="listitem">
+          <button class="faq-question" aria-expanded="false" aria-controls="faq-answer-4" id="faq-btn-4">
+            How much does a full design and installation cost?
+            <span class="faq-icon" aria-hidden="true">
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><line x1="5" y1="1" x2="5" y2="9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="1" y1="5" x2="9" y2="5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </span>
+          </button>
+          <div class="faq-answer" id="faq-answer-4" role="region" aria-labelledby="faq-btn-4">
+            <p class="faq-answer-inner">Design fees are upfront and fixed—typically $3,500 to $8,000 depending on site size and complexity. Installation costs vary widely (small courtyards start around $8,000; larger projects often exceed $30,000) and depend on hardscape materials, plant quantities, and site conditions. We provide transparent estimates before any work begins. We're also happy to discuss phased approaches if budget is a consideration; gardens can evolve in stages.</p>
+          </div>
+        </div>
+
+        <div class="faq-item" role="listitem">
+          <button class="faq-question" aria-expanded="false" aria-controls="faq-answer-5" id="faq-btn-5">
+            How much maintenance is required after installation?
+            <span class="faq-icon" aria-hidden="true">
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><line x1="5" y1="1" x2="5" y2="9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="1" y1="5" x2="9" y2="5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </span>
+          </button>
+          <div class="faq-answer" id="faq-answer-5" role="region" aria-labelledby="faq-btn-5">
+            <p class="faq-answer-inner">Most of our gardens are designed to be beautiful and relatively low-maintenance—they're not wild meadows or high-demanding perennial borders. Seasonal maintenance visits (spring renewal, summer monitoring, autumn cleanup, winter structure) keep things thriving and ensure the design matures intentionally. Many clients appreciate having us handle this; others prefer to manage basic tasks themselves once they understand the rhythm. We can custom-fit a maintenance plan to your preference and lifestyle.</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── CONTACT ──────────────────────────────────────────────────── -->
+<section id="contact" aria-labelledby="contact-heading">
+  <div class="container">
+    <div class="contact-layout">
+      <div class="contact-info reveal">
+        <p class="section-label">Get in Touch</p>
+        <h2 class="contact-headline" id="contact-heading">Let's Discuss<br>Your Garden</h2>
+        <p class="contact-sub">Ready to explore what's possible? We'd love to learn about your home and vision. Fill out the form, and we'll be in touch within two business days to schedule an initial conversation.</p>
+
+        <div class="contact-detail">
+          <div class="contact-detail-icon" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2F6B4F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+          </div>
+          <div class="contact-detail-text">
+            <p class="contact-detail-label">Email</p>
+            <p class="contact-detail-value"><a href="mailto:hello@verdantandvine.com">hello@verdantandvine.com</a></p>
+          </div>
+        </div>
+
+        <div class="contact-detail">
+          <div class="contact-detail-icon" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2F6B4F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 1.28h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8a16 16 0 0 0 8.09 8.09l.98-.94a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+          </div>
+          <div class="contact-detail-text">
+            <p class="contact-detail-label">Phone</p>
+            <p class="contact-detail-value"><a href="tel:+15550000000">(555) 000-0000</a></p>
+          </div>
+        </div>
+
+        <div class="contact-detail">
+          <div class="contact-detail-icon" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2F6B4F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </div>
+          <div class="contact-detail-text">
+            <p class="contact-detail-label">Response Time</p>
+            <p class="contact-detail-value">Within two business days</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="contact-form-wrap reveal" style="transition-delay: 0.15s">
+        <form id="contactForm" novalidate aria-label="Garden inquiry form">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="fullName">Full Name <span aria-hidden="true">*</span></label>
+              <input type="text" id="fullName" name="fullName" placeholder="Your full name" required autocomplete="name" />
+            </div>
+            <div class="form-group">
+              <label for="email">Email Address <span aria-hidden="true">*</span></label>
+              <input type="email" id="email" name="email" placeholder="your@email.com" required autocomplete="email" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="phone">Phone Number</label>
+              <input type="tel" id="phone" name="phone" placeholder="(555) 000-0000" autocomplete="tel" />
+            </div>
+            <div class="form-group">
+              <label for="city">City / Region</label>
+              <input type="text" id="city" name="city" placeholder="e.g. Portland, OR" autocomplete="address-level2" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="propertySize">Property Type</label>
+              <select id="propertySize" name="propertySize">
+                <option value="" disabled selected>Select property type</option>
+                <option value="urban-small">Single-family home</option>
+                <option value="urban-garden">Small urban garden</option>
+                <option value="suburban-large">Large suburban lot</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="projectType">Project Type</label>
+              <select id="projectType" name="projectType">
+                <option value="" disabled selected>Select project type</option>
+                <option value="new-design">New garden design</option>
+                <option value="redesign">Redesign / editing existing garden</option>
+                <option value="consultation">Design consultation</option>
+                <option value="maintenance">Maintenance inquiry</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="vision">Tell Us About Your Vision</label>
+            <textarea id="vision" name="vision" placeholder="What's prompting your inquiry? Tell us about your space, goals, or anything that feels relevant…" rows="5"></textarea>
+          </div>
+          <div class="form-group">
+            <label for="howHeard">How Did You Hear About Us?</label>
+            <select id="howHeard" name="howHeard">
+              <option value="" disabled selected>Select an option</option>
+              <option value="referral">Referral</option>
+              <option value="google">Google search</option>
+              <option value="social">Social media</option>
+              <option value="houzz">Houzz / design platform</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <button type="submit" class="form-submit">
+            Send Us Your Garden Story
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          </button>
+          <div class="form-success" id="formSuccess" role="alert" aria-live="polite">
+            <strong>Thank you!</strong> We'll review your details and reach out within two business days. In the meantime, feel free to email us at <a href="mailto:hello@verdantandvine.com">hello@verdantandvine.com</a> or call (555) 000-0000.
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── FOOTER ───────────────────────────────────────────────────── -->
+<footer id="footer" role="contentinfo">
+  <div class="container">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <a href="#hero" class="footer-logo" aria-label="Verdant & Vine — Return to top">
+          <svg width="30" height="30" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <circle cx="18" cy="18" r="17" stroke="#A8B8A0" stroke-width="1.2" fill="none"/>
+            <path d="M18 28 C18 28 10 22 10 15 C10 10.5 13.5 8 18 8 C22.5 8 26 10.5 26 15 C26 22 18 28 18 28Z" fill="#A8B8A0" opacity="0.1"/>
+            <path d="M18 28 C18 28 10 22 10 15 C10 10.5 13.5 8 18 8" stroke="#A8B8A0" stroke-width="1.3" fill="none" stroke-linecap="round"/>
+            <path d="M18 28 C18 28 26 22 26 15 C26 10.5 22.5 8 18 8" stroke="#A8B8A0" stroke-width="1.3" fill="none" stroke-linecap="round"/>
+            <line x1="18" y1="8" x2="18" y2="28" stroke="#6B8B6A" stroke-width="0.8" stroke-dasharray="2 2"/>
+          </svg>
+          <span class="footer-logo-text">Verdant <span>& Vine</span></span>
+        </a>
+        <p class="footer-tagline">Bespoke landscape design, expert installation, and meticulous seasonal stewardship for modern homes.</p>
+      </div>
+      <div>
+        <p class="footer-col-title">Navigate</p>
+        <ul class="footer-links" role="list">
+          <li><a href="#services">Our Work</a></li>
+          <li><a href="#about">About</a></li>
+          <li><a href="#testimonials">Client Stories</a></li>
+          <li><a href="#faq">FAQ</a></li>
+          <li><a href="#contact">Contact</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="footer-col-title">Reach Us</p>
+        <ul class="footer-links" role="list">
+          <li><a href="mailto:hello@verdantandvine.com">hello@verdantandvine.com</a></li>
+          <li><a href="tel:+15550000000">(555) 000-0000</a></li>
+          <li style="color: rgba(212,224,211,0.4); font-size:0.87rem; padding-top:0.3rem;">Two-business-day response</li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p class="footer-copy">&copy; 2025 Verdant &amp; Vine. All rights reserved. Crafted with intention.</p>
+      <p class="footer-copy">Design-first landscape &mdash; <a href="#hero">Back to top ↑</a></p>
+    </div>
+  </div>
+</footer>
+
+<!-- ── JAVASCRIPT ───────────────────────────────────────────────── -->
+<script>
+  // Nav scroll state
+  const nav = document.getElementById('nav');
+  window.addEventListener('scroll', () => {
+    nav.classList.toggle('scrolled', window.scrollY > 40);
+  }, { passive: true });
+
+  // Mobile nav toggle
+  const toggle = document.getElementById('navToggle');
+  const mobileNav = document.getElementById('navMobile');
+  toggle.addEventListener('click', () => {
+    const isOpen = toggle.classList.toggle('open');
+    mobileNav.classList.toggle('open', isOpen);
+    toggle.setAttribute('aria-expanded', isOpen);
+    toggle.setAttribute('aria-label', isOpen ? 'Close navigation menu' : 'Open navigation menu');
+  });
+  // Close mobile nav on link click
+  mobileNav.querySelectorAll('a').forEach(link => {
+    link.addEventListener('click', () => {
+      toggle.classList.remove('open');
+      mobileNav.classList.remove('open');
+      toggle.setAttribute('aria-expanded', 'false');
+      toggle.setAttribute('aria-label', 'Open navigation menu');
+    });
+  });
+
+  // Scroll reveal
+  const reveals = document.querySelectorAll('.reveal');
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+  reveals.forEach(el => observer.observe(el));
+
+  // FAQ accordion
+  document.querySelectorAll('.faq-question').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const answerId = btn.getAttribute('aria-controls');
+      const answer = document.getElementById(answerId);
+      const isOpen = btn.classList.contains('active');
+
+      // Close all
+      document.querySelectorAll('.faq-question').forEach(b => {
+        b.classList.remove('active');
+        b.setAttribute('aria-expanded', 'false');
+      });
+      document.querySelectorAll('.faq-answer').forEach(a => a.classList.remove('open'));
+
+      // Open clicked (unless it was already open)
+      if (!isOpen) {
+        btn.classList.add('active');
+        btn.setAttribute('aria-expanded', 'true');
+        answer.classList.add('open');
+      }
+    });
+  });
+
+  // Contact form submission
+  const form = document.getElementById('contactForm');
+  const successMsg = document.getElementById('formSuccess');
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    // Basic validation
+    const name = form.querySelector('#fullName');
+    const email = form.querySelector('#email');
+    if (!name.value.trim() || !email.value.trim()) {
+      name.focus();
+      return;
+    }
+    // Simulate submission
+    form.querySelectorAll('input, select, textarea, button').forEach(el => el.disabled = true);
+    successMsg.classList.add('visible');
+    successMsg.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  });
+</script>
+</body>
+</html>

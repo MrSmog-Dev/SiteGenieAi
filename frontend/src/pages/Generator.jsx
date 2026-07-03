@@ -14,6 +14,7 @@ export default function Generator() {
   const [form, setForm] = useState({
     business_name: "", industry: "", description: "",
     style: "modern", primary_color: "#0055FF", contact_email: "", phone: "",
+    target_audience: "", key_services: "", brand_keywords: "", pages: "",
   });
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
@@ -80,6 +81,25 @@ export default function Generator() {
             <Field label="Description">
               <textarea data-testid="gen-description" required rows={4} value={form.description} onChange={set("description")} className={inputCls} placeholder="What do you offer? Who are your customers? What makes you special?" />
             </Field>
+            <div className="border-t border-white/10 pt-4">
+              <div className="text-xs text-brand font-mono uppercase mb-3 flex items-center gap-2"><Sparkles className="w-3.5 h-3.5" /> Help the AI go deeper (optional)</div>
+              <div className="space-y-4">
+                <Field label="Target audience">
+                  <input data-testid="gen-audience" value={form.target_audience} onChange={set("target_audience")} className={inputCls} placeholder="e.g. busy professionals, brides-to-be, local families" />
+                </Field>
+                <Field label="Key services / products">
+                  <input data-testid="gen-services" value={form.key_services} onChange={set("key_services")} className={inputCls} placeholder="e.g. wedding flowers, weekly subscriptions, workshops" />
+                </Field>
+                <div className="grid grid-cols-2 gap-4">
+                  <Field label="Brand vibe / keywords">
+                    <input data-testid="gen-keywords" value={form.brand_keywords} onChange={set("brand_keywords")} className={inputCls} placeholder="e.g. warm, earthy, premium" />
+                  </Field>
+                  <Field label="Sections wanted">
+                    <input data-testid="gen-pages" value={form.pages} onChange={set("pages")} className={inputCls} placeholder="e.g. hero, services, gallery, FAQ" />
+                  </Field>
+                </div>
+              </div>
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <Field label="Style">
                 <select data-testid="gen-style" value={form.style} onChange={set("style")} className={inputCls}>
@@ -103,7 +123,7 @@ export default function Generator() {
             </div>
             <button data-testid="generate-btn" disabled={loading}
               className="w-full flex items-center justify-center gap-2 bg-brand hover:bg-brand-hover py-4 font-medium transition-colors duration-300 disabled:opacity-60">
-              {loading ? <><Loader2 className="w-5 h-5 animate-spin" /> Generating your website…</> : <><Sparkles className="w-5 h-5" /> Generate website</>}
+              {loading ? <><Loader2 className="w-5 h-5 animate-spin" /> Crafting your website…</> : <><Sparkles className="w-5 h-5" /> Generate website</>}
             </button>
           </form>
         </div>
@@ -121,9 +141,10 @@ export default function Generator() {
           </div>
           <div className="flex-1 border border-white/10 bg-white overflow-hidden min-h-[500px]">
             {loading ? (
-              <div className="h-full flex flex-col items-center justify-center gap-4 bg-surface2 text-white/50">
+              <div className="h-full flex flex-col items-center justify-center gap-4 bg-surface2 text-white/50 p-8 text-center">
                 <Loader2 className="w-10 h-10 animate-spin text-brand" />
-                <div className="font-mono text-sm">Designing your site…</div>
+                <div className="font-mono text-sm">Researching your brand & crafting your site…</div>
+                <div className="text-xs text-white/30">Our AI strategist writes a brief, then builds. ~1–2 min.</div>
               </div>
             ) : result ? (
               <iframe data-testid="preview-iframe" title="preview" sandbox="allow-scripts" srcDoc={result.html} className="w-full h-full" style={{ minHeight: 500 }} />

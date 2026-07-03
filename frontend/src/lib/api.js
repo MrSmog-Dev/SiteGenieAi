@@ -18,7 +18,7 @@ export function formatApiError(detail) {
 }
 
 // Polls a generation job until done/error. Returns the final job payload (with .template).
-export function pollGenerationJob(jobId, { interval = 2500, maxAttempts = 90 } = {}) {
+export function pollGenerationJob(jobId, { interval = 3000, maxAttempts = 130 } = {}) {
   return new Promise((resolve, reject) => {
     let attempts = 0;
     const tick = async () => {
