@@ -49,3 +49,7 @@ class EditInput(BaseModel):
 
 class SlugInput(BaseModel):
     slug: str
+
+
+class DomainInput(BaseModel):
+    domain: str

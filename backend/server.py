@@ -47,6 +47,7 @@ async def startup():
     await db.user_sessions.create_index("session_token")
     await db.templates.create_index("user_id")
     await db.templates.create_index("slug", unique=True, sparse=True)
+    await db.templates.create_index("custom_domain", unique=True, sparse=True)
     await db.gen_jobs.create_index("job_id")
     await db.rate_events.create_index("ts", expireAfterSeconds=GEN_WINDOW_SECONDS + 60)
     await db.login_attempts.create_index("ts", expireAfterSeconds=LOGIN_WINDOW_SECONDS + 60)

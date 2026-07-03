@@ -1,16 +1,17 @@
 import io
 import re
+import socket
 import uuid
 import zipfile
 import html as html_lib
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, Request, Response, HTTPException, Depends
 from fastapi.responses import HTMLResponse
 from pymongo.errors import DuplicateKeyError
 
 from database import db
-from models import GenerateInput, EditInput, SlugInput
+from models import GenerateInput, EditInput, SlugInput, DomainInput
 from security import get_current_user, total_credits, user_is_unlimited, parse_dt
 from services.llm import _start_job
 from services.og_image import render_og_png
@@ -74,7 +75,7 @@ async def generation_status(job_id: str, user: dict = Depends(get_current_user))
 
 @router.get("/templates")
 async def list_templates(user: dict = Depends(get_current_user)):
-    docs = await db.templates.find({"user_id": user["user_id"]}, {"_id": 0, "html": 0}).sort("created_at", -1).to_list(200)
+    docs = await db.templates.find({"user_id": user["user_id"]}, {"_id": 0, "html": 0, "views_daily": 0}).sort("created_at", -1).to_list(200)
     for d in docs:
         if isinstance(d.get("created_at"), datetime):
             d["created_at"] = d["created_at"].isoformat()
@@ -167,6 +168,126 @@ async def public_site(slug: str):
     }
 
 
+# ---------------- Analytics ----------------
+_BOT_RE = re.compile(
+    r"bot|crawl|spider|slurp|facebookexternalhit|whatsapp|telegram|discord|slack|"
+    r"linkedin|twitterbot|preview|embed|vkshare|pinterest|curl|wget|python-requests|httpx",
+    re.IGNORECASE)
+
+
+def _count_view(request: Request) -> bool:
+    return not _BOT_RE.search(request.headers.get("user-agent", ""))
+
+
+async def _record_view(template_id: str):
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    await db.templates.update_one(
+        {"template_id": template_id},
+        {"$inc": {"views_total": 1, f"views_daily.{today}": 1}})
+
+
+@router.get("/templates/{template_id}/stats")
+async def template_stats(template_id: str, user: dict = Depends(get_current_user)):
+    tpl = await db.templates.find_one(
+        {"template_id": template_id, "user_id": user["user_id"]},
+        {"_id": 0, "views_total": 1, "views_daily": 1, "published": 1, "slug": 1,
+         "custom_domain": 1, "domain_verified": 1})
+    if not tpl:
+        raise HTTPException(status_code=404, detail="Template not found")
+    daily_map = tpl.get("views_daily") or {}
+    now = datetime.now(timezone.utc)
+    daily = []
+    for i in range(13, -1, -1):
+        d = (now - timedelta(days=i)).strftime("%Y-%m-%d")
+        daily.append({"date": d, "views": int(daily_map.get(d, 0))})
+    return {"views_total": int(tpl.get("views_total", 0)), "daily": daily,
+            "published": bool(tpl.get("published")), "slug": tpl.get("slug"),
+            "custom_domain": tpl.get("custom_domain"),
+            "domain_verified": bool(tpl.get("domain_verified"))}
+
+
+# ---------------- Custom domains ----------------
+_DOMAIN_RE = re.compile(r"^(?=.{4,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$")
+
+
+def _normalize_domain(raw: str) -> str:
+    d = (raw or "").strip().lower()
+    d = re.sub(r"^https?://", "", d)
+    return d.split("/")[0].split("?")[0].split(":")[0].rstrip(".")
+
+
+def _resolve_ips(host: str) -> set:
+    try:
+        return {ai[4][0] for ai in socket.getaddrinfo(host, 443, proto=socket.IPPROTO_TCP)}
+    except OSError:
+        return set()
+
+
+@router.put("/templates/{template_id}/domain")
+async def set_domain(template_id: str, input: DomainInput, user: dict = Depends(get_current_user)):
+    tpl = await db.templates.find_one({"template_id": template_id, "user_id": user["user_id"]}, {"_id": 0, "published": 1})
+    if not tpl:
+        raise HTTPException(status_code=404, detail="Template not found")
+    if not tpl.get("published"):
+        raise HTTPException(status_code=400, detail="Publish your site before connecting a domain.")
+    domain = _normalize_domain(input.domain)
+    if not _DOMAIN_RE.match(domain):
+        raise HTTPException(status_code=400, detail="Enter a valid domain like mybusiness.com or www.mybusiness.com.")
+    clash = await db.templates.find_one({"custom_domain": domain, "template_id": {"$ne": template_id}}, {"_id": 1})
+    if clash:
+        raise HTTPException(status_code=409, detail="That domain is already connected to another site.")
+    try:
+        await db.templates.update_one(
+            {"template_id": template_id, "user_id": user["user_id"]},
+            {"$set": {"custom_domain": domain, "domain_verified": False}})
+    except DuplicateKeyError:
+        raise HTTPException(status_code=409, detail="That domain is already connected to another site.")
+    return {"custom_domain": domain, "domain_verified": False}
+
+
+@router.delete("/templates/{template_id}/domain")
+async def remove_domain(template_id: str, user: dict = Depends(get_current_user)):
+    res = await db.templates.update_one(
+        {"template_id": template_id, "user_id": user["user_id"]},
+        {"$unset": {"custom_domain": "", "domain_verified": ""}})
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Template not found")
+    return {"custom_domain": None}
+
+
+@router.post("/templates/{template_id}/domain/verify")
+async def verify_domain(template_id: str, request: Request, user: dict = Depends(get_current_user)):
+    tpl = await db.templates.find_one({"template_id": template_id, "user_id": user["user_id"]}, {"_id": 0, "custom_domain": 1})
+    if not tpl:
+        raise HTTPException(status_code=404, detail="Template not found")
+    domain = tpl.get("custom_domain")
+    if not domain:
+        raise HTTPException(status_code=400, detail="No domain connected yet.")
+    expected_host = _public_base(request).split("://", 1)[1]
+    domain_ips, expected_ips = await run_in_threadpool(
+        lambda: (_resolve_ips(domain), _resolve_ips(expected_host)))
+    verified = bool(domain_ips) and bool(domain_ips & expected_ips)
+    await db.templates.update_one({"template_id": template_id}, {"$set": {"domain_verified": verified}})
+    return {"custom_domain": domain, "domain_verified": verified, "expected_host": expected_host,
+            "domain_ips": sorted(domain_ips), "expected_ips": sorted(expected_ips)}
+
+
+@router.get("/public/domain/{host}")
+async def public_site_by_domain(host: str, request: Request):
+    domain = _normalize_domain(host)
+    tpl = await db.templates.find_one({"custom_domain": domain, "published": True}, {"_id": 0})
+    if not tpl:
+        raise HTTPException(status_code=404, detail="No published site is connected to this domain")
+    if _count_view(request):
+        await _record_view(tpl["template_id"])
+    return {
+        "business_name": tpl.get("business_name", ""),
+        "industry": tpl.get("industry", ""),
+        "primary_color": tpl.get("primary_color", "#0055FF"),
+        "html": tpl.get("html", ""),
+    }
+
+
 # ---------------- SEO-friendly public page (server-rendered HTML w/ social meta) ----------------
 _NOT_FOUND_HTML = (
     "<!DOCTYPE html><html lang='en'><head><meta charset='utf-8'>"
@@ -225,6 +346,8 @@ async def public_page(slug: str, request: Request):
     tpl = await db.templates.find_one({"slug": slug, "published": True}, {"_id": 0})
     if not tpl:
         return HTMLResponse(_NOT_FOUND_HTML, status_code=404)
+    if _count_view(request):
+        await _record_view(tpl["template_id"])
     doc_html = tpl.get("html", "")
     base = _public_base(request)
     out = _inject_social_meta(

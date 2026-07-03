@@ -15,6 +15,12 @@ import Pricing from "@/pages/Pricing";
 import Billing from "@/pages/Billing";
 import PaymentReturn from "@/pages/PaymentReturn";
 import PublicSite from "@/pages/PublicSite";
+import DomainSite from "@/pages/DomainSite";
+
+const backendHost = (() => {
+  try { return new URL(process.env.REACT_APP_BACKEND_URL).hostname; } catch (e) { return window.location.hostname; }
+})();
+const isCustomDomain = window.location.hostname !== backendHost && window.location.hostname !== "localhost";
 
 function AppRouter() {
   const location = useLocation();
@@ -39,6 +45,7 @@ function AppRouter() {
 }
 
 function App() {
+  if (isCustomDomain) return <DomainSite />;
   return (
     <div className="App font-body">
       <AuthProvider>

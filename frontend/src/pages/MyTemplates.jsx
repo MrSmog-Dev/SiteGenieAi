@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import DashboardLayout from "@/components/DashboardLayout";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
-import { LayoutTemplate, Trash2, Plus, Eye } from "lucide-react";
+import { LayoutTemplate, Trash2, Plus, Eye, BarChart2 } from "lucide-react";
 
 export default function MyTemplates() {
   const [templates, setTemplates] = useState([]);
@@ -48,7 +48,14 @@ export default function MyTemplates() {
                 <div className="p-5">
                   <h3 className="font-display font-semibold truncate">{t.business_name}</h3>
                   <p className="text-white/40 text-xs mt-1">{t.industry}</p>
-                  <p className="text-white/30 text-xs mt-1 font-mono">{new Date(t.created_at).toLocaleDateString()}</p>
+                  <p className="text-white/30 text-xs mt-1 font-mono flex items-center gap-3">
+                    {new Date(t.created_at).toLocaleDateString()}
+                    {t.published && (
+                      <span data-testid={`views-${t.template_id}`} className="flex items-center gap-1 text-white/50">
+                        <BarChart2 className="w-3 h-3 text-brand" /> {t.views_total || 0} views
+                      </span>
+                    )}
+                  </p>
                   <div className="flex items-center gap-2 mt-4">
                     <Link to={`/templates/${t.template_id}`} className="flex-1 flex items-center justify-center gap-2 text-sm border border-white/15 hover:border-white/40 py-2 transition-colors duration-300">
                       <Eye className="w-4 h-4" /> View

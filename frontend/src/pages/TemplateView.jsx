@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import DashboardLayout from "@/components/DashboardLayout";
-import { api, pollGenerationJob } from "@/lib/api";
+import { api, formatApiError, pollGenerationJob } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
-import { ArrowLeft, Download, Copy, Monitor, Smartphone, Code, RefreshCw, Wand2, Loader2, X, Globe, Share2, Check, ExternalLink, ChevronDown, FileArchive, FileCode } from "lucide-react";
+import { ArrowLeft, Download, Copy, Monitor, Smartphone, Code, RefreshCw, Wand2, Loader2, X, Globe, Share2, Check, ExternalLink, ChevronDown, FileArchive, FileCode, BarChart2, ShieldCheck, Clock } from "lucide-react";
 
 export default function TemplateView() {
   const { id } = useParams();
@@ -23,10 +23,21 @@ export default function TemplateView() {
   const [downloadOpen, setDownloadOpen] = useState(false);
   const [slugDraft, setSlugDraft] = useState("");
   const [savingSlug, setSavingSlug] = useState(false);
+  const [stats, setStats] = useState(null);
+  const [domainDraft, setDomainDraft] = useState("");
+  const [savingDomain, setSavingDomain] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [domainInfo, setDomainInfo] = useState(null);
 
   const publicUrl = tpl?.slug ? `${window.location.origin}/api/p/${tpl.slug}` : "";
+  const appHost = window.location.hostname;
 
-  const load = () => api.get(`/templates/${id}`).then(({ data }) => setTpl(data)).catch(() => { toast.error("Not found"); navigate("/templates"); });
+  const loadStats = () => api.get(`/templates/${id}/stats`).then(({ data }) => setStats(data)).catch(() => {});
+  const load = () => api.get(`/templates/${id}`).then(({ data }) => {
+    setTpl(data);
+    setDomainDraft(data.custom_domain || "");
+    if (data.published) loadStats();
+  }).catch(() => { toast.error("Not found"); navigate("/templates"); });
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
 
   const runJob = async (promise, label) => {
@@ -114,7 +125,38 @@ export default function TemplateView() {
       else toast.error("Could not update link. Please try again.");
     } finally { setSavingSlug(false); }
   };
-  const openShare = () => { setSlugDraft(tpl?.slug || ""); setShareOpen(true); };
+  const openShare = () => { setSlugDraft(tpl?.slug || ""); if (tpl?.published) loadStats(); setShareOpen(true); };
+
+  const saveDomain = async () => {
+    setSavingDomain(true);
+    try {
+      const { data } = await api.put(`/templates/${id}/domain`, { domain: domainDraft });
+      setTpl((t) => ({ ...t, custom_domain: data.custom_domain, domain_verified: false }));
+      setDomainDraft(data.custom_domain);
+      setDomainInfo(null);
+      toast.success("Domain connected — now point your DNS, then verify.");
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+    finally { setSavingDomain(false); }
+  };
+  const verifyDomain = async () => {
+    setVerifying(true);
+    try {
+      const { data } = await api.post(`/templates/${id}/domain/verify`);
+      setDomainInfo(data);
+      setTpl((t) => ({ ...t, domain_verified: data.domain_verified }));
+      if (data.domain_verified) toast.success("Domain verified! Your site is reachable on your domain.");
+      else toast.error("DNS isn't pointing here yet — records can take up to 24h to propagate.");
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+    finally { setVerifying(false); }
+  };
+  const removeDomain = async () => {
+    try {
+      await api.delete(`/templates/${id}/domain`);
+      setTpl((t) => ({ ...t, custom_domain: null, domain_verified: false }));
+      setDomainDraft(""); setDomainInfo(null);
+      toast.success("Domain removed.");
+    } catch (e) { toast.error("Could not remove domain."); }
+  };
 
   if (!tpl) return <DashboardLayout><div className="p-10 font-mono text-white/40">Loading…</div></DashboardLayout>;
 
@@ -148,6 +190,11 @@ export default function TemplateView() {
               className={`flex items-center gap-2 text-sm px-3 py-2 border transition-colors duration-300 ${tpl.published ? "border-neon text-neon" : "border-white/15 hover:border-white/40"}`}>
               {tpl.published ? <><span className="w-2 h-2 rounded-full bg-neon animate-pulse" /> Live</> : <><Globe className="w-4 h-4" /> Publish</>}
             </button>
+            {tpl.published && stats && (
+              <div data-testid="views-chip" className="hidden md:flex items-center gap-1.5 text-sm border border-white/10 bg-surface2 px-3 py-2 font-mono text-white/60">
+                <BarChart2 className="w-4 h-4 text-brand" /> {stats.views_total}
+              </div>
+            )}
             <div className="relative">
               <button data-testid="download-btn" onClick={() => setDownloadOpen((o) => !o)}
                 className="flex items-center gap-2 text-sm bg-brand hover:bg-brand-hover px-3 py-2 transition-colors duration-300">
@@ -211,7 +258,7 @@ export default function TemplateView() {
 
       {shareOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/70 backdrop-blur-sm" onClick={() => setShareOpen(false)}>
-          <div className="w-full max-w-lg bg-surface2 border border-white/10 p-6" onClick={(e) => e.stopPropagation()} data-testid="share-dialog">
+          <div className="w-full max-w-lg bg-surface2 border border-white/10 p-6 max-h-[88vh] overflow-y-auto" onClick={(e) => e.stopPropagation()} data-testid="share-dialog">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-display text-xl font-bold flex items-center gap-2"><Share2 className="w-5 h-5 text-neon" /> Share your website</h2>
               <button onClick={() => setShareOpen(false)} className="text-white/50 hover:text-white"><X className="w-5 h-5" /></button>
@@ -245,6 +292,87 @@ export default function TemplateView() {
                     </button>
                   </div>
                   <p className="text-white/30 text-xs mt-2">Letters, numbers and hyphens. Changing it updates your live link.</p>
+                </div>
+
+                {stats && (
+                  <div className="mt-5 border-t border-white/10 pt-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-xs text-white/40 font-mono uppercase">Traffic · last 14 days</div>
+                      <div className="text-sm font-mono text-white/70" data-testid="views-total">
+                        <span className="text-brand font-bold">{stats.views_total}</span> total views
+                      </div>
+                    </div>
+                    <div className="flex items-end gap-1 h-12" data-testid="views-sparkline">
+                      {stats.daily.map((d) => {
+                        const max = Math.max(...stats.daily.map((x) => x.views), 1);
+                        return (
+                          <div key={d.date} title={`${d.date}: ${d.views} views`}
+                            className="flex-1 bg-brand/30 hover:bg-brand transition-colors duration-300"
+                            style={{ height: `${Math.max((d.views / max) * 100, 5)}%` }} />
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                <div className="mt-5 border-t border-white/10 pt-4">
+                  <div className="text-xs text-white/40 font-mono uppercase mb-2">Custom domain</div>
+                  {tpl.custom_domain ? (
+                    <>
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Globe className="w-4 h-4 text-brand shrink-0" />
+                          <span data-testid="connected-domain" className="font-mono text-sm truncate">{tpl.custom_domain}</span>
+                          {tpl.domain_verified ? (
+                            <span data-testid="domain-verified-badge" className="flex items-center gap-1 text-[10px] font-mono uppercase bg-emerald-500/15 text-emerald-400 px-2 py-0.5">
+                              <ShieldCheck className="w-3 h-3" /> Verified
+                            </span>
+                          ) : (
+                            <span data-testid="domain-pending-badge" className="flex items-center gap-1 text-[10px] font-mono uppercase bg-white/10 text-white/50 px-2 py-0.5">
+                              <Clock className="w-3 h-3" /> Pending DNS
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button data-testid="verify-domain-btn" onClick={verifyDomain} disabled={verifying}
+                            className="flex items-center gap-1.5 text-xs border border-white/15 hover:border-brand hover:text-brand px-2.5 py-1.5 transition-colors duration-300 disabled:opacity-50">
+                            {verifying ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />} Verify DNS
+                          </button>
+                          <button data-testid="remove-domain-btn" onClick={removeDomain}
+                            className="text-xs text-white/40 hover:text-neon px-1 py-1.5 transition-colors duration-300">Remove</button>
+                        </div>
+                      </div>
+                      {!tpl.domain_verified && (
+                        <div data-testid="dns-instructions" className="mt-3 bg-surface1 border border-white/10 p-3 text-xs text-white/50 space-y-1.5">
+                          <div className="text-white/70 font-medium">Point your DNS to SiteGenie, then click Verify:</div>
+                          <div className="font-mono">CNAME &nbsp;{tpl.custom_domain} &nbsp;→&nbsp; {appHost}</div>
+                          <div>Apex domain (no www)? Use an ALIAS/ANAME record to <span className="font-mono">{appHost}</span>, or an A record to its IP.</div>
+                          <div className="text-white/30">DNS changes can take up to 24 hours to propagate.</div>
+                          {domainInfo && !domainInfo.domain_verified && (
+                            <div className="text-neon/80 pt-1">
+                              {domainInfo.domain_ips?.length
+                                ? `Your domain currently resolves to ${domainInfo.domain_ips.join(", ")} — expected ${domainInfo.expected_ips?.join(", ") || appHost}.`
+                                : "Your domain doesn't resolve yet — check that the DNS record was saved."}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex items-stretch gap-2">
+                        <input data-testid="domain-input" value={domainDraft}
+                          onChange={(e) => setDomainDraft(e.target.value)}
+                          className="flex-1 bg-surface1 border border-white/10 px-3 py-2 text-sm font-mono text-white outline-none focus:border-brand"
+                          placeholder="www.mybusiness.com" />
+                        <button data-testid="connect-domain-btn" onClick={saveDomain} disabled={savingDomain || !domainDraft.trim()}
+                          className="flex items-center gap-2 text-sm border border-white/15 hover:border-brand hover:text-brand px-3 py-2 transition-colors duration-300 disabled:opacity-40">
+                          {savingDomain ? <Loader2 className="w-4 h-4 animate-spin" /> : "Connect"}
+                        </button>
+                      </div>
+                      <p className="text-white/30 text-xs mt-2">Use your own domain instead of the SiteGenie link. You'll get DNS instructions after connecting.</p>
+                    </>
+                  )}
                 </div>
                 <div className="flex items-center justify-between mt-5">
                   <button data-testid="unpublish-btn" onClick={unpublish} disabled={publishing}

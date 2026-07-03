@@ -1,0 +1,23 @@
+{
+  "summary": "Tested P2 per-site analytics and P3 custom domain features end-to-end (backend pytest + frontend Playwright). All 11 backend tests passed (1 skipped: only 1 published template available so 409 duplicate test skipped). All frontend flows verified: views badge on cards, views chip in header, views-total + 14-bar sparkline in share dialog, view count increments after hitting /api/p/{slug} in a new tab (5 -> 6), custom domain connect (example.com) shows pending badge + DNS instructions, verify with example.com stays pending, verify with app-host flips to Verified badge, remove clears back to input. Cleanup: custom domain successfully removed so app host is not hijacked. Regression: ZIP download and slug rename still work.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_analytics_domain.py",
+    "/app/test_reports/pytest/iter9_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "templates.py is ~400 lines and now covers generation+publish+analytics+domains+SEO+ZIP. Consider splitting analytics & custom-domain routes into their own modules for maintainability.",
+    "verify_domain uses socket.getaddrinfo on request-thread offloaded to threadpool — good; DNS caching could be added to reduce latency.",
+    "Duplicate-domain check uses find_one but there is no unique index on custom_domain — race condition possible between two concurrent PUT /domain calls. Add a partial unique index {custom_domain: 1} (unique, sparse) to prevent duplicates at DB level."
+  ],
+  "updated_files": ["/app/backend/tests/test_analytics_domain.py"],
+  "success_rate": {"backend": "100% (11/11, 1 skip)", "frontend": "100%"},
+  "test_credentials": "Used owner: neobeyondlegacy2@gmail.com / SoloLeveling21! (login via /login form)",
+  "seed_data_creation": "None — used existing tpl_908bc5299b9e / verdant-vine-fa1b20",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Analytics + Custom Domain feature is fully working. When adding view-count tests via requests/curl, MUST set a browser User-Agent — bot UAs (Twitterbot, curl, python-requests, wget, httpx) are filtered by regex in templates.py:_BOT_RE. The share dialog is scrollable (max-h 88vh). Auth uses httpOnly session cookies (POST /api/auth/login) — no bearer token; use a requests.Session(). AI generation endpoints return 500 (Emergent LLM budget exhausted), do not test those. Stripe is LIVE — no purchases.",
+  "rca_of_the_issue": "N/A — no bugs found."
+}
