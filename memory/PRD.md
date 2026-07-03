@@ -26,10 +26,11 @@ An online store that creates website templates for businesses without a website.
 - **P0 BLOCKED**: Emergent LLM Key budget exceeded ($3.00 cap hit) — `/api/generate/start` returns 500 until user tops up (Profile → Universal Key → Add Balance)
 - Stripe is LIVE mode — be careful with test purchases
 
-## Backlog
-- P0: User validates production deployment (redeploy needed to pick up landing redesign)
-- P2: Per-site analytics counter (views on `/api/p/{slug}`)
-- P3: Custom domain mapping (blocked by preview env DNS/ingress; vanity slugs are the MVP)
+- 2026-07-03: **P2 Analytics counter** — non-bot views counted on `/api/p/{slug}` and domain-served pages (`views_total` + `views_daily` per date, bot UAs filtered by regex); `GET /api/templates/{id}/stats` returns totals + 14-day daily series; UI: views badge on My Websites cards, views chip in TemplateView header, total + 14-bar sparkline in share dialog. Tested: iteration_9.json 100% pass.
+- 2026-07-03: **P3 Custom domain mapping** — `PUT/DELETE /api/templates/{id}/domain` (normalize + validate + uniqueness w/ unique sparse index), `POST .../domain/verify` (DNS A-record IP comparison vs app host), `GET /api/public/domain/{host}` public payload, host-based serving in App.js → DomainSite.jsx (foreign hostname renders published site full-screen). Share dialog UI: connect input, Pending DNS/Verified badges, CNAME instructions, verify + remove. NOTE: for production, arbitrary domains must also be routed by the hosting ingress (user may need Emergent support to attach domains to the deployment). Tested: iteration_9.json 100% pass.
+
+## Backlog — ALL CLEAR (as of 2026-07-03)
+- (user action) Top up Emergent LLM key, redeploy to production, validate live.
 
 ## Key Endpoints
 - `POST /api/templates/generate` → job; poll job for template
