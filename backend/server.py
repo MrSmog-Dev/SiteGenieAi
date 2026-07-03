@@ -33,6 +33,7 @@ db = client[os.environ['DB_NAME']]
 
 EMERGENT_LLM_KEY = os.environ['EMERGENT_LLM_KEY']
 STRIPE_API_KEY = os.environ['STRIPE_API_KEY']
+OWNER_EMAIL = os.environ.get('OWNER_EMAIL', '').lower().strip()
 STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY', '')
 STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
 STRIPE_PRICE_IDS = {
@@ -168,7 +169,16 @@ def estimate_cost(*texts) -> int:
     tokens = total_chars / 4.0
     return max(MIN_OPERATION_COST, round(tokens / TOKENS_PER_CREDIT))
 
+def is_owner(user: dict) -> bool:
+    if not user:
+        return False
+    if user.get("role") in ("owner", "admin"):
+        return True
+    return bool(OWNER_EMAIL and (user.get("email", "").lower() == OWNER_EMAIL))
+
 def user_is_unlimited(user: dict) -> bool:
+    if is_owner(user):
+        return True
     plan = SUBSCRIPTION_PLANS.get(user.get("plan"))
     return bool(plan and plan.get("unlimited") and user.get("subscription_status") == "active")
 
@@ -188,6 +198,9 @@ async def process_subscription(user: dict) -> dict:
     """Lazy subscription lifecycle: migrate legacy credits, apply 30-day credit resets,
     handle billing-period renewal (simulated) and cancellation."""
     changed = {}
+    if OWNER_EMAIL and user.get("email", "").lower() == OWNER_EMAIL and user.get("role") != "owner":
+        user["role"] = "owner"
+        changed["role"] = "owner"
     if "plan_credits" not in user or "extra_credits" not in user:
         legacy = int(user.get("credits", 0))
         user["extra_credits"] = int(user.get("extra_credits", legacy))
@@ -474,7 +487,8 @@ async def _run_generation(job_id: str, user_id: str, fields: dict, mode: str = "
 async def _start_job(user: dict, fields: dict, mode: str = "new", template_id: str = None):
     if not user_is_unlimited(user) and total_credits(user) <= 0:
         raise HTTPException(status_code=402, detail="You're out of credits. Purchase a credit pack to keep building.")
-    await check_rate_limit(f"gen:{user['user_id']}", GEN_MAX_PER_WINDOW, GEN_WINDOW_SECONDS)
+    if not is_owner(user):
+        await check_rate_limit(f"gen:{user['user_id']}", GEN_MAX_PER_WINDOW, GEN_WINDOW_SECONDS)
     job_id = f"job_{uuid.uuid4().hex[:12]}"
     await db.gen_jobs.insert_one({
         "job_id": job_id, "user_id": user["user_id"], "status": "pending",
@@ -931,6 +945,26 @@ async def startup():
             await db.users.update_one({"email": admin_email}, {"$set": {"password_hash": hash_password(admin_password)}})
     else:
         logger.warning("Admin seeding skipped: ADMIN_EMAIL and a >=12 char ADMIN_PASSWORD are required.")
+    # seed owner (unlimited, all features; sign-in via Google or password)
+    owner_email = OWNER_EMAIL
+    owner_password = os.environ.get("OWNER_PASSWORD") or ""
+    if owner_email:
+        owner = await db.users.find_one({"email": owner_email})
+        if not owner:
+            await db.users.insert_one({
+                "user_id": f"user_{uuid.uuid4().hex[:12]}", "email": owner_email,
+                "name": "Owner", "picture": "",
+                "password_hash": hash_password(owner_password) if len(owner_password) >= 8 else "",
+                "role": "owner", "plan_credits": 0, "extra_credits": 0,
+                "plan": None, "plan_name": None, "subscription_status": "none",
+                "cancel_at_period_end": False, "current_period_end": None,
+                "next_credit_reset": None, "created_at": now,
+            })
+        else:
+            upd = {"role": "owner"}
+            if len(owner_password) >= 8 and not verify_password(owner_password, owner.get("password_hash", "")):
+                upd["password_hash"] = hash_password(owner_password)
+            await db.users.update_one({"email": owner_email}, {"$set": upd})
     # backfill legacy credit model
     async for u in db.users.find({"extra_credits": {"$exists": False}}, {"_id": 0, "user_id": 1, "credits": 1}):
         await db.users.update_one({"user_id": u["user_id"]},
