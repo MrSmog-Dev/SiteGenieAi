@@ -717,8 +717,14 @@ def _sub_period_end(sub) -> datetime:
 
 async def _get_or_create_customer(user: dict) -> str:
     _use_native_stripe()
-    if user.get("stripe_customer_id"):
-        return user["stripe_customer_id"]
+    cid = user.get("stripe_customer_id")
+    if cid:
+        try:
+            c = stripe_sdk.Customer.retrieve(cid)
+            if not getattr(c, "deleted", False):
+                return cid
+        except Exception:
+            pass  # stale/invalid id (e.g. test->live switch) -> recreate below
     cust = stripe_sdk.Customer.create(
         email=user["email"], name=user.get("name", ""), metadata={"user_id": user["user_id"]})
     await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"stripe_customer_id": cust.id}})
@@ -936,7 +942,7 @@ _cors_origins = [o.strip() for o in os.environ.get("CORS_ORIGINS", "").split(","
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins or ["http://localhost:3000"],
-    allow_origin_regex=r"https://.*\.emergentagent\.com",
+    allow_origin_regex=r"https://.*\.(emergentagent\.com|emergent\.host)",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
