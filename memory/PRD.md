@@ -36,6 +36,8 @@ An online store that creates website templates for businesses without a website.
 - 2026-07-03 (later): **Quality→Economy auto-fallback shipped** (was P3): `services/llm.py::_call_build_llm` retries on Haiku when the Sonnet build times out at 240s — applied to user generations, edits, Forge builds and market seeding.
 - 2026-07-03 (later): **Market fully seeded** — 9 active listings ($280–$320, all AI-priced): Ember & Oak, IronPulse Fitness, Northwind Creative, Lumen Studio, Flowdesk, Velvet & Sage, Harborline Realty, Driftwood Coffee Co. + Forge-built Pawsitive Studio.
 
+- 2026-07-03 (later): **Anime avatars** — regenerated all 12 AI Team avatars as ORIGINAL characters in a One Piece-inspired shonen pirate-adventure art style (user is a One Piece fan; no actual OP characters used). Files overwritten in `frontend/public/agents/{id}.png`.
+
 ## Backlog
 - (user action) Redeploy to production (https://sitegenie.dev) to ship the Template Market + AI Team.
 - P3: Weekly analytics email digest (Resend) — Mara can draft the copy.
