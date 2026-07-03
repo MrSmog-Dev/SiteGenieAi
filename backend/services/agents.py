@@ -6,11 +6,11 @@ from datetime import datetime, timezone, timedelta
 
 from emergentintegrations.llm.chat import LlmChat, UserMessage
 
-from config import EMERGENT_LLM_KEY, STRATEGY_MODEL, BUILD_MODEL, logger
+from config import EMERGENT_LLM_KEY, STRATEGY_MODEL, logger
 from database import db
 from services.llm import (
-    _build_brief_prompt, _build_site_prompt, _call_llm, clean_html,
-    GEN_STRATEGY_SYSTEM, GEN_BUILD_SYSTEM,
+    _build_brief_prompt, _build_site_prompt, _call_llm, _call_build_llm, clean_html,
+    GEN_STRATEGY_SYSTEM,
 )
 from services.market import create_listing
 
@@ -192,7 +192,7 @@ async def run_forge_build(job_id: str, owner_id: str, niche_brief: str):
         spec = json.loads(re.search(r"\{[\s\S]*\}", str(raw)).group(0))
         await _set(status="building", title=spec.get("business_name"))
         brief = await _call_llm(_build_brief_prompt(spec), GEN_STRATEGY_SYSTEM, STRATEGY_MODEL)
-        html = clean_html(await _call_llm(_build_site_prompt(spec, brief), GEN_BUILD_SYSTEM, BUILD_MODEL))
+        html = clean_html(await _call_build_llm(_build_site_prompt(spec, brief)))
         await _set(status="pricing")
         tpl = {**spec, "quality": "quality", "template_id": f"tpl_{uuid.uuid4().hex[:12]}",
                "user_id": owner_id, "html": html, "created_at": datetime.now(timezone.utc)}
@@ -204,4 +204,7 @@ async def run_forge_build(job_id: str, owner_id: str, niche_brief: str):
             "template_id": tpl["template_id"]})
     except Exception as e:
         logger.exception("forge build failed")
-        await _set(status="error", error=str(e)[:300])
+        detail = f"{type(e).__name__}: {e}"[:300].strip(": ")
+        if isinstance(e, asyncio.TimeoutError):
+            detail = "The AI build took too long even after fallback. Try again with a simpler brief."
+        await _set(status="error", error=detail)

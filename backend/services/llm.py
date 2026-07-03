@@ -135,6 +135,15 @@ async def _call_llm(prompt: str, system_message: str, model: str) -> str:
     return result if isinstance(result, str) else str(result)
 
 
+async def _call_build_llm(prompt: str) -> str:
+    """Quality build with auto-fallback: if the heavy model times out, retry once on the fast model."""
+    try:
+        return await _call_llm(prompt, GEN_BUILD_SYSTEM, BUILD_MODEL)
+    except asyncio.TimeoutError:
+        logger.warning("build model timed out after %ss; falling back to economy model", LLM_CALL_TIMEOUT_S)
+        return await _call_llm(prompt, GEN_BUILD_SYSTEM, STRATEGY_MODEL)
+
+
 async def _fail_job(job_id: str, e: Exception):
     logger.exception("generation failed")
     if isinstance(e, asyncio.TimeoutError):
@@ -160,7 +169,7 @@ async def _run_generation(job_id: str, user_id: str, fields: dict, mode: str = "
                 f"REQUESTED CHANGES:\n{fields.get('instructions','')}\n\n"
                 f"CURRENT HTML:\n{existing.get('html','')}"
             )
-            html = clean_html(await _call_llm(prompt, GEN_BUILD_SYSTEM, BUILD_MODEL))
+            html = clean_html(await _call_build_llm(prompt))
             cost_inputs = [prompt, html]
         else:
             quality = (fields.get("quality") or "quality").lower()
@@ -175,7 +184,7 @@ async def _run_generation(job_id: str, user_id: str, fields: dict, mode: str = "
                 brief = await _call_llm(brief_prompt, GEN_STRATEGY_SYSTEM, STRATEGY_MODEL)
                 # Step 2 — builder crafts the site from the brief
                 site_prompt = _build_site_prompt(fields, brief)
-                html = clean_html(await _call_llm(site_prompt, GEN_BUILD_SYSTEM, BUILD_MODEL))
+                html = clean_html(await _call_build_llm(site_prompt))
                 cost_inputs = [brief_prompt, brief, site_prompt, html]
     except Exception as e:
         await _fail_job(job_id, e)

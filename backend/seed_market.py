@@ -4,10 +4,10 @@ import uuid
 from datetime import datetime, timezone
 
 from database import db, client
-from config import OWNER_EMAIL, STRATEGY_MODEL, BUILD_MODEL
+from config import OWNER_EMAIL, STRATEGY_MODEL
 from services.llm import (
-    _build_brief_prompt, _build_site_prompt, _call_llm, clean_html,
-    GEN_STRATEGY_SYSTEM, GEN_BUILD_SYSTEM,
+    _build_brief_prompt, _build_site_prompt, _call_llm, _call_build_llm, clean_html,
+    GEN_STRATEGY_SYSTEM,
 )
 from services.market import create_listing
 
@@ -78,7 +78,7 @@ async def build_one(owner_id: str, spec: dict, sem: asyncio.Semaphore):
             return
         print(f"generating: {spec['business_name']} ...")
         brief = await _call_llm(_build_brief_prompt(spec), GEN_STRATEGY_SYSTEM, STRATEGY_MODEL)
-        html = clean_html(await _call_llm(_build_site_prompt(spec, brief), GEN_BUILD_SYSTEM, BUILD_MODEL))
+        html = clean_html(await _call_build_llm(_build_site_prompt(spec, brief)))
         tpl = {**spec, "quality": "quality", "template_id": f"tpl_{uuid.uuid4().hex[:12]}",
                "user_id": owner_id, "html": html, "created_at": datetime.now(timezone.utc)}
         await db.templates.insert_one(dict(tpl))
