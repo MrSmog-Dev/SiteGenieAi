@@ -135,6 +135,7 @@ export default function Landing() {
   };
 
   const finishFlow = (vibeLabel, vibe) => {
+    if (typing) return;
     const final = { ...brief };
     if (vibeLabel) {
       final.brand_keywords = vibe?.keywords || vibeLabel;
@@ -264,6 +265,7 @@ export default function Landing() {
               <textarea
                 ref={textareaRef}
                 data-testid="hero-prompt-input"
+                aria-label="Describe your business"
                 rows={chatActive ? 1 : 3}
                 value={input}
                 disabled={stage === "done"}
