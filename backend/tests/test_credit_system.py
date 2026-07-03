@@ -162,7 +162,8 @@ async def test_annual_unlimited_bypass():
 def test_estimate_cost_and_deduct_credits_unit():
     import sys
     sys.path.insert(0, "/app/backend")
-    from server import estimate_cost, TOKENS_PER_CREDIT
+    from security import estimate_cost
+    from config import TOKENS_PER_CREDIT
 
     # small op
     assert estimate_cost("hi") == 1
@@ -173,7 +174,8 @@ def test_estimate_cost_and_deduct_credits_unit():
 
     # deduct_credits via mongo
     async def _run():
-        from server import deduct_credits, db as srv_db
+        from security import deduct_credits
+        from database import db as srv_db
         uid = f"TEST_deduct_{uuid.uuid4().hex[:8]}"
         await srv_db.users.insert_one({"user_id": uid, "email": f"{uid}@t.io",
                                        "plan_credits": 10, "extra_credits": 5})

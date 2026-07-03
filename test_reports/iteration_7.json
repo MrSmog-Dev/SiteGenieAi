@@ -1,0 +1,23 @@
+{
+  "summary": "Frontend-only regression for SiteGenie backlog features. All 8 requested flows PASS end-to-end via Playwright against the live REACT_APP_BACKEND_URL. Admin login, live iframe thumbnails, Live badge, Generator quality/economy toggle, TemplateView download menu (HTML + ZIP), Publish/Share dialog (Live button, /api/p/<slug> URL, Copy/Open/Unpublish), vanity slug save+toast+URL update+revert, backend-rendered SEO public page at /api/p/aurora-cafe-demo (og:title meta present, not React shell), and legacy /s/<slug> -> /api/p/<slug> redirect all verified. Slug reverted to 'aurora-cafe-demo' at end of test as requested.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Login submit button lacks type=\"submit\" (still works via Enter/click); adding it would be a minor a11y/robustness improvement.",
+    "Console shows repeated CSP violation for cdn-cgi/rum on the public SEO page (connect-src 'none' blocks Cloudflare RUM). Harmless but noisy; if RUM is not desired, this is fine; otherwise add cdn-cgi to CSP."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped per request)", "frontend": "100% (8/8 flows)"},
+  "test_credentials": "admin@sitegenie.com / Sg!Adm1n_9f3kQ2xL7vB (works, lands on /dashboard, credits shown as infinity).",
+  "seed_data_creation": "None. Vanity slug changed from 'aurora-cafe-demo' -> 'aurora-cafe-qa' -> reverted to 'aurora-cafe-demo'.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All 8 backlog flows currently PASS. If retesting, note: login button uses text 'Log in' (no type=submit) -- use get_by_role('button', name='Log in'). The Share dialog opens via [data-testid=publish-btn] and contains slug-input/save-slug-btn; slug save triggers a toast 'Link updated' and updates public-url-input in-place. SEO /api/p/<slug> is a backend-rendered full page (no React root) with og meta; /s/<slug> redirects to it.",
+  "rca of the issue": "N/A - no failures."
+}

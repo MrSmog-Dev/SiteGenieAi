@@ -4,7 +4,7 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { api, pollGenerationJob } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
-import { ArrowLeft, Download, Copy, Monitor, Smartphone, Code, RefreshCw, Wand2, Loader2, X, Globe, Share2, Check, ExternalLink } from "lucide-react";
+import { ArrowLeft, Download, Copy, Monitor, Smartphone, Code, RefreshCw, Wand2, Loader2, X, Globe, Share2, Check, ExternalLink, ChevronDown, FileArchive, FileCode } from "lucide-react";
 
 export default function TemplateView() {
   const { id } = useParams();
@@ -20,8 +20,11 @@ export default function TemplateView() {
   const [shareOpen, setShareOpen] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [downloadOpen, setDownloadOpen] = useState(false);
+  const [slugDraft, setSlugDraft] = useState("");
+  const [savingSlug, setSavingSlug] = useState(false);
 
-  const publicUrl = tpl?.slug ? `${window.location.origin}/s/${tpl.slug}` : "";
+  const publicUrl = tpl?.slug ? `${window.location.origin}/api/p/${tpl.slug}` : "";
 
   const load = () => api.get(`/templates/${id}`).then(({ data }) => setTpl(data)).catch(() => { toast.error("Not found"); navigate("/templates"); });
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
@@ -56,6 +59,18 @@ export default function TemplateView() {
     const a = document.createElement("a");
     a.href = url; a.download = `${tpl.business_name.replace(/\s+/g, "-").toLowerCase()}.html`; a.click();
     URL.revokeObjectURL(url);
+    setDownloadOpen(false);
+  };
+  const downloadZip = async () => {
+    setDownloadOpen(false);
+    try {
+      const res = await api.get(`/templates/${id}/download-zip`, { responseType: "blob" });
+      const url = URL.createObjectURL(res.data);
+      const a = document.createElement("a");
+      a.href = url; a.download = `${tpl.business_name.replace(/\s+/g, "-").toLowerCase()}.zip`; a.click();
+      URL.revokeObjectURL(url);
+      toast.success("ZIP downloaded");
+    } catch (e) { toast.error("Could not build ZIP. Please try again."); }
   };
   const copy = () => { navigator.clipboard.writeText(tpl.html); toast.success("HTML copied to clipboard"); };
 
@@ -64,6 +79,7 @@ export default function TemplateView() {
     try {
       const { data } = await api.post(`/templates/${id}/publish`);
       setTpl((t) => ({ ...t, published: true, slug: data.slug }));
+      setSlugDraft(data.slug);
       toast.success("Your site is live!");
     } catch (e) { toast.error("Could not publish. Please try again."); }
     finally { setPublishing(false); }
@@ -82,6 +98,23 @@ export default function TemplateView() {
     setCopied(true); setTimeout(() => setCopied(false), 1800);
     toast.success("Public link copied");
   };
+  const saveSlug = async () => {
+    const next = slugDraft.trim();
+    if (next === tpl.slug) return;
+    setSavingSlug(true);
+    try {
+      const { data } = await api.put(`/templates/${id}/slug`, { slug: next });
+      setTpl((t) => ({ ...t, slug: data.slug }));
+      setSlugDraft(data.slug);
+      toast.success("Link updated");
+    } catch (e) {
+      const status = e.response?.status;
+      if (status === 409) toast.error("That link is already taken. Try another.");
+      else if (status === 400) toast.error("Link must be at least 3 characters (letters, numbers, hyphens).");
+      else toast.error("Could not update link. Please try again.");
+    } finally { setSavingSlug(false); }
+  };
+  const openShare = () => { setSlugDraft(tpl?.slug || ""); setShareOpen(true); };
 
   if (!tpl) return <DashboardLayout><div className="p-10 font-mono text-white/40">Loading…</div></DashboardLayout>;
 
@@ -111,11 +144,31 @@ export default function TemplateView() {
             </div>
             <button data-testid="view-code-btn" onClick={() => setShowCode((s) => !s)} className={`flex items-center gap-2 text-sm px-3 py-2 border transition-colors duration-300 ${showCode ? "border-brand text-brand" : "border-white/15 hover:border-white/40"}`}><Code className="w-4 h-4" /> Code</button>
             <button data-testid="copy-btn" onClick={copy} className="flex items-center gap-2 text-sm border border-white/15 hover:border-white/40 px-3 py-2 transition-colors duration-300"><Copy className="w-4 h-4" /></button>
-            <button data-testid="publish-btn" onClick={() => setShareOpen(true)}
+            <button data-testid="publish-btn" onClick={openShare}
               className={`flex items-center gap-2 text-sm px-3 py-2 border transition-colors duration-300 ${tpl.published ? "border-neon text-neon" : "border-white/15 hover:border-white/40"}`}>
               {tpl.published ? <><span className="w-2 h-2 rounded-full bg-neon animate-pulse" /> Live</> : <><Globe className="w-4 h-4" /> Publish</>}
             </button>
-            <button data-testid="download-btn" onClick={download} className="flex items-center gap-2 text-sm bg-brand hover:bg-brand-hover px-3 py-2 transition-colors duration-300"><Download className="w-4 h-4" /> Download</button>
+            <div className="relative">
+              <button data-testid="download-btn" onClick={() => setDownloadOpen((o) => !o)}
+                className="flex items-center gap-2 text-sm bg-brand hover:bg-brand-hover px-3 py-2 transition-colors duration-300">
+                <Download className="w-4 h-4" /> Download <ChevronDown className="w-3.5 h-3.5" />
+              </button>
+              {downloadOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setDownloadOpen(false)} />
+                  <div data-testid="download-menu" className="absolute right-0 mt-1 z-50 w-52 bg-surface2 border border-white/10 shadow-xl">
+                    <button data-testid="download-html-btn" onClick={download}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-sm text-left hover:bg-surface1 transition-colors duration-300">
+                      <FileCode className="w-4 h-4 text-brand" /> HTML file
+                    </button>
+                    <button data-testid="download-zip-btn" onClick={downloadZip}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-sm text-left hover:bg-surface1 transition-colors duration-300 border-t border-white/5">
+                      <FileArchive className="w-4 h-4 text-neon" /> ZIP (HTML + README)
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
         <div className="flex-1 overflow-auto bg-surface2 p-4 flex justify-center relative">
@@ -177,6 +230,21 @@ export default function TemplateView() {
                     className="flex items-center gap-2 text-sm bg-brand hover:bg-brand-hover px-3 py-2 transition-colors duration-300">
                     {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />} {copied ? "Copied" : "Copy"}
                   </button>
+                </div>
+                <div className="mt-4">
+                  <div className="text-xs text-white/40 font-mono uppercase mb-2">Customize your link</div>
+                  <div className="flex items-stretch gap-2">
+                    <div className="flex items-center bg-surface1 border border-white/10 border-r-0 pl-3 pr-1 text-xs text-white/40 font-mono select-none">/api/p/</div>
+                    <input data-testid="slug-input" value={slugDraft}
+                      onChange={(e) => setSlugDraft(e.target.value)}
+                      className="flex-1 bg-surface1 border border-white/10 border-l-0 px-1 py-2 text-sm font-mono text-white outline-none focus:border-neon"
+                      placeholder="your-business" />
+                    <button data-testid="save-slug-btn" onClick={saveSlug} disabled={savingSlug || !slugDraft.trim() || slugDraft.trim() === tpl.slug}
+                      className="flex items-center gap-2 text-sm border border-white/15 hover:border-neon hover:text-neon px-3 py-2 transition-colors duration-300 disabled:opacity-40">
+                      {savingSlug ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save"}
+                    </button>
+                  </div>
+                  <p className="text-white/30 text-xs mt-2">Letters, numbers and hyphens. Changing it updates your live link.</p>
                 </div>
                 <div className="flex items-center justify-between mt-5">
                   <button data-testid="unpublish-btn" onClick={unpublish} disabled={publishing}

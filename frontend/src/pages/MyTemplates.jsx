@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import DashboardLayout from "@/components/DashboardLayout";
 import { api } from "@/lib/api";
@@ -44,14 +44,7 @@ export default function MyTemplates() {
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {templates.map((t) => (
               <div key={t.template_id} data-testid={`template-card-${t.template_id}`} className="border border-white/10 hover:border-white/30 bg-surface1 transition-colors duration-300 group">
-                <div className="h-28 flex items-center justify-center relative" style={{ background: t.primary_color || "#0055FF" }}>
-                  <LayoutTemplate className="w-8 h-8 text-white/80" />
-                  {t.published && (
-                    <span data-testid={`live-badge-${t.template_id}`} className="absolute top-2 right-2 flex items-center gap-1 text-[10px] font-mono uppercase tracking-wider bg-black/50 backdrop-blur-sm text-neon px-2 py-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-neon animate-pulse" /> Live
-                    </span>
-                  )}
-                </div>
+                <SiteThumb id={t.template_id} color={t.primary_color} published={t.published} />
                 <div className="p-5">
                   <h3 className="font-display font-semibold truncate">{t.business_name}</h3>
                   <p className="text-white/40 text-xs mt-1">{t.industry}</p>
@@ -71,5 +64,40 @@ export default function MyTemplates() {
         )}
       </div>
     </DashboardLayout>
+  );
+}
+
+function SiteThumb({ id, color, published }) {
+  const [html, setHtml] = useState(null);
+  const ref = useRef(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting) {
+        io.disconnect();
+        api.get(`/templates/${id}`).then(({ data }) => setHtml(data.html)).catch(() => {});
+      }
+    }, { rootMargin: "300px" });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [id]);
+  return (
+    <div ref={ref} data-testid={`thumb-${id}`} className="h-40 overflow-hidden relative bg-white border-b border-white/10">
+      {html ? (
+        <iframe title="thumb" sandbox="allow-scripts" srcDoc={html} scrolling="no"
+          className="pointer-events-none border-0"
+          style={{ width: "300%", height: "480px", transform: "scale(0.3333)", transformOrigin: "top left" }} />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center" style={{ background: color || "#0055FF" }}>
+          <LayoutTemplate className="w-8 h-8 text-white/80" />
+        </div>
+      )}
+      {published && (
+        <span data-testid={`live-badge-${id}`} className="absolute top-2 right-2 flex items-center gap-1 text-[10px] font-mono uppercase tracking-wider bg-black/60 backdrop-blur-sm text-neon px-2 py-1 z-10">
+          <span className="w-1.5 h-1.5 rounded-full bg-neon animate-pulse" /> Live
+        </span>
+      )}
+    </div>
   );
 }

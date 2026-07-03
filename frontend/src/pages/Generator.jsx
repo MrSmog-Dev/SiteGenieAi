@@ -4,7 +4,7 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { api, formatApiError, pollGenerationJob } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
-import { Sparkles, Loader2, Eye, Download, Save, Zap } from "lucide-react";
+import { Sparkles, Loader2, Eye, Download, Save, Zap, Gauge, Gem } from "lucide-react";
 
 const STYLES = ["modern", "minimal", "bold", "elegant", "playful", "corporate"];
 
@@ -14,7 +14,7 @@ export default function Generator() {
   const [form, setForm] = useState({
     business_name: "", industry: "", description: "",
     style: "modern", primary_color: "#0055FF", contact_email: "", phone: "",
-    target_audience: "", key_services: "", brand_keywords: "", pages: "",
+    target_audience: "", key_services: "", brand_keywords: "", pages: "", quality: "quality",
   });
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
@@ -121,6 +121,21 @@ export default function Generator() {
                 <input data-testid="gen-phone" value={form.phone} onChange={set("phone")} className={inputCls} placeholder="+1 555 000 0000" />
               </Field>
             </div>
+            <div className="border-t border-white/10 pt-4">
+              <div className="text-xs text-white/50 font-mono uppercase mb-3">Generation mode</div>
+              <div className="grid grid-cols-2 gap-3" data-testid="quality-toggle">
+                <button type="button" data-testid="mode-quality" onClick={() => setForm((f) => ({ ...f, quality: "quality" }))}
+                  className={`text-left p-4 border transition-colors duration-300 ${form.quality === "quality" ? "border-brand bg-brand/10" : "border-white/10 hover:border-white/30"}`}>
+                  <div className="flex items-center gap-2 font-medium"><Gem className={`w-4 h-4 ${form.quality === "quality" ? "text-brand" : "text-white/50"}`} /> Quality</div>
+                  <p className="text-xs text-white/40 mt-1">2-pass AI (strategist + builder). Deepest, most polished. ~1–2 min.</p>
+                </button>
+                <button type="button" data-testid="mode-economy" onClick={() => setForm((f) => ({ ...f, quality: "economy" }))}
+                  className={`text-left p-4 border transition-colors duration-300 ${form.quality === "economy" ? "border-neon bg-neon/10" : "border-white/10 hover:border-white/30"}`}>
+                  <div className="flex items-center gap-2 font-medium"><Gauge className={`w-4 h-4 ${form.quality === "economy" ? "text-neon" : "text-white/50"}`} /> Economy</div>
+                  <p className="text-xs text-white/40 mt-1">Fast single-pass draft. Uses fewer credits. Great for quick concepts.</p>
+                </button>
+              </div>
+            </div>
             <button data-testid="generate-btn" disabled={loading}
               className="w-full flex items-center justify-center gap-2 bg-brand hover:bg-brand-hover py-4 font-medium transition-colors duration-300 disabled:opacity-60">
               {loading ? <><Loader2 className="w-5 h-5 animate-spin" /> Crafting your website…</> : <><Sparkles className="w-5 h-5" /> Generate website</>}
@@ -144,7 +159,7 @@ export default function Generator() {
               <div className="h-full flex flex-col items-center justify-center gap-4 bg-surface2 text-white/50 p-8 text-center">
                 <Loader2 className="w-10 h-10 animate-spin text-brand" />
                 <div className="font-mono text-sm">Researching your brand & crafting your site…</div>
-                <div className="text-xs text-white/30">Our AI strategist writes a brief, then builds. ~1–2 min.</div>
+                <div className="text-xs text-white/30">{form.quality === "economy" ? "Fast single-pass build. ~30–60 sec." : "Our AI strategist writes a brief, then builds. ~1–2 min."}</div>
               </div>
             ) : result ? (
               <iframe data-testid="preview-iframe" title="preview" sandbox="allow-scripts" srcDoc={result.html} className="w-full h-full" style={{ minHeight: 500 }} />
