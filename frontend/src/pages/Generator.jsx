@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardLayout from "@/components/DashboardLayout";
 import { api, formatApiError, pollGenerationJob } from "@/lib/api";
@@ -20,6 +20,15 @@ export default function Generator() {
   const [result, setResult] = useState(null);
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  useEffect(() => {
+    const pending = sessionStorage.getItem("sg_pending_prompt");
+    if (pending) {
+      sessionStorage.removeItem("sg_pending_prompt");
+      setForm((f) => ({ ...f, description: pending }));
+      toast.info("Your idea is loaded — add a business name & industry, then generate.");
+    }
+  }, []);
 
   const generate = async (e) => {
     e.preventDefault();

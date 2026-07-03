@@ -20,7 +20,7 @@ export default function Login() {
     try {
       const { data } = await api.post("/auth/login", { email, password });
       setUser(data);
-      navigate("/dashboard");
+      navigate(sessionStorage.getItem("sg_pending_prompt") ? "/generate" : "/dashboard");
     } catch (e) {
       setError(formatApiError(e.response?.data?.detail) || e.message);
     } finally { setLoading(false); }

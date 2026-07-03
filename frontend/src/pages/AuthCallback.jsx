@@ -19,8 +19,9 @@ export default function AuthCallback() {
       try {
         const { data } = await api.post("/auth/google-session", { session_id: sessionId });
         setUser(data);
-        window.history.replaceState(null, "", "/dashboard");
-        navigate("/dashboard", { state: { user: data } });
+        const dest = sessionStorage.getItem("sg_pending_prompt") ? "/generate" : "/dashboard";
+        window.history.replaceState(null, "", dest);
+        navigate(dest, { state: { user: data } });
       } catch (e) {
         navigate("/login");
       }

@@ -21,7 +21,7 @@ export default function Register() {
     try {
       const { data } = await api.post("/auth/register", { name, email, password });
       setUser(data);
-      navigate("/dashboard");
+      navigate(sessionStorage.getItem("sg_pending_prompt") ? "/generate" : "/dashboard");
     } catch (e) {
       setError(formatApiError(e.response?.data?.detail) || e.message);
     } finally { setLoading(false); }
@@ -42,7 +42,7 @@ export default function Register() {
             <span className="font-display font-bold text-lg">SiteGenie</span>
           </Link>
           <h1 className="font-display text-3xl font-bold">Create your account</h1>
-          <p className="text-white/50 mt-2 text-sm">Get <span className="text-brand font-mono">3 free credits</span> to start generating.</p>
+          <p className="text-white/50 mt-2 text-sm">Get <span className="text-brand font-mono">15 free credits</span> to start generating.</p>
 
           <button onClick={googleLogin} data-testid="google-register-btn"
             className="mt-8 w-full flex items-center justify-center gap-3 border border-white/15 hover:border-white/40 py-3 transition-colors duration-300">
