@@ -12,6 +12,10 @@ from config import (
     EMERGENT_LLM_KEY, STRATEGY_MODEL, BUILD_MODEL,
     GEN_MAX_PER_WINDOW, GEN_WINDOW_SECONDS, logger,
 )
+
+# Per-LLM-call ceiling. Sonnet 4.6 builds usually return in 40-120s; anything
+# beyond this is treated as an upstream stall so the job doesn't hang forever.
+LLM_CALL_TIMEOUT_S = 240
 from security import (
     estimate_cost, deduct_credits, user_is_unlimited, is_owner,
     total_credits, check_rate_limit,
@@ -124,17 +128,23 @@ async def _call_llm(prompt: str, system_message: str, model: str) -> str:
         session_id=f"gen_{uuid.uuid4().hex}",
         system_message=system_message,
     ).with_model("anthropic", model)
-    result = await chat.send_message(UserMessage(text=prompt))
+    result = await asyncio.wait_for(
+        chat.send_message(UserMessage(text=prompt)),
+        timeout=LLM_CALL_TIMEOUT_S,
+    )
     return result if isinstance(result, str) else str(result)
 
 
 async def _fail_job(job_id: str, e: Exception):
     logger.exception("generation failed")
-    msg = str(e).lower()
-    if "budget" in msg or "quota" in msg or "insufficient" in msg:
-        err = "AI service is temporarily unavailable. Please try again shortly."
+    if isinstance(e, asyncio.TimeoutError):
+        err = "The AI took too long to respond. Please try again — Economy mode is faster if the site is simple."
     else:
-        err = "Generation failed. Please try again."
+        msg = str(e).lower()
+        if "budget" in msg or "quota" in msg or "insufficient" in msg:
+            err = "AI service is temporarily unavailable. Please try again shortly."
+        else:
+            err = "Generation failed. Please try again."
     await db.gen_jobs.update_one({"job_id": job_id}, {"$set": {"status": "error", "error": err}})
 
 
