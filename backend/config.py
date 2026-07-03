@@ -13,6 +13,7 @@ logger = logging.getLogger("sitegenie")
 EMERGENT_LLM_KEY = os.environ['EMERGENT_LLM_KEY']
 STRIPE_API_KEY = os.environ['STRIPE_API_KEY']
 OWNER_EMAIL = os.environ.get('OWNER_EMAIL', '').lower().strip()
+GOOGLE_PLACES_API_KEY = os.environ.get('GOOGLE_PLACES_API_KEY')
 STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY', '')
 STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
 STRIPE_PRICE_IDS = {

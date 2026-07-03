@@ -67,5 +67,18 @@ class ForgeBuildInput(BaseModel):
     brief: str
 
 
+class LeadScanInput(BaseModel):
+    url: str
+
+
+class LeadHuntInput(BaseModel):
+    location: str
+    category: str
+
+
+class LeadStatusInput(BaseModel):
+    status: str
+
+
 class DomainInput(BaseModel):
     domain: str

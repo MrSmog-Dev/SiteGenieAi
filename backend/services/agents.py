@@ -63,10 +63,11 @@ AGENTS = [
      "quick_actions": [
          {"label": "Weekly digest email", "prompt": "Draft the weekly 'your site got N views' analytics digest email we send to site owners. Friendly, short, with a clear upsell moment."},
          {"label": "Win-back email", "prompt": "Write a win-back email sequence (2 emails) for users whose subscription lapsed or who never generated a site."}]},
-    {"id": "rex", "name": "Rex", "role": "Sales Closer", "color": "#DC2626",
-     "tagline": "Turns visitors into buyers. Always be closing.",
-     "personality": "Charismatic, direct closer. Thinks in objections and answers them before they're raised. Frames everything as value vs cost. Always ends with the ask. Respectful but relentless.",
+    {"id": "rex", "name": "Rex", "role": "Sales Closer & Lead Hunter", "color": "#DC2626",
+     "tagline": "Hunts leads, scores websites, closes deals.",
+     "personality": "Charismatic, direct closer AND SiteGenie's lead hunter. Thinks in objections and answers them before they're raised. Frames everything as value vs cost, always ends with the ask. His hunting rules: businesses with 15+ real reviews and a 3.5+ rating but NO website are prime leads; business websites he scans get a 0-100 score — 65 or below makes the lead list, 40 or below is a HOT lead. When asked about leads he uses his live lead board data and recommends who to pitch first and with what angle.",
      "quick_actions": [
+         {"label": "Who do I pitch first?", "prompt": "Look at my lead board and tell me which leads to pitch first, in order, and the exact angle for each."},
          {"label": "Sell more templates", "prompt": "How do we sell more Template Market templates at $200-500? Give me concrete tactics for the product and the pitch."},
          {"label": "Upsell free users", "prompt": "Design an upsell path that converts free/lapsed users into paid subscribers. What's the pitch at each step?"}]},
     {"id": "halo", "name": "Halo", "role": "Customer Support Lead", "color": "#0EA5E9",
@@ -131,6 +132,8 @@ async def business_snapshot() -> dict:
     market_gross = sum((l.get("price_usd") or 0) * (l.get("purchases") or 0) for l in listings)
     jobs_total = await db.gen_jobs.count_documents({})
     jobs_failed = await db.gen_jobs.count_documents({"status": "error"})
+    from services.leads import leads_summary
+    leads = await leads_summary()
     return {
         "as_of_utc": now.isoformat(),
         "users": {"total": users_total, "new_last_7d": users_7d, "active_subscribers": subs_active,
@@ -142,6 +145,7 @@ async def business_snapshot() -> dict:
         "template_market": {"active_listings": len(listings), "gross_sales_usd": market_gross,
                             "listings": listings},
         "ai_generation_jobs": {"total": jobs_total, "failed": jobs_failed},
+        "sales_leads": leads,
     }
 
 

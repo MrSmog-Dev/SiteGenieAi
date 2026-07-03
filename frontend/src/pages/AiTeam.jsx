@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardLayout from "@/components/DashboardLayout";
+import { RexLeadPanel } from "@/components/RexLeadPanel";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
-import { Send, Loader2, Trash2, Hammer, Sparkles, X } from "lucide-react";
+import { Send, Loader2, Trash2, Hammer, Sparkles, X, Crosshair } from "lucide-react";
 
 export default function AiTeam() {
   const { user } = useAuth();
@@ -16,6 +17,7 @@ export default function AiTeam() {
   const [thinking, setThinking] = useState(false);
   const [forgeJob, setForgeJob] = useState(null);
   const [showForge, setShowForge] = useState(false);
+  const [showRex, setShowRex] = useState(false);
   const scrollRef = useRef(null);
 
   const isOwner = !!user && (user.role === "owner" || user.role === "admin");
@@ -133,6 +135,12 @@ export default function AiTeam() {
                   <Hammer className="w-4 h-4" /> Build & list template
                 </button>
               )}
+              {active.id === "rex" && (
+                <button data-testid="rex-leads-toggle" onClick={() => setShowRex(!showRex)}
+                  className="flex items-center gap-2 text-sm border border-red-400/50 text-red-300 hover:border-red-300 px-3 py-2 transition-colors duration-300">
+                  <Crosshair className="w-4 h-4" /> Lead Hunter
+                </button>
+              )}
               <button data-testid="clear-chat-btn" onClick={clearChat} title="Clear conversation"
                 className="p-2 text-white/40 hover:text-neon transition-colors duration-300">
                 <Trash2 className="w-4 h-4" />
@@ -143,6 +151,8 @@ export default function AiTeam() {
           {active?.id === "forge" && showForge && (
             <ForgePanel forgeJob={forgeJob} setForgeJob={setForgeJob} pollForge={pollForge} onClose={() => setShowForge(false)} navigate={navigate} />
           )}
+
+          {active?.id === "rex" && showRex && <RexLeadPanel onClose={() => setShowRex(false)} />}
 
           <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-6 space-y-4" data-testid="agent-messages">
             {messages === null ? (

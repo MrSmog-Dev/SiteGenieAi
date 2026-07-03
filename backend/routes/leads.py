@@ -1,0 +1,78 @@
+from fastapi import APIRouter, HTTPException, Depends
+
+from config import GOOGLE_PLACES_API_KEY
+from database import db
+from models import LeadScanInput, LeadHuntInput, LeadStatusInput
+from security import get_current_user, is_owner
+from services.leads import scan_website, upsert_weak_site_lead, hunt_places, LEAD_STATUSES
+
+router = APIRouter()
+
+
+def _require_owner(user: dict):
+    if not is_owner(user):
+        raise HTTPException(status_code=403, detail="Rex's lead tools are available to the store owner only.")
+
+
+@router.get("/leads")
+async def list_leads(user: dict = Depends(get_current_user)):
+    _require_owner(user)
+    return await db.leads.find({}, {"_id": 0}).sort("created_at", -1).to_list(300)
+
+
+@router.get("/leads/hunt/status")
+async def hunt_status(user: dict = Depends(get_current_user)):
+    _require_owner(user)
+    return {"places_configured": bool(GOOGLE_PLACES_API_KEY)}
+
+
+@router.post("/leads/hunt")
+async def hunt(input: LeadHuntInput, user: dict = Depends(get_current_user)):
+    _require_owner(user)
+    if not GOOGLE_PLACES_API_KEY:
+        raise HTTPException(status_code=424,
+                            detail="Google Places API key not connected yet — add GOOGLE_PLACES_API_KEY to unlock Rex's hunting.")
+    location, category = input.location.strip(), input.category.strip()
+    if not location or not category:
+        raise HTTPException(status_code=400, detail="Give Rex a location and a business type.")
+    try:
+        return await hunt_places(location, category)
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+
+@router.post("/leads/scan")
+async def scan(input: LeadScanInput, user: dict = Depends(get_current_user)):
+    _require_owner(user)
+    if not input.url.strip():
+        raise HTTPException(status_code=400, detail="Give Rex a website URL to scan.")
+    try:
+        result = await scan_website(input.url)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    lead_added, lead_id = False, None
+    if result["score"] <= 65:
+        info = await upsert_weak_site_lead(result)
+        lead_added, lead_id = True, info["lead_id"]
+    result.pop("domain", None)
+    return {**result, "lead_added": lead_added, "lead_id": lead_id}
+
+
+@router.patch("/leads/{lead_id}")
+async def update_lead(lead_id: str, input: LeadStatusInput, user: dict = Depends(get_current_user)):
+    _require_owner(user)
+    if input.status not in LEAD_STATUSES:
+        raise HTTPException(status_code=400, detail=f"Status must be one of {LEAD_STATUSES}")
+    res = await db.leads.update_one({"lead_id": lead_id}, {"$set": {"status": input.status}})
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    return {"lead_id": lead_id, "status": input.status}
+
+
+@router.delete("/leads/{lead_id}")
+async def delete_lead(lead_id: str, user: dict = Depends(get_current_user)):
+    _require_owner(user)
+    res = await db.leads.delete_one({"lead_id": lead_id})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    return {"deleted": True}

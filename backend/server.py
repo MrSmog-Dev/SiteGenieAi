@@ -25,6 +25,7 @@ from routes.payments import router as payments_router
 from routes.subscriptions import router as subscriptions_router
 from routes.market import router as market_router
 from routes.agents import router as agents_router
+from routes.leads import router as leads_router
 
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
@@ -42,6 +43,7 @@ api_router.include_router(payments_router)
 api_router.include_router(subscriptions_router)
 api_router.include_router(market_router)
 api_router.include_router(agents_router)
+api_router.include_router(leads_router)
 
 
 @app.on_event("startup")
@@ -55,6 +57,8 @@ async def startup():
     await db.gen_jobs.create_index("job_id")
     await db.market_listings.create_index("market_id", unique=True)
     await db.market_listings.create_index("active")
+    await db.leads.create_index("lead_id", unique=True)
+    await db.leads.create_index("dedupe_key", unique=True)
     await db.rate_events.create_index("ts", expireAfterSeconds=GEN_WINDOW_SECONDS + 60)
     await db.login_attempts.create_index("ts", expireAfterSeconds=LOGIN_WINDOW_SECONDS + 60)
     await db.login_attempts.create_index("identifier")
