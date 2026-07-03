@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, formatApiError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
-import { Zap } from "lucide-react";
+import { Zap, Sparkles } from "lucide-react";
 
 const SIDE_IMG = "https://images.pexels.com/photos/27141316/pexels-photo-27141316.jpeg?auto=compress&cs=tinysrgb&w=1200";
 
@@ -20,7 +20,7 @@ export default function Login() {
     try {
       const { data } = await api.post("/auth/login", { email, password });
       setUser(data);
-      navigate(sessionStorage.getItem("sg_pending_prompt") ? "/generate" : "/dashboard");
+      navigate(sessionStorage.getItem("sg_pending_brief") ? "/generate" : "/dashboard");
     } catch (e) {
       setError(formatApiError(e.response?.data?.detail) || e.message);
     } finally { setLoading(false); }
@@ -42,6 +42,12 @@ export default function Login() {
           </Link>
           <h1 className="font-display text-3xl font-bold">Welcome back</h1>
           <p className="text-white/50 mt-2 text-sm">Log in to generate and manage your websites.</p>
+
+          {!!sessionStorage.getItem("sg_pending_brief") && (
+            <div data-testid="login-brief-banner" className="mt-4 flex items-center gap-2 border border-brand/40 bg-brand/10 px-3 py-2.5 text-sm text-white/80">
+              <Sparkles className="w-4 h-4 text-brand shrink-0" /> Your website brief is saved — log in and I'll drop you into the build.
+            </div>
+          )}
 
           <button onClick={googleLogin} data-testid="google-login-btn"
             className="mt-8 w-full flex items-center justify-center gap-3 border border-white/15 hover:border-white/40 py-3 transition-colors duration-300">

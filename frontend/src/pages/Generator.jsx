@@ -22,12 +22,21 @@ export default function Generator() {
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
   useEffect(() => {
-    const pending = sessionStorage.getItem("sg_pending_prompt");
-    if (pending) {
-      sessionStorage.removeItem("sg_pending_prompt");
-      setForm((f) => ({ ...f, description: pending }));
-      toast.info("Your idea is loaded — add a business name & industry, then generate.");
-    }
+    const raw = sessionStorage.getItem("sg_pending_brief");
+    if (!raw) return;
+    sessionStorage.removeItem("sg_pending_brief");
+    try {
+      const b = JSON.parse(raw);
+      setForm((f) => ({
+        ...f,
+        description: b.description || f.description,
+        business_name: b.business_name || f.business_name,
+        industry: b.industry || f.industry,
+        brand_keywords: b.brand_keywords || f.brand_keywords,
+        style: b.style || f.style,
+      }));
+      toast.info(b.business_name ? `Brief loaded for ${b.business_name} — review & generate.` : "Your idea is loaded — add a business name & industry, then generate.");
+    } catch (e) {}
   }, []);
 
   const generate = async (e) => {
