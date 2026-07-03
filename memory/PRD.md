@@ -52,17 +52,25 @@ An online store that creates website templates for businesses that don't have a 
 - REWORKED credit system (usage-based currency): cost per AI op = max(1, round((prompt+output chars/4)/3000)). Plans: Monthly $20/50cr, 3-Month $49/120cr, Annual $149/UNLIMITED. plan_credits (30d reset) + extra_credits (packs). 402 block at 0 credits (non-unlimited); packs pack_25/60/150. New users get 15 free credits.
 
 ## Implemented — Publish / Hosting (2026-07-03)
-- Each template can be PUBLISHED to a shareable public URL `/s/{slug}` (no login needed). Slug = slugified business name + short hex, stable across re-publish. Backend: POST /api/templates/{id}/publish, POST /api/templates/{id}/unpublish, public GET /api/public/site/{slug} (returns html+meta only when published, else 404, ownership-guarded). templates gain `published`, `slug` (unique sparse index), `published_at`.
-- Frontend: public full-viewport iframe page `PublicSite.jsx` (sandboxed, graceful not-found); TemplateView "Publish/Live" button + Share dialog (copy link, open, unpublish); MyTemplates "Live" badge on published cards. Edits/regenerations update the live site automatically (html updated in place).
-- Verified: /app/backend/tests/test_publish_flow.py (publish, public fetch, stable slug, unpublish→404, unknown slug 404, ownership guard) + frontend smoke (public page renders, share dialog shows live URL).
+- Publish templates to a shareable public URL. Backend: POST /api/templates/{id}/publish, /unpublish; templates gain `published`, `slug` (unique sparse index), `published_at`. MyTemplates "Live" badge; TemplateView Publish/Share dialog. Edits/regenerations update the live site automatically.
+
+## Implemented — Backlog batch (2026-07-03)
+- **ZIP export**: GET /api/templates/{id}/download-zip → zip of index.html + README.txt. TemplateView "Download" is now a menu (HTML file / ZIP).
+- **Thumbnails**: MyTemplates cards show a LIVE scaled iframe preview (`SiteThumb`, lazy IntersectionObserver fetch of /templates/{id}).
+- **Economy/Quality toggle**: GenerateInput `quality` ("quality"=2-pass Haiku→Sonnet default, "economy"=fast single-pass Haiku, fewer credits). Generator mode selector; regenerate reuses stored quality.
+- **Backend refactor**: server.py (1150+ lines) split into config.py, database.py, models.py, security.py, services/{llm,billing}.py, routes/{auth,plans,templates,payments,subscriptions}.py. server.py now a thin orchestrator. All APIs unchanged. `_use_native_stripe`→`use_native_stripe`.
+- **Vanity slug**: PUT /api/templates/{id}/slug (slugified, min 3 chars, 409 on clash, ownership-guarded). Editor in the Share dialog.
+- **SEO / social meta (canonical public page)**: GET /api/p/{slug} serves the published site as REAL server-rendered HTML with injected og:title/description/image (auto-extracted from first Unsplash URL) + twitter card + CSP `connect-src 'none'`. This is the shareable URL (works with link-preview crawlers). `/s/{slug}` now redirects to `/api/p/{slug}`. JSON GET /api/public/site/{slug} retained.
+- Verified: test_publish_flow.py, test_phase1.py, test_phase3.py, test_credit_system.py 16/16 + rate-limit regression; frontend agent iteration_7.json = 8/8 PASS.
 
 ## Backlog / Remaining
-- P1: Regenerate/edit an existing template; custom section prompts.
-- P1: Real recurring Stripe subscriptions (currently one-time checkouts that grant plan+credits with expiry).
-- P2: Auto-expire plan + monthly credit reset job.
-- P2: Custom domain / hosting/publish option. ✅ DONE (2026-07-03 — shareable /s/{slug} public URLs). Remaining: custom domain mapping.
-- P2: More export formats (zip with assets), template thumbnails via screenshot.
-- P2: Cheaper/faster model option (gemini-3-flash / claude-haiku) toggle to stretch credits.
+- P1: Regenerate/edit an existing template; custom section prompts. ✅ DONE (regenerate/edit).
+- P1: Real recurring Stripe subscriptions. ✅ DONE (native Stripe, live mode).
+- P2: Auto-expire plan + monthly credit reset job. ✅ DONE (lazy + hourly worker).
+- P2: Publish/hosting. ✅ DONE. Remaining: **custom domain mapping** (needs DNS + per-domain TLS/ingress — not feasible in this env; delivered vanity slugs as the practical equivalent).
+- P2: More export formats. ✅ ZIP done. (image/asset bundling N/A — sites use hosted assets.)
+- P2: Cheaper/faster model toggle. ✅ DONE (Economy mode).
+- P3 (new idea): auto-generated branded OG card image per published site (currently reuses the site's hero image).
 
 ## Notes
 - LLM budget: each generation costs ~$0.12. Ensure Universal Key has adequate balance
