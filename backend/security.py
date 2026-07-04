@@ -1,6 +1,5 @@
 import os
 import re
-import uuid
 import secrets
 import bcrypt
 from datetime import datetime, timezone, timedelta
@@ -135,26 +134,14 @@ async def process_subscription(user: dict) -> dict:
         plan = SUBSCRIPTION_PLANS.get(user.get("plan"))
         is_native = user.get("provider") == "stripe_native"
         cpe = parse_dt(user.get("current_period_end"))
-        # Simulated billing renewal ONLY for non-native subs (native handled by Stripe webhooks).
-        while not is_native and plan and cpe and now >= cpe:
-            if user.get("cancel_at_period_end"):
-                user["subscription_status"] = "cancelled"
-                user["plan"] = None
-                user["plan_name"] = None
-                user["plan_credits"] = 0
-                changed.update(subscription_status="cancelled", plan=None, plan_name=None, plan_credits=0)
-                cpe = None
-                break
-            cpe = cpe + timedelta(days=plan["billing_days"])
-            user["current_period_end"] = cpe.isoformat()
-            changed["current_period_end"] = user["current_period_end"]
-            await db.payment_transactions.insert_one({
-                "session_id": f"renewal_{uuid.uuid4().hex[:12]}", "user_id": user["user_id"],
-                "amount": plan["amount"], "currency": "usd", "kind": "renewal",
-                "plan_id": user.get("plan"), "credits": plan["monthly_credits"],
-                "payment_status": "paid", "status": "complete", "processed": True,
-                "created_at": datetime.now(timezone.utc),
-            })
+        # Non-native subscriptions have no real recurring charge — they LAPSE at period end
+        # (native subs are renewed exclusively by verified Stripe webhooks).
+        if not is_native and cpe and now >= cpe:
+            user["subscription_status"] = "cancelled"
+            user["plan"] = None
+            user["plan_name"] = None
+            user["plan_credits"] = 0
+            changed.update(subscription_status="cancelled", plan=None, plan_name=None, plan_credits=0)
         # 30-day credit resets (applies to both native and simulated)
         if user.get("subscription_status") == "active" and plan:
             ncr = parse_dt(user.get("next_credit_reset"))

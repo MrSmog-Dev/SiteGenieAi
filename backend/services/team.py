@@ -67,7 +67,8 @@ async def detect_and_route_memos(owner_id: str, agent_id: str, owner_msg: str, r
 async def post_war_room(owner_id: str, agent_id, content: str, role: str = "agent"):
     await db.war_room.update_one(
         {"user_id": owner_id},
-        {"$push": {"messages": {"role": role, "agent_id": agent_id, "content": content, "ts": _now()}},
+        {"$push": {"messages": {"$each": [{"role": role, "agent_id": agent_id, "content": content, "ts": _now()}],
+                                "$slice": -300}},
          "$set": {"updated_at": _now()}}, upsert=True)
 
 

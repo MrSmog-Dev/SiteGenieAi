@@ -8,7 +8,7 @@ from emergentintegrations.payments.stripe.checkout import (
 
 from database import db
 from models import CheckoutInput
-from config import SUBSCRIPTION_PLANS, CREDIT_PACKS, logger
+from config import CREDIT_PACKS, logger
 from security import get_current_user, public_user, validate_origin
 from services.billing import get_stripe, apply_payment
 
@@ -17,17 +17,16 @@ router = APIRouter()
 
 @router.post("/checkout/session")
 async def create_checkout(input: CheckoutInput, request: Request, user: dict = Depends(get_current_user)):
-    if input.kind == "subscription":
-        pkg = SUBSCRIPTION_PLANS.get(input.plan_id)
-    elif input.kind == "credits":
-        pkg = CREDIT_PACKS.get(input.plan_id)
-    else:
+    # Subscriptions must go through the native Stripe flow (/subscription/checkout) so renewals
+    # are driven by verified webhooks — never by this one-time checkout.
+    if input.kind != "credits":
         raise HTTPException(status_code=400, detail="Invalid kind")
+    pkg = CREDIT_PACKS.get(input.plan_id)
     if not pkg:
         raise HTTPException(status_code=400, detail="Invalid plan")
 
     amount = float(pkg["amount"])
-    pkg_credits = int(pkg["monthly_credits"]) if input.kind == "subscription" else int(pkg["credits"])
+    pkg_credits = int(pkg["credits"])
     origin = validate_origin(input.origin_url)
     success_url = f"{origin}/payment-return?session_id={{CHECKOUT_SESSION_ID}}"
     cancel_url = f"{origin}/pricing"

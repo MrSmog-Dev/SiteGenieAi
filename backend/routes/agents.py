@@ -149,7 +149,7 @@ async def send_agent_chat(agent_id: str, input: AgentChatInput, user: dict = Dep
                 {"role": "agent", "content": reply, "ts": now}]
     await db.agent_chats.update_one(
         {"user_id": user["user_id"], "agent_id": agent_id},
-        {"$push": {"messages": {"$each": new_msgs}}, "$set": {"updated_at": now}}, upsert=True)
+        {"$push": {"messages": {"$each": new_msgs, "$slice": -200}}, "$set": {"updated_at": now}}, upsert=True)
     asyncio.create_task(detect_and_route_memos(user["user_id"], agent_id, message, reply))
     return {"reply": reply}
 

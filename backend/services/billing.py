@@ -38,24 +38,6 @@ async def apply_payment(txn: dict):
         await db.users.update_one({"user_id": user_id}, {"$inc": {"extra_credits": int(claimed.get("credits", 0))}})
     elif claimed["kind"] == "market_purchase":
         await fulfill_market_purchase(claimed)
-    elif claimed["kind"] == "subscription":
-        plan = SUBSCRIPTION_PLANS.get(claimed["plan_id"])
-        if plan:
-            now = datetime.now(timezone.utc)
-            await db.users.update_one({"user_id": user_id}, {"$set": {
-                "plan": claimed["plan_id"], "plan_name": plan["name"],
-                "subscription_status": "active", "cancel_at_period_end": False,
-                "plan_credits": plan["monthly_credits"],
-                "current_period_end": (now + timedelta(days=plan["billing_days"])).isoformat(),
-                "next_credit_reset": (now + timedelta(days=CREDIT_RESET_DAYS)).isoformat(),
-                "subscription_started_at": now.isoformat(),
-            }})
-            await db.subscriptions.update_one(
-                {"user_id": user_id},
-                {"$set": {"user_id": user_id, "plan": claimed["plan_id"], "status": "active",
-                          "started_at": now.isoformat()}},
-                upsert=True,
-            )
 
 
 # ---------------- Native Stripe recurring subscriptions ----------------

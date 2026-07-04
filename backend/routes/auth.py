@@ -29,7 +29,10 @@ async def register(input: RegisterInput, response: Response):
         "current_period_end": None, "next_credit_reset": None, "cancel_at_period_end": False,
         "created_at": datetime.now(timezone.utc),
     }
-    await db.users.insert_one(doc)
+    try:
+        await db.users.insert_one(doc)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Email already registered")
     token = await create_session(user_id)
     set_session_cookie(response, token)
     return public_user(doc)

@@ -199,7 +199,7 @@ async def post_agent_message(user_id: str, agent_id: str, content: str):
     now = datetime.now(timezone.utc).isoformat()
     await db.agent_chats.update_one(
         {"user_id": user_id, "agent_id": agent_id},
-        {"$push": {"messages": {"role": "agent", "content": content, "ts": now}},
+        {"$push": {"messages": {"$each": [{"role": "agent", "content": content, "ts": now}], "$slice": -200}},
          "$set": {"updated_at": now}}, upsert=True)
 
 

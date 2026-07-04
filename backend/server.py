@@ -108,6 +108,22 @@ async def _run_db_init():
     await db.team_tasks.create_index("task_id", unique=True)
     await db.team_tasks.create_index([("status", 1), ("created_at", 1)])
     await db.war_room_meetings.create_index("meeting_id", unique=True)
+    for col, keys, kw in (
+        (db.payment_transactions, [("session_id", 1)], {"unique": True}),
+        (db.payment_transactions, [("user_id", 1), ("created_at", -1)], {}),
+        (db.gen_jobs, [("job_id", 1)], {"unique": True}),
+        (db.gen_jobs, [("user_id", 1), ("status", 1)], {}),
+        (db.agent_jobs, [("job_id", 1)], {"unique": True}),
+        (db.agent_jobs, [("status", 1)], {}),
+        (db.agent_chats, [("user_id", 1), ("agent_id", 1)], {}),
+        (db.war_room, [("user_id", 1)], {}),
+        (db.automation_state, [("job", 1)], {"unique": True}),
+        (db.leads, [("lead_id", 1)], {"unique": True}),
+    ):
+        try:
+            await col.create_index(keys, **kw)
+        except Exception:
+            logger.warning("index creation skipped for %s %s", col.name, keys)
     await db.blog_images.create_index("image_id", unique=True)
     await db.rate_events.create_index("ts", expireAfterSeconds=GEN_WINDOW_SECONDS + 60)
     await db.login_attempts.create_index("ts", expireAfterSeconds=LOGIN_WINDOW_SECONDS + 60)

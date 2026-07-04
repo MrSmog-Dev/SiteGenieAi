@@ -370,21 +370,38 @@ async def _run_generation(job_id: str, user_id: str, fields: dict, mode: str = "
                                            "cost": charged, "mode": mode}})
 
 
+def _min_cost(mode: str, fields: dict) -> int:
+    if mode == "new":
+        return {"economy": 1, "quality": 4, "premium": 8}.get((fields or {}).get("quality") or "quality", 4)
+    if mode in ("upgrade", "regenerate"):
+        return 4
+    return 1
+
+
 async def _start_job(user: dict, fields: dict, mode: str = "new", template_id: str = None, free: bool = False):
-    if not free and not user_is_unlimited(user) and total_credits(user) <= 0:
+    metered = not free and not user_is_unlimited(user)
+    if metered and total_credits(user) <= 0:
         raise HTTPException(status_code=402, detail="You're out of credits. Purchase a credit pack to keep building.")
+    if metered and total_credits(user) < _min_cost(mode, fields):
+        raise HTTPException(status_code=402,
+                            detail=f"This operation needs at least {_min_cost(mode, fields)} credits. "
+                                   "Top up a credit pack to continue.")
     if not is_owner(user):
-        recent = datetime.now(timezone.utc) - timedelta(minutes=10)
-        active = await db.gen_jobs.count_documents(
-            {"user_id": user["user_id"], "status": "pending", "created_at": {"$gt": recent}})
-        if active >= 2:
-            raise HTTPException(status_code=429,
-                                detail="You already have builds in progress. Please wait for them to finish.")
         await check_rate_limit(f"gen:{user['user_id']}", GEN_MAX_PER_WINDOW, GEN_WINDOW_SECONDS)
     job_id = f"job_{uuid.uuid4().hex[:12]}"
     await db.gen_jobs.insert_one({
         "job_id": job_id, "user_id": user["user_id"], "status": "pending",
         "template_id": template_id, "error": None, "created_at": datetime.now(timezone.utc),
     })
+    if not is_owner(user):
+        # Atomic-enough concurrency cap: count AFTER inserting our own job (self included),
+        # so two racing requests both see the overflow and both get rejected.
+        recent = datetime.now(timezone.utc) - timedelta(minutes=10)
+        active = await db.gen_jobs.count_documents(
+            {"user_id": user["user_id"], "status": "pending", "created_at": {"$gt": recent}})
+        if active > 2:
+            await db.gen_jobs.delete_one({"job_id": job_id})
+            raise HTTPException(status_code=429,
+                                detail="You already have builds in progress. Please wait for them to finish.")
     asyncio.create_task(_run_generation(job_id, user["user_id"], fields, mode, template_id, free))
     return {"job_id": job_id, "status": "pending"}

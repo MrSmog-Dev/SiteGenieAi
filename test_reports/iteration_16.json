@@ -1,0 +1,24 @@
+{
+  "summary": "Verified all 5 code-review fixes + regression in PREVIEW. 13/13 backend tests passed. FIX1 checkout kind gate (400 for subscription, 200 for credits/pack_25) + non-native active subscription lapses to cancelled/plan_credits=0 with NO new renewal payment_transaction inserted. FIX2 premium quality gates at 402 with 1 credit, economy passes with 1 credit, and 3rd request with 2 pending gen_jobs returns 429 with the 3rd job doc NOT persisted. FIX3 all required indexes verified via Mongo index_information. FIX4 war_room $slice -300 and agent_chats $slice -200 both hold under overflow. FIX5 duplicate register returns 400 'Email already registered'. REGRESSION: /api/status {api:true, db:true}, owner login+me, /api/agents/war-room GET all pass.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": { "ui_bugs": [], "integration_issues": [], "design_issues": [] },
+  "test_report_links": [
+    "/app/backend/tests/test_iter16_fixes.py",
+    "/app/test_reports/pytest/iter16_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "gen_jobs job_id index is present but non-unique (legacy index blocks recreation with unique=True). Wrapped in try/except with warning — expected/benign per review-request note, but worth cleaning up in a future maintenance pass by dropping the legacy index and re-creating unique.",
+    "billing.py subscription branch removal and security.py non-native lapse logic correctly work together — the lapse path fires BEFORE the credit-reset while-loop, preventing infinite fake renewals."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter16_fixes.py (new)"
+  ],
+  "success_rate": { "backend": "100% (13/13)", "frontend": "n/a (skipped per request)" },
+  "test_credentials": "owner: neobeyondlegacy2@gmail.com / SoloLeveling21!; throwaway users registered per test with test_iter16_<uuid>@example.com / TestPass123!",
+  "seed_data_creation": "Registered ~6 throwaway test users (test_iter16_*@example.com, dup_iter16_*@example.com). Left behind harmlessly. Fake gen_jobs created by concurrency test are cleaned up in the test itself.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Preview env is fully healthy. To run this suite: cd /app/backend && python -m pytest tests/test_iter16_fixes.py -v -n 0 --asyncio-mode=auto (must pass -n 0 to override the xdist addopts in pytest.ini, and --asyncio-mode=auto because tests use plain 'async def' with @pytest.mark.asyncio). The mdb fixture creates a fresh Motor client per test to bind to the current event loop — do not switch it to module scope. Owner has role 'owner'; owner bypasses credit/concurrency gates so all FIX2 tests use throwaway users with credits injected directly into Mongo. /api/checkout/session with subscription kind now returns 400 — subscription flows must use /api/subscription/checkout.",
+  "rca of the issue": "n/a — verification-only run, no bugs found."
+}

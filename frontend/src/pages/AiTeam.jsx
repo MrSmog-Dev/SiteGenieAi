@@ -83,19 +83,23 @@ export default function AiTeam() {
     }
   };
 
+  const forgeTimerRef = useRef(null);
+  useEffect(() => () => clearInterval(forgeTimerRef.current), []);
+
   const pollForge = useCallback((jobId) => {
-    const timer = setInterval(async () => {
+    clearInterval(forgeTimerRef.current);
+    forgeTimerRef.current = setInterval(async () => {
       try {
         const { data } = await api.get(`/agents/jobs/${jobId}`);
         setForgeJob(data);
         if (data.status === "done") {
-          clearInterval(timer);
+          clearInterval(forgeTimerRef.current);
           toast.success(`Forge listed "${data.result.title}" on the Market at $${data.result.price_usd} (${data.result.tier}).`);
         } else if (data.status === "error") {
-          clearInterval(timer);
+          clearInterval(forgeTimerRef.current);
           toast.error(`Forge hit a problem: ${data.error}`);
         }
-      } catch { clearInterval(timer); }
+      } catch { clearInterval(forgeTimerRef.current); }
     }, 5000);
   }, []);
 
