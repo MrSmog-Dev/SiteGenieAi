@@ -1,0 +1,33 @@
+{
+  "summary": "End-to-end verification of the Premium Upgrade bug fix in preview. Owner login works. On a non-premium template, clicking Upgrade to Premium runs a job that meaningfully rebuilds the site (HTML grew 34,392 -> 87,190 bytes, +153%), flips quality to 'premium', and injects the promised interactive sections (lightbox, gallery, FAQ, accordion, keyframes animations, scroll listeners). After upgrade the amber button is replaced by the PREMIUM badge and POST /api/templates/{id}/upgrade returns 409 (idempotent). Premium templates listed on Market are correctly priced high (tpl_908bc5299b9e listed at $450 / Premium tier via AI pricing agent). Regression: /regenerate and /edit endpoints still start jobs (HTTP 200 + job_id). Frontend UI matches expected states on both premium and non-premium templates.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/templates/job/{id}", "issue": "Orphan-job timeout is 600s but hot-reload during a running upgrade leaves the job stuck in 'pending' for the full 10 minutes before it is auto-failed. Not a fix-required bug; just something to be aware of during dev/testing."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_premium_upgrade.py",
+    "/app/test_reports/pytest/premium_upgrade_fast.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "services/llm.py is ~370 lines and mixes build/edit/upgrade/polish logic — consider splitting per-mode helpers into a submodule for readability, but not urgent.",
+    "Consider registering a 'slow' pytest marker in pytest.ini to silence the PytestUnknownMarkWarning."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_premium_upgrade.py"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "Owner: neobeyondlegacy2@gmail.com / SoloLeveling21! (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Upgraded tpl_84b8308dd2e3 (Owner Test) to premium as part of E2E. Listed tpl_908bc5299b9e (Verdant & Vine) on Market as mkt_a6bca8b41210 at $450 Premium.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "All bug-fix verifications passed. Non-premium templates still available for future upgrade testing: tpl_29decf25c01f (First Growth Capital). Premium templates: tpl_908bc5299b9e, tpl_84b8308dd2e3. Owner has unlimited credits so upgrade is free. Full LLM upgrade job took ~3.5 minutes end-to-end.",
+  "rca_of_the_issue": "Original production bug (identical site after upgrade + $250 market price) was caused by production running the old regenerate-style code path. The fix in preview uses services/llm.py::_premium_upgrade() which runs two Claude Sonnet passes (behaviors + sections) and _inject_addendum() to merge STYLE/SECTIONS/SCRIPT blocks into the existing HTML, then sets quality='premium'. Verified: HTML actually grows (34KB->87KB, tpl_908bc5299b9e previously 60KB->127KB), new sections appear, quality flag flips, pricing_agent.price_template() reads the higher metrics and returns Premium tier ($450). 409 handling in routes/templates.py::upgrade_template() prevents double-upgrades."
+}
