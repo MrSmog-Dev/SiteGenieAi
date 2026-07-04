@@ -1,3 +1,5 @@
+import os
+import re
 import uuid
 import secrets
 import bcrypt
@@ -52,6 +54,17 @@ async def check_rate_limit(key: str, max_count: int, window_seconds: int):
     if count >= max_count:
         raise HTTPException(status_code=429, detail="Too many requests. Please slow down and try again shortly.")
     await db.rate_events.insert_one({"key": key, "ts": now})
+
+
+_ALLOWED_ORIGINS = {o.strip().rstrip("/") for o in os.environ.get("CORS_ORIGINS", "").split(",") if o.strip()}
+_PLATFORM_ORIGIN_RE = re.compile(r"^https://[a-z0-9.-]+\.(emergentagent\.com|emergent\.host)$")
+
+
+def validate_origin(origin_url: str) -> str:
+    origin = (origin_url or "").strip().rstrip("/")
+    if origin in _ALLOWED_ORIGINS or _PLATFORM_ORIGIN_RE.match(origin):
+        return origin
+    raise HTTPException(status_code=400, detail="Invalid origin")
 
 
 async def login_is_locked(identifier: str) -> bool:

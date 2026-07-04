@@ -10,7 +10,7 @@ from config import (
     SUBSCRIPTION_PLANS, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_IDS,
     use_native_stripe, logger,
 )
-from security import get_current_user, public_user, user_is_unlimited
+from security import get_current_user, public_user, user_is_unlimited, validate_origin
 from services.billing import (
     _get_or_create_customer, _activate_native_sub, _renew_native_sub, _sub_period_end,
 )
@@ -86,7 +86,7 @@ async def subscription_checkout(input: SubCheckoutInput, user: dict = Depends(ge
         raise HTTPException(status_code=400, detail="Invalid plan")
     customer_id = await _get_or_create_customer(user)
     use_native_stripe()
-    origin = input.origin_url.rstrip("/")
+    origin = validate_origin(input.origin_url)
     try:
         session = stripe_sdk.checkout.Session.create(
             mode="subscription", customer=customer_id,
@@ -139,18 +139,14 @@ async def stripe_native_webhook(request: Request):
     body = await request.body()
     sig = request.headers.get("stripe-signature")
     use_native_stripe()
-    if STRIPE_WEBHOOK_SECRET:
-        try:
-            event = stripe_sdk.Webhook.construct_event(body, sig, STRIPE_WEBHOOK_SECRET)
-        except Exception:
-            logger.exception("native webhook signature verification failed")
-            raise HTTPException(status_code=400, detail="Invalid webhook")
-    else:
-        import json as _json
-        try:
-            event = _json.loads(body)
-        except Exception:
-            raise HTTPException(status_code=400, detail="Invalid payload")
+    if not STRIPE_WEBHOOK_SECRET:
+        logger.error("native webhook received but STRIPE_WEBHOOK_SECRET is not configured; rejecting")
+        raise HTTPException(status_code=400, detail="Webhook not configured")
+    try:
+        event = stripe_sdk.Webhook.construct_event(body, sig, STRIPE_WEBHOOK_SECRET)
+    except Exception:
+        logger.exception("native webhook signature verification failed")
+        raise HTTPException(status_code=400, detail="Invalid webhook")
     etype = event["type"]
     obj = event["data"]["object"]
     try:

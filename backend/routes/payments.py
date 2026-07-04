@@ -9,7 +9,7 @@ from emergentintegrations.payments.stripe.checkout import (
 from database import db
 from models import CheckoutInput
 from config import SUBSCRIPTION_PLANS, CREDIT_PACKS, logger
-from security import get_current_user, public_user
+from security import get_current_user, public_user, validate_origin
 from services.billing import get_stripe, apply_payment
 
 router = APIRouter()
@@ -28,7 +28,7 @@ async def create_checkout(input: CheckoutInput, request: Request, user: dict = D
 
     amount = float(pkg["amount"])
     pkg_credits = int(pkg["monthly_credits"]) if input.kind == "subscription" else int(pkg["credits"])
-    origin = input.origin_url.rstrip("/")
+    origin = validate_origin(input.origin_url)
     success_url = f"{origin}/payment-return?session_id={{CHECKOUT_SESSION_ID}}"
     cancel_url = f"{origin}/pricing"
     metadata = {

@@ -1,7 +1,7 @@
 import uuid
 import re
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from fastapi import HTTPException
 
@@ -374,6 +374,12 @@ async def _start_job(user: dict, fields: dict, mode: str = "new", template_id: s
     if not free and not user_is_unlimited(user) and total_credits(user) <= 0:
         raise HTTPException(status_code=402, detail="You're out of credits. Purchase a credit pack to keep building.")
     if not is_owner(user):
+        recent = datetime.now(timezone.utc) - timedelta(minutes=10)
+        active = await db.gen_jobs.count_documents(
+            {"user_id": user["user_id"], "status": "pending", "created_at": {"$gt": recent}})
+        if active >= 2:
+            raise HTTPException(status_code=429,
+                                detail="You already have builds in progress. Please wait for them to finish.")
         await check_rate_limit(f"gen:{user['user_id']}", GEN_MAX_PER_WINDOW, GEN_WINDOW_SECONDS)
     job_id = f"job_{uuid.uuid4().hex[:12]}"
     await db.gen_jobs.insert_one({

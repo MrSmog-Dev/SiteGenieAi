@@ -372,8 +372,10 @@ async def public_page(slug: str, request: Request):
         url=f"{base}/api/p/{slug}",
         image=f"{base}/api/og/{slug}.png",
     )
-    # Block generated scripts from calling back to our API (mitigates same-origin abuse).
-    return HTMLResponse(out, headers={"Content-Security-Policy": "connect-src 'none'"})
+    # Sandbox published sites: opaque origin (no cookies/session/same-origin access), scripts still run.
+    return HTMLResponse(out, headers={
+        "Content-Security-Policy":
+            "sandbox allow-scripts allow-forms allow-popups allow-modals; connect-src 'none'"})
 
 
 @router.get("/og/{slug}.png")

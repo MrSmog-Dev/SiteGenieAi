@@ -2,6 +2,7 @@ import asyncio
 import ipaddress
 import json
 import re
+import socket
 import time
 import uuid
 from datetime import datetime, timezone
@@ -32,20 +33,35 @@ def _normalize_url(url: str) -> str:
 
 
 def _blocked_host(host: str) -> bool:
+    """True if the host is private/internal — checked by NAME and by every resolved IP."""
     host = (host or "").lower().strip(".")
     if not host or host == "localhost" or host.endswith((".local", ".internal")):
         return True
     try:
-        return ipaddress.ip_address(host).is_private or ipaddress.ip_address(host).is_loopback
+        ips = [ipaddress.ip_address(host)]
     except ValueError:
-        return False
+        try:
+            ips = [ipaddress.ip_address(info[4][0]) for info in socket.getaddrinfo(host, None)]
+        except (socket.gaierror, ValueError):
+            return True
+    return any(ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved
+               or ip.is_multicast or ip.is_unspecified for ip in ips)
 
 
 async def _fetch(url: str) -> dict:
     start = time.monotonic()
-    async with httpx.AsyncClient(follow_redirects=True, timeout=15, headers={
+    async with httpx.AsyncClient(follow_redirects=False, timeout=15, headers={
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125 Safari/537.36"}) as client:
-        r = await client.get(url)
+        r = None
+        for _ in range(4):
+            if await asyncio.to_thread(_blocked_host, httpx.URL(url).host):
+                raise RuntimeError("Blocked host")
+            r = await client.get(url)
+            loc = r.headers.get("location")
+            if r.status_code in (301, 302, 303, 307, 308) and loc:
+                url = str(httpx.URL(url).join(loc))
+                continue
+            break
     return {"html": r.text[:800_000], "final_url": str(r.url), "status": r.status_code,
             "https": str(r.url).startswith("https://"), "elapsed": round(time.monotonic() - start, 2),
             "size_kb": round(len(r.content) / 1024, 1)}
@@ -111,7 +127,7 @@ async def _llm_review(html: str, url: str) -> dict:
 async def scan_website(url: str) -> dict:
     url = _normalize_url(url)
     host = urlparse(url).hostname
-    if _blocked_host(host):
+    if await asyncio.to_thread(_blocked_host, host):
         raise ValueError("That URL can't be scanned.")
     domain = re.sub(r"^www\.", "", (host or "").lower())
     try:

@@ -65,6 +65,14 @@ An online store that creates website templates for businesses without a website.
   4. **War Room → Rex hunts** — new executable `rex_hunt` (brief "City, ST | category") in EXTRACT_SYSTEM/_create_tasks/process_team_tasks; `_exec_rex` parses brief (Haiku fallback parse), runs hunt, marks task done, posts ✅ to War Room + full report in Rex's chat. Verified E2E: meeting "have Rex hunt taco trucks in El Paso" → 7 real leads on the board.
   Dev note (recurring): hot-reload during in-flight asyncio jobs orphans them; automation _tick recovers (stale→error, queued resume).
 
+- 2026-07-04 (security): **Security audit (security_audit_agent) → all findings fixed & verified**:
+  - SEC-001 HIGH: published/preview HTML (`/api/p/{slug}` templates.py, `/api/market/{id}/preview` market.py) now served with CSP `sandbox allow-scripts allow-forms allow-popups allow-modals; connect-src 'none'` → opaque origin, no cookie/same-origin access. Verified: header present, sites render fully (DomainSite already used sandboxed iframe).
+  - SEC-002: `/api/webhook/stripe-native` (subscriptions.py) fails CLOSED if STRIPE_WEBHOOK_SECRET missing; forged unsigned event → 400 (verified).
+  - SEC-003: `_start_job` (llm.py) caps non-owners at 2 pending gen jobs (10-min window) before rate limit check.
+  - SSRF: leads.py `_blocked_host` now resolves hostnames (getaddrinfo, run in thread) and blocks private/loopback/link-local/reserved IPs; `_fetch` follows redirects manually (max 4) re-validating each hop. Verified: 169.254.169.254 and DNS-rebind hosts (localtest.me) blocked.
+  - Open redirect: `validate_origin` in security.py (CORS_ORIGINS allowlist + emergent domain regex) applied to checkout origin_url in payments.py/subscriptions.py/market.py. Verified: evil origin → 400, legit → session created.
+  - Gotcha hit: inserting validate_origin mid-file split `check_rate_limit` body (SyntaxError) — fixed; verify insertion points against full function bodies.
+
 ## Backlog
 - ~~**Awaiting user: Google Places API key** to unlock Rex's hunting~~ **RESOLVED 2026-07-04** — user provided key, added to `backend/.env` as `GOOGLE_PLACES_API_KEY`. First hunt (Marfa, TX food trucks) surfaced 5 real no-website leads (Marfa Burritos 1,080★, El Turista 51★, the Water Stop 819★, Angel's 296★, Jacko's 16★) + Odessa handyman (Don's Plumbing 37★). Endpoint status code changed 502→424 in `routes/leads.py` so Cloudflare doesn't rewrite the error page (was hiding "IP restriction" message on the key). `services/leads.py` now bubbles specific Google 403 reasons (IP restriction / API disabled) so future misconfigurations are self-diagnosing.
 - (user action) Redeploy to production (https://sitegenie.dev) to ship the Template Market + AI Team.

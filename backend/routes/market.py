@@ -7,7 +7,7 @@ from emergentintegrations.payments.stripe.checkout import CheckoutSessionRequest
 
 from database import db
 from models import MarketListInput, MarketCheckoutInput, MarketPriceInput
-from security import get_current_user, is_owner
+from security import get_current_user, is_owner, validate_origin
 from services.billing import get_stripe, apply_payment
 from services.market import create_listing
 from routes.templates import _count_view
@@ -99,7 +99,7 @@ async def market_checkout(market_id: str, input: MarketCheckoutInput, request: R
     if already:
         raise HTTPException(status_code=409, detail="You already own this template.")
     amount = float(listing["price_usd"])
-    origin = input.origin_url.rstrip("/")
+    origin = validate_origin(input.origin_url)
     metadata = {"user_id": user["user_id"], "kind": "market_purchase", "market_id": market_id}
     stripe = get_stripe(request)
     req = CheckoutSessionRequest(
@@ -125,7 +125,8 @@ async def market_preview(market_id: str, request: Request, count: int = 0):
     if count and _count_view(request):
         await db.market_listings.update_one({"market_id": market_id}, {"$inc": {"views": 1}})
     return HTMLResponse(listing.get("html", ""),
-                        headers={"Content-Security-Policy": "connect-src 'none'"})
+                        headers={"Content-Security-Policy":
+                                 "sandbox allow-scripts allow-forms allow-popups allow-modals; connect-src 'none'"})
 
 
 @router.delete("/market/{market_id}")
