@@ -344,17 +344,16 @@ export default function Landing() {
 
       {/* Features bento */}
       <section id="features" className="px-6 py-24 max-w-7xl mx-auto">
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-          <div className="md:col-span-5 border border-white/10 p-10 bg-surface1">
-            <h2 className="font-display text-3xl font-bold leading-tight">Everything you need to<br />get online, fast.</h2>
-            <p className="mt-4 text-white/50">No templates to fiddle with. No blank canvas anxiety. Just answer a few questions and ship.</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="sm:col-span-2 lg:col-span-4 border border-white/10 p-10 bg-surface1">
+            <h2 className="font-display text-3xl md:text-4xl font-bold leading-tight max-w-2xl">Everything you need to<br />get online, fast.</h2>
+            <p className="mt-4 text-white/50 max-w-2xl">No templates to fiddle with. No blank canvas anxiety. Just answer a few questions and ship.</p>
           </div>
           {features.map((f, i) => {
             const Icon = f.icon;
             return (
               <motion.div key={f.title} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.08 }}
-                className="md:col-span-3.5 border border-white/10 p-8 bg-surface1 hover:border-white/30 transition-colors duration-300"
-                style={{ gridColumn: i < 2 ? "span 3.5" : "span 3.5" }}>
+                className="border border-white/10 p-8 bg-surface1 hover:border-white/30 transition-colors duration-300">
                 <Icon className="w-8 h-8 text-brand mb-4" />
                 <h3 className="font-display text-lg font-semibold">{f.title}</h3>
                 <p className="mt-2 text-sm text-white/50">{f.desc}</p>
