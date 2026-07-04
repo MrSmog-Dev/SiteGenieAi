@@ -92,6 +92,19 @@ AGENTS = [
 
 AGENT_MAP = {a["id"]: a for a in AGENTS}
 
+
+async def team_memory_context() -> str:
+    memos = await db.team_memos.find({}, {"_id": 0}).sort("created_at", -1).to_list(12)
+    if not memos:
+        return "TEAM MEMO BOARD: empty — no memos have been exchanged between agents yet."
+    lines = []
+    for m in reversed(memos):
+        frm = AGENT_MAP.get(m.get("from_agent"), {}).get("name", m.get("from_agent", "Team"))
+        to = ", ".join(AGENT_MAP.get(t, {}).get("name", t) for t in m.get("to_agents", []))
+        lines.append(f"[{str(m.get('created_at', ''))[:10]}] {frm} → {to} ({m.get('kind', 'memo')}): {m['content']}")
+    return ("TEAM MEMO BOARD (real messages actually exchanged between agents — your shared team memory):\n"
+            + "\n".join(lines))
+
 BASE_CONTEXT = (
     "You work for SiteGenie (sitegenie.dev) — a subscription SaaS where business owners generate complete "
     "websites through an agentic AI pipeline. Revenue streams: (1) subscriptions — Monthly, 3-Month, Annual "
@@ -149,12 +162,19 @@ async def business_snapshot() -> dict:
     }
 
 
-def _system_prompt(agent: dict, snapshot_json: str) -> str:
+def _system_prompt(agent: dict, snapshot_json: str, team_ctx: str = "") -> str:
     return (
         f"You are {agent['name']} — {agent['role']} on SiteGenie's private AI executive team. "
         "You report directly to the business OWNER, who is chatting with you now.\n"
         f"PERSONALITY: {agent['personality']}\n\n{BASE_CONTEXT}\n\n"
         f"LIVE BUSINESS DATA (real-time from the production database):\n{snapshot_json}\n\n"
+        f"{team_ctx}\n\n"
+        "TEAM MESSAGING (real, not roleplay): memos on the board above were ACTUALLY delivered between "
+        "agents — messages starting with 📨 in your chat history are memos you truly received. If a memo "
+        "addressed to you exists, you HAVE it; acknowledge and use it. If the Owner asks whether a teammate "
+        "sent you something and no such memo exists, say honestly that nothing has arrived yet. When you "
+        "tell the Owner you'll send or hand something to a teammate, include the FULL deliverable in that "
+        "same reply — it will be automatically delivered to them as a memo.\n\n"
         "Rules: ground your advice in the live data and cite real numbers when relevant. Stay in character "
         "but be genuinely useful and specific to SiteGenie. Be concise — short paragraphs and tight lists, "
         "no fluff, no markdown tables. If a question falls outside your specialty, give a quick take and "
@@ -165,7 +185,8 @@ def _system_prompt(agent: dict, snapshot_json: str) -> str:
 
 async def agent_reply(agent: dict, history: list, user_msg: str) -> str:
     snapshot = await business_snapshot()
-    system = _system_prompt(agent, json.dumps(snapshot, default=str))
+    team_ctx = await team_memory_context()
+    system = _system_prompt(agent, json.dumps(snapshot, default=str), team_ctx)
     convo = "\n\n".join(
         f"{'Owner' if m['role'] == 'user' else agent['name']}: {m['content']}" for m in history[-12:])
     prompt = (f"CONVERSATION SO FAR:\n{convo}\n\n" if convo else "") + f"Owner: {user_msg}"

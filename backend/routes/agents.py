@@ -1,13 +1,14 @@
 import asyncio
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, HTTPException, Depends
 
 from database import db
-from models import AgentChatInput, ForgeBuildInput
+from models import AgentChatInput, ForgeBuildInput, WarRoomInput
 from security import get_current_user, is_owner
 from services.agents import AGENTS, AGENT_MAP, agent_reply, run_forge_build
+from services.team import detect_and_route_memos, post_war_room, run_war_room_meeting
 
 router = APIRouter()
 
@@ -72,6 +73,46 @@ async def ivy_write_blog(user: dict = Depends(get_current_user)):
     return {"status": "writing"}
 
 
+@router.get("/agents/war-room")
+async def get_war_room(user: dict = Depends(get_current_user)):
+    _require_owner(user)
+    room = await db.war_room.find_one({"user_id": user["user_id"]}, {"_id": 0, "messages": 1})
+    meeting = await db.war_room_meetings.find_one(
+        {"user_id": user["user_id"]}, {"_id": 0}, sort=[("created_at", -1)])
+    tasks = await db.team_tasks.find(
+        {"user_id": user["user_id"]}, {"_id": 0}).sort("created_at", -1).to_list(20)
+    return {"messages": (room or {}).get("messages", []), "meeting": meeting, "tasks": tasks}
+
+
+@router.post("/agents/war-room")
+async def start_war_room(input: WarRoomInput, user: dict = Depends(get_current_user)):
+    _require_owner(user)
+    topic = input.topic.strip()
+    if len(topic) < 3:
+        raise HTTPException(status_code=400, detail="Give the team a topic to discuss.")
+    fresh = (datetime.now(timezone.utc) - timedelta(minutes=20)).isoformat()
+    active = await db.war_room_meetings.find_one(
+        {"user_id": user["user_id"], "status": {"$in": ["starting", "running"]},
+         "updated_at": {"$gte": fresh}}, {"_id": 1})
+    if active:
+        raise HTTPException(status_code=409, detail="A meeting is already in progress. Let the team finish.")
+    meeting_id = f"meet_{uuid.uuid4().hex[:10]}"
+    now = datetime.now(timezone.utc).isoformat()
+    await db.war_room_meetings.insert_one({
+        "meeting_id": meeting_id, "user_id": user["user_id"], "topic": topic,
+        "status": "starting", "created_at": now, "updated_at": now})
+    await post_war_room(user["user_id"], None, topic, role="owner")
+    asyncio.create_task(run_war_room_meeting(meeting_id, user["user_id"], topic))
+    return {"meeting_id": meeting_id, "status": "starting"}
+
+
+@router.delete("/agents/war-room")
+async def clear_war_room(user: dict = Depends(get_current_user)):
+    _require_owner(user)
+    await db.war_room.delete_one({"user_id": user["user_id"]})
+    return {"cleared": True}
+
+
 @router.get("/agents/{agent_id}/chat")
 async def get_agent_chat(agent_id: str, user: dict = Depends(get_current_user)):
     _require_owner(user)
@@ -109,6 +150,7 @@ async def send_agent_chat(agent_id: str, input: AgentChatInput, user: dict = Dep
     await db.agent_chats.update_one(
         {"user_id": user["user_id"], "agent_id": agent_id},
         {"$push": {"messages": {"$each": new_msgs}}, "$set": {"updated_at": now}}, upsert=True)
+    asyncio.create_task(detect_and_route_memos(user["user_id"], agent_id, message, reply))
     return {"reply": reply}
 
 

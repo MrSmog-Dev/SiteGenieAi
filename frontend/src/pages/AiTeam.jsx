@@ -2,10 +2,11 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardLayout from "@/components/DashboardLayout";
 import { RexLeadPanel } from "@/components/RexLeadPanel";
+import { WarRoom } from "@/components/WarRoom";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
-import { Send, Loader2, Trash2, Hammer, Sparkles, X, Crosshair, BookOpen, PenLine } from "lucide-react";
+import { Send, Loader2, Trash2, Hammer, Sparkles, X, Crosshair, BookOpen, PenLine, Users } from "lucide-react";
 
 export default function AiTeam() {
   const { user } = useAuth();
@@ -34,7 +35,7 @@ export default function AiTeam() {
   }, [isOwner]);
 
   const loadChat = useCallback((silent = false) => {
-    if (!isOwner || !activeId) return;
+    if (!isOwner || !activeId || activeId === "war_room") return;
     if (!silent) setMessages(null);
     api.get(`/agents/${activeId}/chat`)
       .then(({ data }) => setMessages(data.messages))
@@ -110,6 +111,17 @@ export default function AiTeam() {
             <p className="text-white/40 text-xs mt-1">Your autonomous staff of 12</p>
             <p data-testid="automation-status" className="text-[10px] font-mono text-emerald-300/70 mt-2 uppercase tracking-wider">● Automation on — daily briefing · daily article · weekly template</p>
           </div>
+          <button data-testid="war-room-item" onClick={() => setActiveId("war_room")}
+            className={`flex items-center gap-3 px-4 py-3 text-left transition-colors duration-300 border-l-2 ${
+              activeId === "war_room" ? "bg-surface2 border-l-brand" : "border-l-transparent hover:bg-surface2/50"}`}>
+            <div className="w-10 h-10 rounded-full shrink-0 flex items-center justify-center bg-brand/20 border border-brand/40">
+              <Users className="w-5 h-5 text-brand" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-sm font-semibold">War Room</div>
+              <div className="text-[11px] text-white/40 truncate">Team meetings, memos & tasks</div>
+            </div>
+          </button>
           {agents.map((a) => (
             <button key={a.id} data-testid={`agent-item-${a.id}`} onClick={() => setActiveId(a.id)}
               className={`flex items-center gap-3 px-4 py-3 text-left transition-colors duration-300 border-l-2 ${
@@ -128,6 +140,12 @@ export default function AiTeam() {
         <div className="flex-1 flex flex-col min-w-0">
           {/* mobile roster strip */}
           <div className="lg:hidden flex gap-2 overflow-x-auto p-3 border-b border-white/10 bg-surface1">
+            <button onClick={() => setActiveId("war_room")}
+              className={`shrink-0 rounded-full p-0.5 ${activeId === "war_room" ? "ring-2 ring-brand" : ""}`}>
+              <div className="w-10 h-10 rounded-full flex items-center justify-center bg-brand/20 border border-brand/40">
+                <Users className="w-5 h-5 text-brand" />
+              </div>
+            </button>
             {agents.map((a) => (
               <button key={a.id} onClick={() => setActiveId(a.id)}
                 className={`shrink-0 rounded-full p-0.5 ${a.id === activeId ? "ring-2 ring-brand" : ""}`}>
@@ -183,6 +201,7 @@ export default function AiTeam() {
 
           {active?.id === "rex" && showRex && <RexLeadPanel onClose={() => setShowRex(false)} />}
 
+          {activeId === "war_room" ? <WarRoom agents={agents} /> : (<>
           <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-6 space-y-4" data-testid="agent-messages">
             {messages === null ? (
               <div className="font-mono text-white/30 text-sm">Loading conversation…</div>
@@ -240,6 +259,7 @@ export default function AiTeam() {
               </div>
             </div>
           )}
+          </>)}
         </div>
       </div>
     </DashboardLayout>

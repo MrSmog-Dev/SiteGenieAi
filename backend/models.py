@@ -72,6 +72,10 @@ class ForgeBuildInput(BaseModel):
     brief: str
 
 
+class WarRoomInput(BaseModel):
+    topic: str
+
+
 class LeadScanInput(BaseModel):
     url: str
 

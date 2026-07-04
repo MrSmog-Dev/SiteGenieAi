@@ -45,6 +45,18 @@ async def _tick():
     await db.leads.update_many(
         {"demo_status": {"$in": ["queued", "building"]}, "updated_at": {"$lt": stale}},
         {"$set": {"demo_status": "error"}})
+    await db.team_tasks.update_many(
+        {"status": "running", "updated_at": {"$lt": stale}},
+        {"$set": {"status": "error", "error": "Interrupted by a server restart."}})
+    await db.war_room_meetings.update_many(
+        {"status": {"$in": ["starting", "running"]}, "updated_at": {"$lt": stale}},
+        {"$set": {"status": "error", "error": "Interrupted by a server restart."}})
+    queued_task = await db.team_tasks.find_one(
+        {"status": "queued", "executable": {"$ne": None}}, {"_id": 1})
+    running_task = await db.team_tasks.find_one({"status": "running"}, {"_id": 1})
+    if queued_task and not running_task:
+        from services.team import process_team_tasks
+        asyncio.create_task(process_team_tasks(owner["user_id"]))
     today = now.strftime("%Y-%m-%d")
     if now.hour >= BRIEFING_UTC_HOUR:
         claimed = await db.automation_state.find_one_and_update(
