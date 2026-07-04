@@ -53,7 +53,7 @@ An online store that creates website templates for businesses without a website.
   Tested by testing agent (iteration_13.json): 100% frontend + full backend coverage, no action items, all E2E flows pass (chat progression, vibe chips, tier toggle, preview iframe render, override toast).
 
 ## Backlog
-- **Awaiting user: Google Places API key** to unlock Rex's hunting (create at console.cloud.google.com, enable "Places API (New)", add as GOOGLE_PLACES_API_KEY to backend/.env + production env).
+- ~~**Awaiting user: Google Places API key** to unlock Rex's hunting~~ **RESOLVED 2026-07-04** — user provided key, added to `backend/.env` as `GOOGLE_PLACES_API_KEY`. First hunt (Marfa, TX food trucks) surfaced 5 real no-website leads (Marfa Burritos 1,080★, El Turista 51★, the Water Stop 819★, Angel's 296★, Jacko's 16★) + Odessa handyman (Don's Plumbing 37★). Endpoint status code changed 502→424 in `routes/leads.py` so Cloudflare doesn't rewrite the error page (was hiding "IP restriction" message on the key). `services/leads.py` now bubbles specific Google 403 reasons (IP restriction / API disabled) so future misconfigurations are self-diagnosing.
 - (user action) Redeploy to production (https://sitegenie.dev) to ship the Template Market + AI Team.
 - P3: Weekly analytics email digest (Resend) — Mara can draft the copy.
 - P3: Scheduled autonomous agent runs (e.g., Titan posts a daily briefing to an activity feed automatically).
