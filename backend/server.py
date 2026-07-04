@@ -37,6 +37,12 @@ async def root():
     return {"message": "SiteGenie API"}
 
 
+@app.get("/health")
+async def health():
+    # Liveness probe — must never touch the DB so the pod becomes ready even if Atlas is briefly unavailable.
+    return {"status": "ok"}
+
+
 api_router.include_router(auth_router)
 api_router.include_router(plans_router)
 api_router.include_router(templates_router)
@@ -50,6 +56,33 @@ api_router.include_router(blog_router)
 
 @app.on_event("startup")
 async def startup():
+    # Never block or crash app startup on DB work — the pod must become ready to pass health checks
+    # even if Atlas is briefly electing a primary. All DB init runs in a resilient background task.
+    asyncio.create_task(_initialize())
+
+
+async def _initialize():
+    for attempt in range(1, 13):
+        try:
+            await _run_db_init()
+            logger.info("DB initialization complete.")
+            break
+        except Exception:
+            logger.exception("DB initialization attempt %s failed; retrying in 10s", attempt)
+            await asyncio.sleep(10)
+    else:
+        logger.error("DB initialization did not complete after retries; workers not started.")
+        return
+    asyncio.create_task(subscription_worker())
+    from services.automation import automation_loop, ensure_automation_state
+    try:
+        await ensure_automation_state()
+    except Exception:
+        logger.exception("ensure_automation_state failed")
+    asyncio.create_task(automation_loop())
+
+
+async def _run_db_init():
     await db.users.create_index("email", unique=True)
     await db.users.create_index("user_id", unique=True)
     await db.user_sessions.create_index("session_token")
@@ -115,10 +148,6 @@ async def startup():
     async for u in db.users.find({"extra_credits": {"$exists": False}}, {"_id": 0, "user_id": 1, "credits": 1}):
         await db.users.update_one({"user_id": u["user_id"]},
                                   {"$set": {"extra_credits": int(u.get("credits", 0)), "plan_credits": 0}})
-    asyncio.create_task(subscription_worker())
-    from services.automation import automation_loop, ensure_automation_state
-    await ensure_automation_state()
-    asyncio.create_task(automation_loop())
 
 
 app.include_router(api_router)
