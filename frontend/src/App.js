@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { Toaster } from "sonner";
 import { AuthProvider } from "@/context/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { GenieWaking } from "@/components/GenieWaking";
 import Landing from "@/pages/Landing";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
@@ -56,6 +57,7 @@ function App() {
     <div className="App font-body">
       <AuthProvider>
         <BrowserRouter>
+          <GenieWaking />
           <AppRouter />
           <Toaster theme="dark" position="top-right" richColors />
         </BrowserRouter>

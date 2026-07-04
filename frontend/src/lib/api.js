@@ -1,4 +1,5 @@
 import axios from "axios";
+import { reportApiError } from "./apiHealth";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 export const API = `${BACKEND_URL}/api`;
@@ -7,6 +8,14 @@ export const api = axios.create({
   baseURL: API,
   withCredentials: true,
 });
+
+api.interceptors.response.use(
+  (res) => res,
+  (error) => {
+    if (!error.response || error.response.status >= 500) reportApiError();
+    return Promise.reject(error);
+  }
+);
 
 export function formatApiError(detail) {
   if (detail == null) return "Something went wrong. Please try again.";

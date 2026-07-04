@@ -43,6 +43,15 @@ async def health():
     return {"status": "ok"}
 
 
+@api_router.get("/status")
+async def api_status():
+    try:
+        await asyncio.wait_for(db.command("ping"), timeout=3)
+        return {"api": True, "db": True}
+    except Exception:
+        return {"api": True, "db": False}
+
+
 api_router.include_router(auth_router)
 api_router.include_router(plans_router)
 api_router.include_router(templates_router)
