@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
-import { Zap, Sparkles, Gauge, Palette, Rocket, ArrowUp, Check, Coffee, Scissors, Dumbbell, UtensilsCrossed, Scale, Flower2, RotateCcw } from "lucide-react";
+import { Sparkles, Gauge, Palette, Rocket, ArrowUp, Check, Coffee, Scissors, Dumbbell, UtensilsCrossed, Scale, Flower2, RotateCcw } from "lucide-react";
 
 const plans = [
   { id: "monthly", name: "Monthly", price: 20, per: "/mo", credits: 50, unlimited: false, highlight: false },
@@ -178,8 +178,8 @@ export default function Landing() {
       {/* Nav */}
       <header className="fixed top-0 inset-x-0 z-40 bg-black/60 backdrop-blur-xl border-b border-white/10">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2" data-testid="landing-logo">
-            <div className="w-8 h-8 bg-brand flex items-center justify-center"><Zap className="w-5 h-5" /></div>
+          <Link to="/" className="flex items-center gap-2.5" data-testid="landing-logo">
+            <img src="/sitegenie_logo_mark.png" alt="SiteGenie" className="w-9 h-9 object-contain" />
             <span className="font-display font-bold text-lg tracking-tight">SiteGenie</span>
           </Link>
           <nav className="hidden md:flex items-center gap-8 text-sm text-white/60">
@@ -213,8 +213,8 @@ export default function Landing() {
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}
           className="relative w-full max-w-3xl flex flex-col items-center text-center">
           <div className="flex items-center gap-2.5 mb-6" data-testid="hero-agent-badge">
-            <div className="relative w-9 h-9 bg-brand flex items-center justify-center">
-              <Zap className="w-5 h-5" />
+            <div className="relative w-9 h-9 flex items-center justify-center">
+              <img src="/sitegenie_logo_mark.png" alt="SiteGenie AI" className="w-9 h-9 object-contain" />
               <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-base" />
             </div>
             <span className="font-mono text-sm text-white/60">SiteGenie AI · online</span>
@@ -236,7 +236,7 @@ export default function Landing() {
             <div data-testid="chat-thread" className="mt-6 w-full space-y-3 text-left max-h-[340px] overflow-y-auto pr-1">
               {messages.map((m, i) => m.role === "ai" ? (
                 <motion.div key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex items-start gap-2.5" data-testid={`chat-msg-ai-${i}`}>
-                  <div className="w-7 h-7 bg-brand flex items-center justify-center shrink-0 mt-0.5"><Zap className="w-4 h-4" /></div>
+                  <div className="w-7 h-7 flex items-center justify-center shrink-0 mt-0.5"><img src="/sitegenie_logo_mark.png" alt="AI" className="w-7 h-7 object-contain" /></div>
                   <div className="rounded-2xl rounded-tl-sm bg-surface1 border border-white/10 px-4 py-3 text-sm text-white/85 max-w-[85%]">{m.text}</div>
                 </motion.div>
               ) : (
@@ -246,7 +246,7 @@ export default function Landing() {
               ))}
               {typing && (
                 <div className="flex items-start gap-2.5" data-testid="chat-typing">
-                  <div className="w-7 h-7 bg-brand flex items-center justify-center shrink-0 mt-0.5"><Zap className="w-4 h-4" /></div>
+                  <div className="w-7 h-7 flex items-center justify-center shrink-0 mt-0.5"><img src="/sitegenie_logo_mark.png" alt="AI" className="w-7 h-7 object-contain" /></div>
                   <div className="rounded-2xl rounded-tl-sm bg-surface1 border border-white/10 px-4 py-3.5 flex gap-1.5 items-center">
                     <span className="w-1.5 h-1.5 rounded-full bg-white/50 animate-bounce" />
                     <span className="w-1.5 h-1.5 rounded-full bg-white/50 animate-bounce [animation-delay:0.15s]" />
@@ -413,7 +413,7 @@ export default function Landing() {
 
       <footer className="border-t border-white/10 px-6 py-10">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-white/40">
-          <div className="flex items-center gap-2"><div className="w-6 h-6 bg-brand flex items-center justify-center"><Zap className="w-4 h-4" /></div> SiteGenie © 2026</div>
+          <div className="flex items-center gap-2"><img src="/sitegenie_logo_mark.png" alt="SiteGenie" className="w-6 h-6 object-contain" /> SiteGenie © 2026</div>
           <div className="font-mono">Websites, generated.</div>
         </div>
       </footer>

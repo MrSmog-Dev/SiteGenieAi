@@ -1,6 +1,6 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { LayoutDashboard, Sparkles, LayoutTemplate, CreditCard, LogOut, Zap, Store, Bot } from "lucide-react";
+import { LayoutDashboard, Sparkles, LayoutTemplate, CreditCard, LogOut, Store, Bot } from "lucide-react";
 
 const nav = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -23,10 +23,8 @@ export default function DashboardLayout({ children }) {
       {/* Sidebar */}
       <aside className="w-64 shrink-0 hidden md:flex flex-col hairline border-l-0 border-t-0 border-b-0 bg-surface1 sticky top-0 h-screen">
         <div className="p-6 border-b border-white/10">
-          <Link to="/dashboard" className="flex items-center gap-2" data-testid="sidebar-logo">
-            <div className="w-8 h-8 bg-brand flex items-center justify-center">
-              <Zap className="w-5 h-5 text-white" />
-            </div>
+          <Link to="/dashboard" className="flex items-center gap-2.5" data-testid="sidebar-logo">
+            <img src="/sitegenie_logo_mark.png" alt="SiteGenie" className="w-9 h-9 object-contain" />
             <span className="font-display font-bold text-lg tracking-tight">SiteGenie</span>
           </Link>
         </div>
@@ -68,7 +66,7 @@ export default function DashboardLayout({ children }) {
         {/* mobile top bar */}
         <header className="md:hidden flex items-center justify-between p-4 border-b border-white/10 bg-surface1 sticky top-0 z-20">
           <Link to="/dashboard" className="flex items-center gap-2">
-            <div className="w-7 h-7 bg-brand flex items-center justify-center"><Zap className="w-4 h-4" /></div>
+            <img src="/sitegenie_logo_mark.png" alt="SiteGenie" className="w-8 h-8 object-contain" />
             <span className="font-display font-bold">SiteGenie</span>
           </Link>
           <div className="flex items-center gap-3">

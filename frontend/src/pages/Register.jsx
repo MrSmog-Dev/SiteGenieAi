@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, formatApiError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
-import { Zap, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 
 const SIDE_IMG = "https://images.pexels.com/photos/27141316/pexels-photo-27141316.jpeg?auto=compress&cs=tinysrgb&w=1200";
 
@@ -38,7 +38,7 @@ export default function Register() {
       <div className="flex items-center justify-center p-6">
         <div className="w-full max-w-sm">
           <Link to="/" className="flex items-center gap-2 mb-10">
-            <div className="w-8 h-8 bg-brand flex items-center justify-center"><Zap className="w-5 h-5" /></div>
+            <img src="/sitegenie_logo_mark.png" alt="SiteGenie" className="w-9 h-9 object-contain" />
             <span className="font-display font-bold text-lg">SiteGenie</span>
           </Link>
           <h1 className="font-display text-3xl font-bold">Create your account</h1>

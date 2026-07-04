@@ -4,7 +4,7 @@ import { api, API } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
 import {
-  Zap, Store, Crown, Check, ExternalLink, Loader2, ShoppingCart, Trash2, Wand2,
+  Store, Crown, Check, ExternalLink, Loader2, ShoppingCart, Trash2, Wand2,
   Pencil, Sparkles,
 } from "lucide-react";
 
@@ -78,8 +78,8 @@ export default function Market() {
     <div className="min-h-screen bg-base text-white">
       <header className="sticky top-0 z-30 bg-base/80 backdrop-blur-md border-b border-white/10">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2" data-testid="market-logo">
-            <div className="w-8 h-8 bg-brand flex items-center justify-center"><Zap className="w-5 h-5 text-white" /></div>
+          <Link to="/" className="flex items-center gap-2.5" data-testid="market-logo">
+            <img src="/sitegenie_logo_mark.png" alt="SiteGenie" className="w-9 h-9 object-contain" />
             <span className="font-display font-bold text-lg tracking-tight">SiteGenie</span>
           </Link>
           <nav className="hidden md:flex items-center gap-8 text-sm text-white/60">
