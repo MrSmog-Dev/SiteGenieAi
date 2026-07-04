@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
-import { Crosshair, Globe, Loader2, X, Trash2, Flame, Search, KeyRound, Star, Phone, Rocket } from "lucide-react";
+import { Crosshair, Globe, Loader2, X, Trash2, Flame, Search, KeyRound, Star, Phone, Rocket, MessageSquareText, Copy, RefreshCw } from "lucide-react";
 
 const STATUS_COLORS = { new: "text-white/60", contacted: "text-sky-300", won: "text-emerald-300", lost: "text-white/30" };
 
@@ -15,6 +15,8 @@ export const RexLeadPanel = ({ onClose }) => {
   const [huntCategory, setHuntCategory] = useState("");
   const [hunting, setHunting] = useState(false);
   const [huntResult, setHuntResult] = useState(null);
+  const [pitchLead, setPitchLead] = useState(null);
+  const [pitchLoading, setPitchLoading] = useState(null);
 
   const loadLeads = () => api.get("/leads").then(({ data }) => setLeads(data)).catch(() => setLeads([]));
   useEffect(() => {
@@ -64,6 +66,22 @@ export const RexLeadPanel = ({ onClose }) => {
     } catch { toast.error("Couldn't update the lead."); }
   };
 
+  const draftPitch = async (lead, force = false) => {
+    if (lead.outreach && !force) { setPitchLead(lead); return; }
+    setPitchLoading(lead.lead_id);
+    try {
+      const { data } = await api.post(`/leads/${lead.lead_id}/outreach`);
+      setLeads((ls) => ls.map((l) => (l.lead_id === lead.lead_id ? { ...l, outreach: data } : l)));
+      setPitchLead({ ...lead, outreach: data });
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Rex couldn't draft the pitch.");
+    } finally { setPitchLoading(null); }
+  };
+
+  const copyText = (text, label) => {
+    navigator.clipboard.writeText(text).then(() => toast.success(`${label} copied.`));
+  };
+
   const remove = async (lead) => {
     if (!window.confirm(`Remove "${lead.business_name}" from the lead board?`)) return;
     try {
@@ -77,7 +95,7 @@ export const RexLeadPanel = ({ onClose }) => {
       <div className="px-6 py-4">
         <div className="flex items-center justify-between">
           <p className="text-sm text-red-200/90 flex items-center gap-2">
-            <Crosshair className="w-4 h-4" /> Rex's Lead Hunter — scan any business website (0–100, ≤65 = lead, ≤40 = HOT) or hunt businesses with 15+ reviews and no website. Mark a lead Contacted and Forge auto-builds a pitch demo site.
+            <Crosshair className="w-4 h-4" /> Rex's Lead Hunter — Autopilot ON: hunts 3x/week, drafts your pitch for every lead, auto-builds demos for HOT leads (2/wk) and pings you the moment a demo gets viewed. Scan any site (≤65 = lead, ≤40 = HOT) or hunt manually below.
           </p>
           <button onClick={onClose} className="text-white/40 hover:text-white p-1" data-testid="rex-panel-close"><X className="w-4 h-4" /></button>
         </div>
@@ -197,6 +215,10 @@ export const RexLeadPanel = ({ onClose }) => {
                   {l.demo_status === "error" && (
                     <span className="text-[11px] text-red-400 font-mono shrink-0">Demo failed</span>
                   )}
+                  <button data-testid={`lead-pitch-${l.lead_id}`} onClick={() => draftPitch(l)} disabled={pitchLoading === l.lead_id}
+                    className="flex items-center gap-1 text-[11px] font-mono text-red-300 border border-red-400/30 hover:border-red-300 px-2 py-1 shrink-0 transition-colors duration-300 disabled:opacity-40">
+                    {pitchLoading === l.lead_id ? <Loader2 className="w-3 h-3 animate-spin" /> : <MessageSquareText className="w-3 h-3" />} Pitch
+                  </button>
                   <select data-testid={`lead-status-${l.lead_id}`} value={l.status} onChange={(e) => setStatus(l, e.target.value)}
                     className={`bg-surface2 border border-white/10 text-xs px-2 py-1.5 outline-none ${STATUS_COLORS[l.status] || ""}`}>
                     <option value="new">New</option>
@@ -212,6 +234,44 @@ export const RexLeadPanel = ({ onClose }) => {
           )}
         </div>
       </div>
+
+      {pitchLead && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" data-testid="pitch-modal" onClick={() => setPitchLead(null)}>
+          <div className="bg-surface1 border border-red-400/30 max-w-lg w-full p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="font-display font-bold flex items-center gap-2">
+                <MessageSquareText className="w-4 h-4 text-red-300" /> Rex's pitch — {pitchLead.business_name}
+              </h3>
+              <button onClick={() => setPitchLead(null)} className="text-white/40 hover:text-white p-1" data-testid="pitch-modal-close"><X className="w-4 h-4" /></button>
+            </div>
+            {pitchLead.outreach?.demo_url && (
+              <a href={pitchLead.outreach.demo_url} target="_blank" rel="noopener noreferrer"
+                className="mt-2 inline-flex items-center gap-1 text-xs text-emerald-300 underline"><Rocket className="w-3 h-3" /> Their live demo site</a>
+            )}
+            <div className="mt-4">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-white/40">Text / SMS (send manually)</span>
+                <button onClick={() => copyText(pitchLead.outreach?.sms || "", "SMS")} className="flex items-center gap-1 text-[11px] text-red-300 hover:text-red-200" data-testid="pitch-copy-sms"><Copy className="w-3 h-3" /> Copy</button>
+              </div>
+              <p className="mt-1.5 text-sm text-white/80 bg-surface2 border border-white/10 p-3 whitespace-pre-wrap" data-testid="pitch-sms-text">{pitchLead.outreach?.sms}</p>
+            </div>
+            <div className="mt-4">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-white/40">Call script</span>
+                <button onClick={() => copyText(pitchLead.outreach?.call_script || "", "Call script")} className="flex items-center gap-1 text-[11px] text-red-300 hover:text-red-200" data-testid="pitch-copy-call"><Copy className="w-3 h-3" /> Copy</button>
+              </div>
+              <p className="mt-1.5 text-sm text-white/80 bg-surface2 border border-white/10 p-3 whitespace-pre-wrap" data-testid="pitch-call-text">{pitchLead.outreach?.call_script}</p>
+            </div>
+            <div className="mt-4 flex items-center justify-between">
+              <p className="text-[11px] text-white/30">You send it — Rex never auto-blasts (keeps you TCPA/CAN-SPAM safe).</p>
+              <button onClick={() => draftPitch(pitchLead, true)} disabled={pitchLoading === pitchLead.lead_id}
+                className="flex items-center gap-1.5 text-xs text-white/60 hover:text-white border border-white/15 px-3 py-1.5 transition-colors duration-300 disabled:opacity-40" data-testid="pitch-redraft-btn">
+                {pitchLoading === pitchLead.lead_id ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />} Redraft
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

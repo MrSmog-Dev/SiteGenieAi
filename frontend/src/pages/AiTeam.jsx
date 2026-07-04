@@ -109,7 +109,7 @@ export default function AiTeam() {
           <div className="p-5 border-b border-white/10">
             <h1 className="font-display font-bold text-lg">AI Team</h1>
             <p className="text-white/40 text-xs mt-1">Your autonomous staff of 12</p>
-            <p data-testid="automation-status" className="text-[10px] font-mono text-emerald-300/70 mt-2 uppercase tracking-wider">● Automation on — daily briefing · daily article · weekly template · weekly hunt · Monday digest</p>
+            <p data-testid="automation-status" className="text-[10px] font-mono text-emerald-300/70 mt-2 uppercase tracking-wider">● Automation on — daily briefing · daily article · weekly template · 3x/wk hunts · Monday digest</p>
           </div>
           <button data-testid="war-room-item" onClick={() => setActiveId("war_room")}
             className={`flex items-center gap-3 px-4 py-3 text-left transition-colors duration-300 border-l-2 ${

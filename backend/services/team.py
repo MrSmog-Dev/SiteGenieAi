@@ -337,3 +337,5 @@ async def _exec_rex(owner_id: str, task: dict):
     await post_war_room(owner_id, "rex",
                         f"✅ Task done — hunted {category} in {location}: {res['new_leads']} new lead(s) on "
                         f"the board from {res['found']} businesses scanned. Full report in my chat.")
+    from services.automation import rex_autopilot
+    await rex_autopilot(owner_id)

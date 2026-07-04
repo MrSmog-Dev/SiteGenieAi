@@ -14,11 +14,14 @@ from services.blog import run_ivy_blog
 BRIEFING_UTC_HOUR = 11
 BLOG_UTC_HOUR = 9
 DIGEST_UTC_HOUR = 12
+NUDGE_UTC_HOUR = 14
+AUTO_DEMO_WEEKLY_CAP = 2
 TICK_SECONDS = 900
 
 
 async def ensure_automation_state():
-    for job in ("titan_briefing", "forge_weekly", "ivy_daily_blog", "rex_weekly_hunt", "mara_digest"):
+    for job in ("titan_briefing", "forge_weekly", "ivy_daily_blog", "rex_weekly_hunt",
+                "rex_pipeline_nudge", "mara_digest"):
         await db.automation_state.update_one({"job": job}, {"$setOnInsert": {"job": job}}, upsert=True)
 
 
@@ -77,12 +80,20 @@ async def _tick():
             {"$set": {"last_run_date": today}})
         if claimed:
             await run_mara_digest(owner["user_id"])
-    cutoff = (now - timedelta(days=7)).isoformat()
+    if now.hour >= NUDGE_UTC_HOUR:
+        claimed = await db.automation_state.find_one_and_update(
+            {"job": "rex_pipeline_nudge", "last_run_date": {"$ne": today}},
+            {"$set": {"last_run_date": today}})
+        if claimed:
+            await run_rex_nudge(owner["user_id"])
+    await rex_demo_watch(owner["user_id"])
+    hunt_cutoff = (now - timedelta(hours=56)).isoformat()  # ~3 hunts per week
     claimed = await db.automation_state.find_one_and_update(
-        {"job": "rex_weekly_hunt", "$or": [{"last_run": {"$exists": False}}, {"last_run": {"$lt": cutoff}}]},
+        {"job": "rex_weekly_hunt", "$or": [{"last_run": {"$exists": False}}, {"last_run": {"$lt": hunt_cutoff}}]},
         {"$set": {"last_run": now.isoformat()}})
     if claimed:
         await run_rex_weekly_hunt(owner["user_id"])
+    cutoff = (now - timedelta(days=7)).isoformat()
     claimed = await db.automation_state.find_one_and_update(
         {"job": "forge_weekly", "$or": [{"last_run": {"$exists": False}}, {"last_run": {"$lt": cutoff}}]},
         {"$set": {"last_run": now.isoformat()}})
@@ -129,12 +140,107 @@ async def run_rex_weekly_hunt(owner_id: str):
                               HUNT_PICK_SYSTEM, STRATEGY_MODEL)
         pick = json.loads(re.search(r"\{[\s\S]*\}", str(raw)).group(0))
         from services.team import rex_hunt_and_report
-        await rex_hunt_and_report(owner_id, pick["location"], pick["category"], intro="Weekly auto-hunt")
-        logger.info("automation: rex weekly hunt done (%s / %s)", pick["location"], pick["category"])
+        await rex_hunt_and_report(owner_id, pick["location"], pick["category"], intro="Auto-hunt")
+        logger.info("automation: rex auto-hunt done (%s / %s)", pick["location"], pick["category"])
+        await rex_autopilot(owner_id)
     except Exception as e:
-        logger.exception("rex weekly hunt failed")
+        logger.exception("rex auto-hunt failed")
         await post_agent_message(owner_id, "rex",
-                                 f"My weekly auto-hunt hit a snag ({type(e).__name__}). I'll try again next week.")
+                                 f"My auto-hunt hit a snag ({type(e).__name__}). I'll try again on the next run.")
+
+
+# ---------------- Rex Autopilot ----------------
+
+async def rex_autopilot(owner_id: str):
+    """Post-hunt automation: draft pitches for fresh leads, auto-demo the hottest ones (capped)."""
+    try:
+        await auto_outreach_leads()
+    except Exception:
+        logger.exception("rex autopilot outreach failed")
+    try:
+        await auto_demo_hot_leads(owner_id)
+    except Exception:
+        logger.exception("rex autopilot auto-demo failed")
+
+
+async def auto_outreach_leads(limit: int = 5):
+    from services.leads import set_lead_outreach
+    leads = await db.leads.find(
+        {"outreach": {"$exists": False}, "status": "new", "archived": {"$ne": True},
+         "tier": {"$in": ["hot", "warm"]}},
+        {"_id": 0}).sort([("tier", 1), ("reviews_count", -1)]).to_list(limit)
+    for lead in leads:
+        try:
+            await set_lead_outreach(lead)
+        except Exception:
+            logger.exception("outreach draft failed for %s", lead.get("lead_id"))
+
+
+async def auto_demo_hot_leads(owner_id: str):
+    week_ago = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+    used = await db.leads.count_documents({"demo_auto": True, "demo_queued_at": {"$gte": week_ago}})
+    remaining = AUTO_DEMO_WEEKLY_CAP - used
+    if remaining <= 0:
+        return
+    leads = await db.leads.find(
+        {"tier": "hot", "status": "new", "archived": {"$ne": True},
+         "demo_status": {"$nin": ["queued", "building", "ready"]}},
+        {"_id": 0, "lead_id": 1, "business_name": 1}).sort("reviews_count", -1).to_list(remaining)
+    for l in leads:
+        now = datetime.now(timezone.utc).isoformat()
+        await db.leads.update_one(
+            {"lead_id": l["lead_id"]},
+            {"$set": {"demo_status": "queued", "demo_auto": True, "demo_queued_at": now, "updated_at": now}})
+        await post_agent_message(owner_id, "rex",
+                                 f"🤖 Autopilot: {l['business_name']} is a HOT lead — commissioning Forge "
+                                 f"for their demo site right now (weekly auto-demo budget: {AUTO_DEMO_WEEKLY_CAP}).")
+        await run_lead_demo(l["lead_id"])
+
+
+async def rex_demo_watch(owner_id: str):
+    """Alert the owner when a lead's demo site gets viewed (first view is silently absorbed as the owner's own check)."""
+    ready = await db.leads.find(
+        {"demo_status": "ready", "status": {"$in": ["new", "contacted"]}, "archived": {"$ne": True}},
+        {"_id": 0, "lead_id": 1, "business_name": 1, "demo_template_id": 1,
+         "demo_views_seen": 1, "phone": 1, "demo_slug": 1}).to_list(50)
+    for l in ready:
+        tpl = await db.templates.find_one({"template_id": l.get("demo_template_id")}, {"_id": 0, "views_total": 1})
+        views = int((tpl or {}).get("views_total") or 0)
+        seen = int(l.get("demo_views_seen") or 0)
+        if views <= seen:
+            continue
+        await db.leads.update_one({"lead_id": l["lead_id"]}, {"$set": {"demo_views_seen": views}})
+        if seen == 0:
+            continue
+        phone = f" Phone: {l['phone']}." if l.get("phone") else ""
+        await post_agent_message(owner_id, "rex",
+                                 f"🔥 {l['business_name']} just viewed their demo site ({views - seen} new "
+                                 f"view(s), {views} total). They're interested — strike NOW.{phone}")
+
+
+async def run_rex_nudge(owner_id: str):
+    """Daily pipeline hygiene: nudge on stale HOT leads, archive dead ones."""
+    now = datetime.now(timezone.utc)
+    stale_cutoff = (now - timedelta(days=5)).isoformat()
+    stale = await db.leads.find(
+        {"tier": "hot", "status": {"$in": ["new", "contacted"]}, "archived": {"$ne": True},
+         "updated_at": {"$lt": stale_cutoff}},
+        {"_id": 0, "business_name": 1, "phone": 1, "reviews_count": 1, "demo_slug": 1}
+    ).sort("reviews_count", -1).to_list(5)
+    if stale:
+        lines = "\n".join(
+            f"• {l['business_name']}" + (f" — {l['phone']}" if l.get("phone") else "")
+            + (" (demo is live!)" if l.get("demo_slug") else "") for l in stale)
+        await post_agent_message(owner_id, "rex",
+                                 f"⏰ Pipeline check — these HOT leads have sat untouched for 5+ days:\n{lines}\n"
+                                 "Hot leads go cold fast. Hit the Pitch button on the Lead Board — I've got "
+                                 "your opener ready.")
+    dead_cutoff = (now - timedelta(days=30)).isoformat()
+    res = await db.leads.update_many(
+        {"status": "lost", "archived": {"$ne": True}, "updated_at": {"$lt": dead_cutoff}},
+        {"$set": {"archived": True}})
+    if res.modified_count:
+        logger.info("automation: rex archived %s dead leads", res.modified_count)
 
 
 async def run_mara_digest(owner_id: str):
@@ -220,6 +326,12 @@ async def run_lead_demo(lead_id: str):
         await db.leads.update_one({"lead_id": lead_id},
                                   {"$set": {"demo_status": "ready", "demo_template_id": template_id,
                                             "demo_slug": slug, "updated_at": now.isoformat()}})
+        try:
+            from services.leads import set_lead_outreach
+            fresh = await db.leads.find_one({"lead_id": lead_id}, {"_id": 0})
+            await set_lead_outreach(fresh)
+        except Exception:
+            logger.exception("post-demo outreach refresh failed")
         await post_agent_message(owner["user_id"], "rex",
             f"Handoff complete — Forge just finished the demo site for {lead['business_name']} and it's "
             f"live (hit 'Demo' on the Lead Board, path /api/p/{slug}). My opener: \"We already built your "

@@ -6,7 +6,7 @@ from config import GOOGLE_PLACES_API_KEY
 from database import db
 from models import LeadScanInput, LeadHuntInput, LeadStatusInput
 from security import get_current_user, is_owner
-from services.leads import scan_website, upsert_weak_site_lead, hunt_places, LEAD_STATUSES
+from services.leads import scan_website, upsert_weak_site_lead, hunt_places, set_lead_outreach, LEAD_STATUSES
 
 router = APIRouter()
 
@@ -19,7 +19,7 @@ def _require_owner(user: dict):
 @router.get("/leads")
 async def list_leads(user: dict = Depends(get_current_user)):
     _require_owner(user)
-    return await db.leads.find({}, {"_id": 0}).sort("created_at", -1).to_list(300)
+    return await db.leads.find({"archived": {"$ne": True}}, {"_id": 0}).sort("created_at", -1).to_list(300)
 
 
 @router.get("/leads/hunt/status")
@@ -38,7 +38,10 @@ async def hunt(input: LeadHuntInput, user: dict = Depends(get_current_user)):
     if not location or not category:
         raise HTTPException(status_code=400, detail="Give Rex a location and a business type.")
     try:
-        return await hunt_places(location, category)
+        result = await hunt_places(location, category)
+        from services.automation import rex_autopilot
+        asyncio.create_task(rex_autopilot(user["user_id"]))
+        return result
     except RuntimeError as e:
         # 424 (not 502) so Cloudflare doesn't hide our error message with its own 5xx page.
         raise HTTPException(status_code=424, detail=str(e))
@@ -81,6 +84,18 @@ async def update_lead(lead_id: str, input: LeadStatusInput, user: dict = Depends
             asyncio.create_task(run_lead_demo(lead_id))
             demo_triggered = True
     return {"lead_id": lead_id, "status": input.status, "demo_triggered": demo_triggered}
+
+
+@router.post("/leads/{lead_id}/outreach")
+async def draft_outreach(lead_id: str, user: dict = Depends(get_current_user)):
+    _require_owner(user)
+    lead = await db.leads.find_one({"lead_id": lead_id}, {"_id": 0})
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    try:
+        return await set_lead_outreach(lead)
+    except Exception:
+        raise HTTPException(status_code=502, detail="Rex couldn't draft the pitch right now — try again.")
 
 
 @router.delete("/leads/{lead_id}")

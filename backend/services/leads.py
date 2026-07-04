@@ -1,6 +1,7 @@
 import asyncio
 import ipaddress
 import json
+import os
 import re
 import socket
 import time
@@ -15,6 +16,8 @@ from config import EMERGENT_LLM_KEY, STRATEGY_MODEL, GOOGLE_PLACES_API_KEY, logg
 from database import db
 
 LEAD_STATUSES = ("new", "contacted", "won", "lost")
+
+PUBLIC_BASE = next((o.strip().rstrip("/") for o in os.environ.get("CORS_ORIGINS", "").split(",") if o.strip()), "")
 
 
 def _tier(score: int) -> str | None:
@@ -225,6 +228,38 @@ async def hunt_places(location: str, category: str) -> dict:
         added += 1
     return {"found": len(places), "new_leads": added, "skipped_existing": skipped,
             "website_candidates": candidates}
+
+
+OUTREACH_SYSTEM = (
+    "You are Rex, SiteGenie's top sales hunter, drafting first-touch outreach for a small local business "
+    "that needs a website. The Owner will send it MANUALLY (never auto-blasted). Tone: friendly, local, "
+    "specific, zero corporate speak — lead with value, reference something real about their business. "
+    "The SMS is sent TO the business owner — never include their own phone number in it; end with a "
+    "question CTA instead. "
+    "Reply ONLY JSON, no markdown fences:\n"
+    '{"sms": "<first-touch SMS, max 280 chars, mention a specific detail (reviews, rating, missing/weak '
+    "website), one clear CTA; if a live demo link is provided, make it the hook>\", "
+    '"call_script": "<a 2-3 sentence call opener, then the single best line to handle: '
+    "'we don't need a website'>\"}"
+)
+
+
+async def set_lead_outreach(lead: dict) -> dict:
+    from services.llm import _call_llm
+    demo_url = f"{PUBLIC_BASE}/api/p/{lead['demo_slug']}" if lead.get("demo_slug") else None
+    info = {k: lead.get(k) for k in ("business_name", "category", "location", "phone", "rating",
+                                     "reviews_count", "issues", "rex_pitch", "website")}
+    prompt = f"Business info: {json.dumps(info, default=str)}"
+    if demo_url:
+        prompt += f"\nTheir brand-new demo website is ALREADY LIVE at {demo_url} — strongest possible hook."
+    raw = await _call_llm(prompt, OUTREACH_SYSTEM, STRATEGY_MODEL)
+    data = json.loads(re.search(r"\{[\s\S]*\}", str(raw)).group(0))
+    outreach = {"sms": str(data.get("sms", ""))[:400],
+                "call_script": str(data.get("call_script", ""))[:900],
+                "demo_url": demo_url,
+                "generated_at": datetime.now(timezone.utc).isoformat()}
+    await db.leads.update_one({"lead_id": lead["lead_id"]}, {"$set": {"outreach": outreach}})
+    return outreach
 
 
 async def leads_summary() -> dict:
