@@ -57,6 +57,7 @@ export default function Market() {
           <nav className="hidden md:flex items-center gap-8 text-sm text-white/60">
             <Link to="/" className="hover:text-white transition-colors duration-300">Home</Link>
             <span className="text-amber-300">Template Market</span>
+            <a href="/api/blog" data-testid="market-nav-blog" className="hover:text-white transition-colors duration-300">Blog</a>
             <Link to="/pricing" className="hover:text-white transition-colors duration-300">Pricing</Link>
           </nav>
           {user ? (

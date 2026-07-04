@@ -24,6 +24,15 @@ async def blog_sitemap(request: Request):
     return Response(render_sitemap(posts, _host(request)), media_type="application/xml")
 
 
+@router.get("/blog/img/{image_id}")
+async def blog_image(image_id: str):
+    doc = await db.blog_images.find_one({"image_id": image_id})
+    if not doc:
+        return Response(status_code=404)
+    return Response(bytes(doc["data"]), media_type=doc.get("content_type") or "image/jpeg",
+                    headers={"Cache-Control": "public, max-age=31536000, immutable"})
+
+
 @router.get("/blog/{slug}")
 async def blog_post(slug: str, request: Request):
     post = await db.blog_posts.find_one({"slug": slug}, {"_id": 0})

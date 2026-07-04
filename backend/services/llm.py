@@ -122,7 +122,7 @@ def _build_economy_prompt(fields: dict) -> str:
     return "\n".join(lines)
 
 
-async def _call_llm(prompt: str, system_message: str, model: str) -> str:
+async def _call_llm(prompt: str, system_message: str, model: str, timeout: int = None) -> str:
     chat = LlmChat(
         api_key=EMERGENT_LLM_KEY,
         session_id=f"gen_{uuid.uuid4().hex}",
@@ -130,7 +130,7 @@ async def _call_llm(prompt: str, system_message: str, model: str) -> str:
     ).with_model("anthropic", model)
     result = await asyncio.wait_for(
         chat.send_message(UserMessage(text=prompt)),
-        timeout=LLM_CALL_TIMEOUT_S,
+        timeout=timeout or LLM_CALL_TIMEOUT_S,
     )
     return result if isinstance(result, str) else str(result)
 

@@ -17,8 +17,10 @@ IVY_WRITER_SYSTEM = (
     "with descriptive keyword-rich anchor text: <a href=\"/\">AI website builder</a>-style links to '/' "
     "(the SiteGenie builder), '/market' (premium website templates, $200-500, free unlimited edits), and "
     "'/pricing' (subscription plans). If related articles are provided, naturally link 1-2 of them via "
-    "their /api/blog/<slug> path. End the body with a short call-to-action paragraph inviting readers to "
-    "build their site with SiteGenie.\n"
+    "their /api/blog/<slug> path. Insert EXACTLY 3 image placeholders at natural break points, each on "
+    "its own line in this exact format: [IMAGE: short vivid description of an ideal photo for that "
+    "section] — the first one goes right after the opening paragraph. End the body with a short "
+    "call-to-action paragraph inviting readers to build their site with SiteGenie.\n"
     "Output EXACTLY this format, nothing else:\n"
     "TITLE: <SEO title, max 60 chars>\n"
     "SLUG: <kebab-case-slug>\n"
@@ -60,6 +62,8 @@ async def write_blog_post(owner_id: str | None = None) -> dict:
     )
     raw = str(await _call_llm(prompt, IVY_WRITER_SYSTEM, STRATEGY_MODEL))
     art = _parse_article(raw)
+    from services.blog_images import resolve_article_images
+    art["body"] = await resolve_article_images(art["body"])
     slug = art["slug"]
     if await db.blog_posts.find_one({"slug": slug}, {"_id": 1}):
         slug = f"{slug}-{uuid.uuid4().hex[:4]}"
@@ -69,13 +73,30 @@ async def write_blog_post(owner_id: str | None = None) -> dict:
             "body": art["body"], "author": "ivy", "created_at": now}
     await db.blog_posts.insert_one(dict(post))
     internal_links = art["body"].count("<a ")
+    images_used = art["body"].count("<figure")
     if owner_id:
         await post_agent_message(owner_id, "ivy",
             f'Today\'s article is live: "{art["title"]}" — read it at /api/blog/{slug}. '
-            f'Target keywords: {", ".join(art["keywords"][:3])}. I wove in {internal_links} links '
-            "pointing readers back to SiteGenie. Compounding content, one day at a time.")
+            f'Target keywords: {", ".join(art["keywords"][:3])}. {images_used} images embedded, '
+            f"{internal_links} links pointing readers back to SiteGenie. Compounding content, one day at a time.")
+        await _blaze_social_draft(owner_id, art["title"], slug, art["keywords"])
     logger.info("ivy published blog post '%s'", slug)
     return post
+
+
+async def _blaze_social_draft(owner_id: str, title: str, slug: str, keywords: list):
+    try:
+        raw = await _call_llm(
+            f'New SiteGenie blog article just published: "{title}" (path /api/blog/{slug}; keywords: '
+            f'{", ".join(keywords)}). Write 2 ready-to-post promos: one X/Twitter post (<280 chars, strong '
+            "hook) and one LinkedIn post (3-5 sentences, ends with the link path). Label them exactly "
+            "'X:' and 'LINKEDIN:'. Max 2 hashtags total.",
+            "You are Blaze, SiteGenie's high-energy social media manager. Punchy hooks, zero fluff.",
+            STRATEGY_MODEL)
+        await post_agent_message(owner_id, "blaze",
+            f"Ivy just dropped a new article — today's distribution kit, ready to post:\n\n{str(raw).strip()}")
+    except Exception:
+        logger.exception("blaze social draft failed")
 
 
 async def run_ivy_blog(owner_id: str):

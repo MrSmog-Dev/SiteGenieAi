@@ -61,6 +61,8 @@ async def startup():
     await db.market_listings.create_index("active")
     await db.leads.create_index("lead_id", unique=True)
     await db.leads.create_index("dedupe_key", unique=True)
+    await db.blog_posts.create_index("slug", unique=True)
+    await db.blog_images.create_index("image_id", unique=True)
     await db.rate_events.create_index("ts", expireAfterSeconds=GEN_WINDOW_SECONDS + 60)
     await db.login_attempts.create_index("ts", expireAfterSeconds=LOGIN_WINDOW_SECONDS + 60)
     await db.login_attempts.create_index("identifier")

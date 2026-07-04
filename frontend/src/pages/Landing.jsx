@@ -184,7 +184,6 @@ export default function Landing() {
           </Link>
           <nav className="hidden md:flex items-center gap-8 text-sm text-white/60">
             <Link to="/market" data-testid="nav-market-link" className="text-amber-300/90 hover:text-amber-200 transition-colors duration-300">Template Market</Link>
-            <a href="/api/blog" data-testid="nav-blog-link" className="hover:text-white transition-colors duration-300">Blog</a>
             <a href="#features" className="hover:text-white transition-colors duration-300">Features</a>
             <a href="#pricing" className="hover:text-white transition-colors duration-300">Pricing</a>
             <a href="#how" className="hover:text-white transition-colors duration-300">How it works</a>

@@ -12,10 +12,17 @@ PRICE_MIN, PRICE_MAX = 200, 500
 PRICING_SYSTEM = (
     "You are the pricing analyst agent for a premium website template marketplace. You are given "
     "objective code metrics and a content outline for a professionally built single-page website "
-    "template. Price it between $200 (solid but simple) and $500 (exceptionally deep: many rich "
-    "sections, advanced interactivity, animation work, polished design system). Weigh: depth of "
-    "sections, interactivity (JS behaviours), animations, responsive breakpoints, copy volume and "
-    "overall craftsmanship. Respond with ONLY a JSON object, no markdown fences:\n"
+    "template. Price it between $200 and $500 using these calibration bands strictly:\n"
+    "- $200-275: solid but simple — 5-7 sections, light interactivity, few animations.\n"
+    "- $280-360: rich single-pager — 7-9 sections, moderate JS, several animations, good copy depth.\n"
+    "- $370-460: deep professional site — 10+ sections, multiple interactive components, strong "
+    "animation suite, 90KB+.\n"
+    "- $470-500: FLAGSHIP — awards the top of the range and $500 is expected when a template has 10+ "
+    "sections AND ships working advanced components (gallery with lightbox, slider/carousel, multi-step "
+    "validated form, accordion, scroll-spy nav, animated counters), 10+ keyframe animations, 25+ JS "
+    "listeners and 140KB+ of polished code. Do NOT withhold $500 from templates that meet this bar.\n"
+    "Weigh: depth of sections, interactivity (JS behaviours), animations, responsive breakpoints, copy "
+    "volume and overall craftsmanship. Respond with ONLY a JSON object, no markdown fences:\n"
     '{"price": <integer 200-500>, "tier": "Standard"|"Professional"|"Premium", '
     '"summary": "<one persuasive sentence describing this template to buyers>", '
     '"highlights": ["<3-5 short selling points>"], '
