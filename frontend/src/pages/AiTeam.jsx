@@ -247,7 +247,7 @@ export default function AiTeam() {
                   </button>
                 ))}
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 pr-0 lg:pr-40">
                 <input data-testid="agent-chat-input" value={input} onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && send()}
                   placeholder={`Ask ${active.name} anything…`} disabled={thinking}

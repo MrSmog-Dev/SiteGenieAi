@@ -152,7 +152,7 @@ export const WarRoom = ({ agents }) => {
       </div>
 
       <div className="border-t border-white/10 bg-surface1 p-4">
-        <div className="flex gap-2">
+        <div className="flex gap-2 pr-0 lg:pr-40">
           <input data-testid="war-room-topic-input" value={topic} onChange={(e) => setTopic(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && start()}
             placeholder={meetingLive ? "Meeting in progress…" : 'Drop a topic for the team — e.g. "Plan 3 new flagships for the Market"'}
