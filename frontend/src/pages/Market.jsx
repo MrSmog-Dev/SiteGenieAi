@@ -3,7 +3,13 @@ import { Link, useNavigate } from "react-router-dom";
 import { api, API } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
-import { Zap, Store, Crown, Check, ExternalLink, Loader2, ShoppingCart, Trash2, Wand2 } from "lucide-react";
+import {
+  Zap, Store, Crown, Check, ExternalLink, Loader2, ShoppingCart, Trash2, Wand2,
+  Pencil, Sparkles,
+} from "lucide-react";
+
+// A listing is a "flagship" if the owner tagged it Premium or priced it >= $400.
+const isFlagship = (l) => (l?.tier === "Premium") || (Number(l?.price_usd) >= 400);
 
 export default function Market() {
   const { user } = useAuth();
@@ -46,6 +52,28 @@ export default function Market() {
     } catch (e) { toast.error("Could not remove listing."); }
   };
 
+  const overridePrice = async (l) => {
+    const raw = window.prompt(`Set new price for "${l.title}" (USD). Current: $${l.price_usd}`, String(l.price_usd));
+    if (raw == null) return;
+    const price = parseFloat(String(raw).replace(/[^\d.]/g, ""));
+    if (!Number.isFinite(price) || price <= 0) {
+      toast.error("Enter a valid positive number.");
+      return;
+    }
+    try {
+      await api.put(`/market/${l.market_id}/price`, { price_usd: price });
+      toast.success(`Price updated to $${price}.`);
+      load();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Could not update price.");
+    }
+  };
+
+  const flagships = (listings || []).filter(isFlagship);
+  const rest = (listings || []).filter((l) => !isFlagship(l));
+
+  const cardProps = { isOwner, buying, onBuy: buy, onDelist: delist, onOverride: overridePrice };
+
   return (
     <div className="min-h-screen bg-base text-white">
       <header className="sticky top-0 z-30 bg-base/80 backdrop-blur-md border-b border-white/10">
@@ -71,7 +99,7 @@ export default function Market() {
         </div>
       </header>
 
-      <section className="max-w-7xl mx-auto px-6 pt-16 pb-10">
+      <section className="max-w-7xl mx-auto px-6 pt-16 pb-8">
         <div className="flex items-center gap-2 font-mono text-xs text-amber-300/80 uppercase tracking-widest">
           <Store className="w-4 h-4" /> Template Market
         </div>
@@ -85,28 +113,112 @@ export default function Market() {
         </p>
       </section>
 
-      <section className="max-w-7xl mx-auto px-6 pb-24">
+      {/* FLAGSHIP HERO BAND */}
+      {listings && flagships.length > 0 && (
+        <section className="relative overflow-hidden border-y border-amber-300/20 bg-gradient-to-b from-amber-950/30 via-amber-900/10 to-transparent">
+          <div className="pointer-events-none absolute inset-0 opacity-30" style={{
+            background: "radial-gradient(circle at 20% 30%, rgba(251,191,36,0.25), transparent 55%), radial-gradient(circle at 80% 60%, rgba(217,119,6,0.2), transparent 55%)",
+          }} />
+          <div className="relative max-w-7xl mx-auto px-6 py-12" data-testid="flagship-hero">
+            <div className="flex flex-wrap items-end justify-between gap-4 mb-8">
+              <div>
+                <div className="flex items-center gap-2 font-mono text-xs text-amber-300 uppercase tracking-widest">
+                  <Crown className="w-4 h-4" /> Flagship Collection
+                </div>
+                <h2 className="font-display text-3xl md:text-4xl font-bold mt-2">Our most crafted, most complete builds.</h2>
+                <p className="text-white/60 mt-2 max-w-2xl text-sm md:text-base">
+                  Deep multi-pass builds with gallery, sliders, animations, full contact forms, FAQ and premium copywriting. Anchor pieces you can ship as-is.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 text-xs font-mono text-amber-300/80">
+                <Sparkles className="w-4 h-4" /> {flagships.length} flagship{flagships.length === 1 ? "" : "s"}
+              </div>
+            </div>
+            <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-5" data-testid="flagship-grid">
+              {flagships.map((l) => (
+                <FlagshipCard key={l.market_id} l={l} ownedTemplateId={owned[l.market_id]} {...cardProps} />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Regular grid */}
+      <section className="max-w-7xl mx-auto px-6 py-16">
         {listings === null ? (
           <div className="font-mono text-white/40 text-sm" data-testid="market-loading">Loading the Market…</div>
         ) : listings.length === 0 ? (
           <div data-testid="market-empty" className="border border-dashed border-white/15 p-16 text-center text-white/40">
             New templates are being crafted — check back soon.
           </div>
-        ) : (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5" data-testid="market-grid">
-            {listings.map((l) => (
-              <ListingCard key={l.market_id} l={l} ownedTemplateId={owned[l.market_id]}
-                isOwner={isOwner} buying={buying} onBuy={buy} onDelist={delist} />
-            ))}
-          </div>
+        ) : rest.length === 0 ? null : (
+          <>
+            <div className="flex items-center gap-2 font-mono text-xs text-white/40 uppercase tracking-widest mb-6">
+              <Store className="w-4 h-4" /> More templates
+            </div>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5" data-testid="market-grid">
+              {rest.map((l) => (
+                <ListingCard key={l.market_id} l={l} ownedTemplateId={owned[l.market_id]} {...cardProps} />
+              ))}
+            </div>
+          </>
         )}
       </section>
     </div>
   );
 }
 
-function ListingCard({ l, ownedTemplateId, isOwner, buying, onBuy, onDelist }) {
-  const previewUrl = `${API}/market/${l.market_id}/preview?count=1`;
+function FlagshipCard({ l, ownedTemplateId, isOwner, buying, onBuy, onDelist, onOverride }) {
+  return (
+    <div data-testid={`flagship-card-${l.market_id}`}
+      className="relative border border-amber-300/30 hover:border-amber-300/60 bg-gradient-to-b from-surface1 to-black transition-colors duration-300 flex flex-col">
+      <div className="relative">
+        <MarketThumb marketId={l.market_id} tall />
+        <div className="absolute top-2 left-2 flex items-center gap-2 z-10">
+          <span className="flex items-center gap-1 text-[10px] font-mono uppercase tracking-wider bg-amber-400 text-black px-2 py-1">
+            <Crown className="w-3 h-3" /> Flagship
+          </span>
+          {l.popular && (
+            <span className="flex items-center gap-1 text-[10px] font-mono uppercase tracking-wider bg-black/70 backdrop-blur-sm text-amber-300 px-2 py-1">
+              Most Popular
+            </span>
+          )}
+        </div>
+        <div className="absolute top-2 right-2 z-10">
+          <span className="text-[10px] font-mono uppercase tracking-wider bg-black/70 backdrop-blur-sm text-white/70 px-2 py-1">{l.tier}</span>
+        </div>
+      </div>
+      <div className="p-6 flex flex-col flex-1">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="font-display font-semibold text-lg truncate">{l.title}</h3>
+            <p className="text-white/40 text-xs mt-0.5 truncate">{l.category}</p>
+          </div>
+          <div className="text-right shrink-0">
+            <div data-testid={`price-${l.market_id}`} className="font-mono text-3xl font-bold text-amber-300">${l.price_usd}</div>
+            <div className="text-[10px] text-white/30 font-mono uppercase">one-time</div>
+          </div>
+        </div>
+        <p className="text-white/60 text-sm mt-3 line-clamp-3">{l.summary}</p>
+        <ul className="mt-4 space-y-1.5">
+          {(l.highlights || []).slice(0, 4).map((h, i) => (
+            <li key={i} className="flex items-start gap-2 text-xs text-white/70">
+              <Check className="w-3.5 h-3.5 text-amber-300 shrink-0 mt-0.5" /> {h}
+            </li>
+          ))}
+        </ul>
+        <div className="flex items-center gap-3 text-[11px] text-white/40 font-mono mt-4">
+          <span data-testid={`sold-${l.market_id}`}>{l.purchases || 0} sold</span>
+          <span className="flex items-center gap-1"><Wand2 className="w-3 h-3 text-neon" /> Free AI edits after purchase</span>
+        </div>
+        <CardActions l={l} ownedTemplateId={ownedTemplateId} isOwner={isOwner} buying={buying}
+          onBuy={onBuy} onDelist={onDelist} onOverride={onOverride} accent="amber" />
+      </div>
+    </div>
+  );
+}
+
+function ListingCard({ l, ownedTemplateId, isOwner, buying, onBuy, onDelist, onOverride }) {
   return (
     <div data-testid={`market-card-${l.market_id}`} className="border border-white/10 hover:border-white/25 bg-surface1 transition-colors duration-300 flex flex-col">
       <div className="relative">
@@ -143,35 +255,52 @@ function ListingCard({ l, ownedTemplateId, isOwner, buying, onBuy, onDelist }) {
           <span data-testid={`sold-${l.market_id}`}>{l.purchases || 0} sold</span>
           <span className="flex items-center gap-1 text-white/40"><Wand2 className="w-3 h-3 text-neon" /> Free AI edits after purchase</span>
         </div>
-        <div className="flex items-center gap-2 mt-auto pt-4">
-          <a data-testid={`preview-${l.market_id}`} href={previewUrl} target="_blank" rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2 text-sm border border-white/15 hover:border-white/40 px-3 py-2.5 transition-colors duration-300">
-            <ExternalLink className="w-4 h-4" /> Preview
-          </a>
-          {ownedTemplateId ? (
-            <Link data-testid={`owned-open-${l.market_id}`} to={`/templates/${ownedTemplateId}`}
-              className="flex-1 flex items-center justify-center gap-2 text-sm bg-surface2 border border-emerald-400/30 text-emerald-300 px-3 py-2.5 transition-colors duration-300">
-              <Check className="w-4 h-4" /> Owned — Open
-            </Link>
-          ) : (
-            <button data-testid={`buy-${l.market_id}`} onClick={() => onBuy(l)} disabled={buying === l.market_id}
-              className="flex-1 flex items-center justify-center gap-2 text-sm bg-brand hover:bg-brand-hover px-3 py-2.5 transition-colors duration-300 disabled:opacity-50">
-              {buying === l.market_id ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShoppingCart className="w-4 h-4" />} Buy — ${l.price_usd}
-            </button>
-          )}
-          {isOwner && (
-            <button data-testid={`delist-${l.market_id}`} onClick={() => onDelist(l)} title="Remove from Market"
-              className="p-2.5 border border-white/15 hover:border-neon hover:text-neon transition-colors duration-300">
-              <Trash2 className="w-4 h-4" />
-            </button>
-          )}
-        </div>
+        <CardActions l={l} ownedTemplateId={ownedTemplateId} isOwner={isOwner} buying={buying}
+          onBuy={onBuy} onDelist={onDelist} onOverride={onOverride} accent="brand" />
       </div>
     </div>
   );
 }
 
-function MarketThumb({ marketId }) {
+function CardActions({ l, ownedTemplateId, isOwner, buying, onBuy, onDelist, onOverride, accent }) {
+  const previewUrl = `${API}/market/${l.market_id}/preview?count=1`;
+  const buyClass = accent === "amber"
+    ? "bg-amber-400 hover:bg-amber-300 text-black"
+    : "bg-brand hover:bg-brand-hover text-white";
+  return (
+    <div className="flex items-center gap-2 mt-auto pt-4">
+      <a data-testid={`preview-${l.market_id}`} href={previewUrl} target="_blank" rel="noopener noreferrer"
+        className="flex items-center justify-center gap-2 text-sm border border-white/15 hover:border-white/40 px-3 py-2.5 transition-colors duration-300">
+        <ExternalLink className="w-4 h-4" /> Preview
+      </a>
+      {ownedTemplateId ? (
+        <Link data-testid={`owned-open-${l.market_id}`} to={`/templates/${ownedTemplateId}`}
+          className="flex-1 flex items-center justify-center gap-2 text-sm bg-surface2 border border-emerald-400/30 text-emerald-300 px-3 py-2.5 transition-colors duration-300">
+          <Check className="w-4 h-4" /> Owned — Open
+        </Link>
+      ) : (
+        <button data-testid={`buy-${l.market_id}`} onClick={() => onBuy(l)} disabled={buying === l.market_id}
+          className={`flex-1 flex items-center justify-center gap-2 text-sm px-3 py-2.5 transition-colors duration-300 disabled:opacity-50 ${buyClass}`}>
+          {buying === l.market_id ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShoppingCart className="w-4 h-4" />} Buy — ${l.price_usd}
+        </button>
+      )}
+      {isOwner && (
+        <>
+          <button data-testid={`override-${l.market_id}`} onClick={() => onOverride(l)} title="Owner: override price"
+            className="p-2.5 border border-white/15 hover:border-amber-300 hover:text-amber-300 transition-colors duration-300">
+            <Pencil className="w-4 h-4" />
+          </button>
+          <button data-testid={`delist-${l.market_id}`} onClick={() => onDelist(l)} title="Remove from Market"
+            className="p-2.5 border border-white/15 hover:border-neon hover:text-neon transition-colors duration-300">
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+function MarketThumb({ marketId, tall }) {
   const [visible, setVisible] = useState(false);
   const ref = useRef(null);
   useEffect(() => {
@@ -184,11 +313,12 @@ function MarketThumb({ marketId }) {
     return () => io.disconnect();
   }, []);
   return (
-    <div ref={ref} data-testid={`market-thumb-${marketId}`} className="h-52 overflow-hidden relative bg-white border-b border-white/10">
+    <div ref={ref} data-testid={`market-thumb-${marketId}`}
+      className={`${tall ? "h-64" : "h-52"} overflow-hidden relative bg-white border-b border-white/10`}>
       {visible && (
         <iframe title="preview" sandbox="allow-scripts" src={`${API}/market/${marketId}/preview`} scrolling="no"
           className="pointer-events-none border-0"
-          style={{ width: "300%", height: "624px", transform: "scale(0.3333)", transformOrigin: "top left" }} />
+          style={{ width: "300%", height: tall ? "768px" : "624px", transform: "scale(0.3333)", transformOrigin: "top left" }} />
       )}
     </div>
   );

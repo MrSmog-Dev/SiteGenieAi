@@ -29,7 +29,8 @@ class GenerateInput(BaseModel):
     key_services: Optional[str] = ""
     brand_keywords: Optional[str] = ""
     pages: Optional[str] = ""
-    quality: Optional[str] = "quality"   # "quality" (2-pass) | "economy" (fast single-pass)
+    quality: Optional[str] = "quality"   # "economy" | "quality" | "premium"
+    model: Optional[str] = None          # override build model (e.g. claude-sonnet-4-6, claude-haiku-4-5)
 
 
 class CheckoutInput(BaseModel):
@@ -57,6 +58,10 @@ class MarketListInput(BaseModel):
 
 class MarketCheckoutInput(BaseModel):
     origin_url: str
+
+
+class MarketPriceInput(BaseModel):
+    price_usd: float
 
 
 class AgentChatInput(BaseModel):

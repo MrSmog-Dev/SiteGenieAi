@@ -135,13 +135,49 @@ async def _call_llm(prompt: str, system_message: str, model: str, timeout: int =
     return result if isinstance(result, str) else str(result)
 
 
-async def _call_build_llm(prompt: str) -> str:
+async def _call_build_llm(prompt: str, model: str = None) -> str:
     """Quality build with auto-fallback: if the heavy model times out, retry once on the fast model."""
+    primary = model or BUILD_MODEL
     try:
-        return await _call_llm(prompt, GEN_BUILD_SYSTEM, BUILD_MODEL)
+        return await _call_llm(prompt, GEN_BUILD_SYSTEM, primary)
     except asyncio.TimeoutError:
-        logger.warning("build model timed out after %ss; falling back to economy model", LLM_CALL_TIMEOUT_S)
+        logger.warning("build model %s timed out after %ss; falling back to economy model", primary, LLM_CALL_TIMEOUT_S)
         return await _call_llm(prompt, GEN_BUILD_SYSTEM, STRATEGY_MODEL)
+
+
+PREMIUM_POLISH_SYSTEM = (
+    "You are a senior front-end engineer polishing a premium marketing website. You will receive a "
+    "complete HTML5 document. Return the FULL updated HTML (starting with <!DOCTYPE html>, no commentary, "
+    "no code fences) with these upgrades — do NOT regress anything:\n"
+    "• Add subtle scroll-triggered entrance animations (IntersectionObserver-based) and gentle hover "
+    "micro-interactions.\n"
+    "• Add a functional lightbox gallery OR an image slider (3-6 items) in an appropriate section.\n"
+    "• Add a stats/counter row (3-4 numbers animating up when in view).\n"
+    "• Add an FAQ accordion (if not already present) with 5 high-intent Q&As.\n"
+    "• Improve the contact form: multi-step or richer fields (name, email, phone, service, message) with "
+    "client-side validation.\n"
+    "• Refine typography scale, spacing rhythm, section transitions and add a subtle scroll-progress bar.\n"
+    "Keep all existing copy and structure; only enhance."
+)
+
+
+async def _premium_polish(html: str) -> str:
+    """Extra depth pass for Premium tier. Falls back gracefully if the model times out."""
+    prompt = (
+        "Apply the premium polish upgrades to the following HTML. Return the full updated document.\n\n"
+        f"CURRENT HTML:\n{html}"
+    )
+    try:
+        polished = await _call_llm(prompt, PREMIUM_POLISH_SYSTEM, BUILD_MODEL)
+    except asyncio.TimeoutError:
+        logger.warning("premium polish pass timed out; keeping quality build")
+        return html
+    cleaned = clean_html(polished)
+    # Guard against a truncated response — only accept if it grew or stayed roughly the same size.
+    if len(cleaned) < len(html) * 0.85 or not cleaned.lower().startswith("<!doctype"):
+        logger.warning("premium polish returned short/invalid output; keeping quality build")
+        return html
+    return cleaned
 
 
 async def _fail_job(job_id: str, e: Exception):
@@ -159,6 +195,7 @@ async def _fail_job(job_id: str, e: Exception):
 
 async def _run_generation(job_id: str, user_id: str, fields: dict, mode: str = "new", template_id: str = None, free: bool = False):
     cost_inputs = []
+    build_model = (fields.get("model") or "").strip() or None
     try:
         if mode == "edit":
             existing = await db.templates.find_one({"template_id": template_id, "user_id": user_id}, {"_id": 0})
@@ -169,7 +206,7 @@ async def _run_generation(job_id: str, user_id: str, fields: dict, mode: str = "
                 f"REQUESTED CHANGES:\n{fields.get('instructions','')}\n\n"
                 f"CURRENT HTML:\n{existing.get('html','')}"
             )
-            html = clean_html(await _call_build_llm(prompt))
+            html = clean_html(await _call_build_llm(prompt, build_model))
             cost_inputs = [prompt, html]
         else:
             quality = (fields.get("quality") or "quality").lower()
@@ -184,8 +221,14 @@ async def _run_generation(job_id: str, user_id: str, fields: dict, mode: str = "
                 brief = await _call_llm(brief_prompt, GEN_STRATEGY_SYSTEM, STRATEGY_MODEL)
                 # Step 2 — builder crafts the site from the brief
                 site_prompt = _build_site_prompt(fields, brief)
-                html = clean_html(await _call_build_llm(site_prompt))
+                html = clean_html(await _call_build_llm(site_prompt, build_model))
                 cost_inputs = [brief_prompt, brief, site_prompt, html]
+                # Step 3 (Premium only) — polish pass for depth, animations, gallery, counters
+                if quality == "premium":
+                    polished = await _premium_polish(html)
+                    if polished != html:
+                        cost_inputs.append(polished)
+                        html = polished
     except Exception as e:
         await _fail_job(job_id, e)
         return
@@ -202,6 +245,7 @@ async def _run_generation(job_id: str, user_id: str, fields: dict, mode: str = "
             "target_audience": fields.get("target_audience"), "key_services": fields.get("key_services"),
             "brand_keywords": fields.get("brand_keywords"), "pages": fields.get("pages"),
             "quality": fields.get("quality", "quality"),
+            "model": build_model,
             "html": html, "created_at": datetime.now(timezone.utc),
         })
     else:

@@ -6,7 +6,7 @@ from fastapi.responses import HTMLResponse
 from emergentintegrations.payments.stripe.checkout import CheckoutSessionRequest, CheckoutStatusResponse
 
 from database import db
-from models import MarketListInput, MarketCheckoutInput
+from models import MarketListInput, MarketCheckoutInput, MarketPriceInput
 from security import get_current_user, is_owner
 from services.billing import get_stripe, apply_payment
 from services.market import create_listing
@@ -136,3 +136,23 @@ async def delist_market(market_id: str, user: dict = Depends(get_current_user)):
     if res.matched_count == 0:
         raise HTTPException(status_code=404, detail="Listing not found")
     return {"active": False}
+
+
+@router.put("/market/{market_id}/price")
+async def override_market_price(market_id: str, input: MarketPriceInput,
+                                user: dict = Depends(get_current_user)):
+    """Owner override — bypass the AI pricing agent and set a manual USD price."""
+    if not is_owner(user):
+        raise HTTPException(status_code=403, detail="Only the store owner can override Market prices.")
+    price = round(float(input.price_usd), 2)
+    if price <= 0 or price > 100000:
+        raise HTTPException(status_code=400, detail="Price must be between $1 and $100,000.")
+    res = await db.market_listings.update_one(
+        {"market_id": market_id, "active": True},
+        {"$set": {"price_usd": price, "priced_by": "owner_override",
+                  "price_updated_at": datetime.now(timezone.utc)}},
+    )
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    listing = await db.market_listings.find_one({"market_id": market_id}, _LIST_PROJECTION)
+    return _serialize(listing)

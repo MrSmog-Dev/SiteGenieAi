@@ -33,7 +33,8 @@ async def regenerate_template(template_id: str, user: dict = Depends(get_current
         raise HTTPException(status_code=404, detail="Template not found")
     fields = {k: tpl.get(k) for k in ("business_name", "industry", "description", "style",
                                       "primary_color", "contact_email", "phone",
-                                      "target_audience", "key_services", "brand_keywords", "pages", "quality")}
+                                      "target_audience", "key_services", "brand_keywords", "pages",
+                                      "quality", "model")}
     return await _start_job(user, fields, mode="regenerate", template_id=template_id,
                             free=bool(tpl.get("purchased")))
 
