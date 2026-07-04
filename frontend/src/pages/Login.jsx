@@ -36,9 +36,8 @@ export default function Login() {
     <div className="min-h-screen bg-base text-white grid lg:grid-cols-2">
       <div className="flex items-center justify-center p-6">
         <div className="w-full max-w-sm">
-          <Link to="/" className="flex items-center gap-2 mb-10">
-            <img src="/sitegenie_logo_mark.png" alt="SiteGenie" className="w-9 h-9 object-contain" />
-            <span className="font-display font-bold text-lg">SiteGenie</span>
+          <Link to="/" className="inline-block mb-8">
+            <img src="/sitegenie_logo_full.png" alt="SiteGenie — Your Website Wish, Granted" className="h-32 object-contain" data-testid="login-logo-lockup" />
           </Link>
           <h1 className="font-display text-3xl font-bold">Welcome back</h1>
           <p className="text-white/50 mt-2 text-sm">Log in to generate and manage your websites.</p>

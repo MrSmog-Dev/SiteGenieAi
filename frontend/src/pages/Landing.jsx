@@ -212,12 +212,11 @@ export default function Landing() {
 
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}
           className="relative w-full max-w-3xl flex flex-col items-center text-center">
-          <div className="flex items-center gap-2.5 mb-6" data-testid="hero-agent-badge">
-            <div className="relative w-9 h-9 flex items-center justify-center">
-              <img src="/sitegenie_logo_mark.png" alt="SiteGenie AI" className="w-9 h-9 object-contain" />
-              <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-base" />
-            </div>
-            <span className="font-mono text-sm text-white/60">SiteGenie AI · online</span>
+          <div className="flex flex-col items-center gap-3 mb-6" data-testid="hero-agent-badge">
+            <img src="/sitegenie_logo_full.png" alt="SiteGenie — Your Website Wish, Granted" className="h-40 md:h-48 object-contain" data-testid="hero-logo-lockup" />
+            <span className="font-mono text-sm text-white/60 flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" /> SiteGenie AI · online
+            </span>
           </div>
 
           {!chatActive && (
