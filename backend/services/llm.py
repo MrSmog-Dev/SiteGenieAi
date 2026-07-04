@@ -180,6 +180,101 @@ async def _premium_polish(html: str) -> str:
     return cleaned
 
 
+# ---------------- Premium upgrade (existing sites) — addendum injection ----------------
+# Full-HTML rewrites of large existing sites reliably time out; instead the model returns
+# small STYLE/SECTIONS/SCRIPT addendum blocks that we inject into the existing document.
+
+UPGRADE_ENHANCE_SYSTEM = (
+    "You are a principal front-end engineer adding premium upgrades to an existing single-file website. "
+    "You receive its design context. You respond with ONLY three blocks in this EXACT format and nothing "
+    "else:\n"
+    "===STYLE===\n<style>/* all new CSS, matching the site's existing design tokens */</style>\n"
+    "===SECTIONS===\n<!-- all NEW full <section> elements, matching the site's class conventions -->\n"
+    "===SCRIPT===\n<script>/* all vanilla JS, defensive with null checks so it never throws */</script>"
+)
+
+UPGRADE_ENHANCE_PROMPT = (
+    "You are upgrading an existing single-file website to Premium tier. Below is its design context "
+    "(palette, fonts, class conventions, existing sections). Everything you produce must match that "
+    "design system exactly and be self-contained (no external assets). JS must be defensive (null "
+    "checks, no errors if an element is missing)."
+)
+
+UPGRADE_TASKS = [
+    ("behaviors",
+     "Produce: scroll-reveal entrance animations for ALL existing <section> elements via "
+     "IntersectionObserver (CSS classes + JS), a thin scroll-progress bar fixed at the top, animated "
+     "number counters for elements containing digits in stats, a floating back-to-top button "
+     "(JS-created), smooth-scroll for anchor links and gentle hover micro-interactions. At least 2 new "
+     "@keyframes. SECTIONS block may be empty for this task."),
+    ("sections",
+     "Produce THREE new sections: (1) an interactive gallery ('Our Work' style, 6 items using CSS-styled "
+     "placeholder tiles with gradients/icons, NO external images) with a working lightbox (open/close, "
+     "prev/next, ESC), (2) an FAQ accordion with 5 high-intent Q&As and smooth height animation, and "
+     "(3) a richer contact/booking section with a validated multi-field form (name, email, phone, "
+     "service, message) and an animated success state. Include 2 new @keyframes."),
+]
+
+
+def _extract_block(block: str, raw: str, next_marker: str = None) -> str:
+    if f"==={block}===" not in raw:
+        return ""
+    part = raw.split(f"==={block}===", 1)[1]
+    if next_marker and f"==={next_marker}===" in part:
+        part = part.split(f"==={next_marker}===", 1)[0]
+    return part.strip()
+
+
+def _inject_addendum(html: str, raw: str) -> str:
+    style = _extract_block("STYLE", raw, "SECTIONS")
+    sections = _extract_block("SECTIONS", raw, "SCRIPT")
+    script = _extract_block("SCRIPT", raw)
+    if not (style or sections or script):
+        return html
+    if style and "</head>" in html:
+        html = html.replace("</head>", f"\n{style}\n</head>", 1)
+    if sections:
+        anchor = "<footer" if "<footer" in html else "</body>"
+        html = html.replace(anchor, f"\n{sections}\n{anchor}", 1)
+    if script and "</body>" in html:
+        html = html.replace("</body>", f"\n{script}\n</body>", 1)
+    return html
+
+
+def _upgrade_design_context(html: str) -> str:
+    style = ""
+    m = re.search(r"<style[\s\S]*?</style>", html, re.I)
+    if m:
+        style = m.group(0)[:14000]
+    sections = re.findall(r"<section[^>]*>", html)
+    title = re.search(r"<title[^>]*>([^<]*)", html, re.I)
+    return (f"SITE TITLE: {title.group(1) if title else ''}\n"
+            f"EXISTING SECTION TAGS: {sections}\n"
+            f"EXISTING CSS (design tokens, fonts, palette, class conventions):\n{style}")
+
+
+async def _premium_upgrade(html: str):
+    """Upgrade an existing site to Premium via addendum injection. Returns (html, llm_outputs)."""
+    ctx = _upgrade_design_context(html)
+    outputs = []
+    for task_name, task in UPGRADE_TASKS:
+        prompt = f"{UPGRADE_ENHANCE_PROMPT}\nTASK ({task_name}): {task}\n\n{ctx}"
+        try:
+            raw = await _call_llm(prompt, UPGRADE_ENHANCE_SYSTEM, BUILD_MODEL, timeout=300)
+        except asyncio.TimeoutError:
+            logger.warning("premium upgrade task %s timed out on %s; retrying on fast model", task_name, BUILD_MODEL)
+            try:
+                raw = await _call_llm(prompt, UPGRADE_ENHANCE_SYSTEM, STRATEGY_MODEL, timeout=240)
+            except asyncio.TimeoutError:
+                logger.warning("premium upgrade task %s timed out twice; skipped", task_name)
+                continue
+        new_html = _inject_addendum(html, str(raw))
+        if new_html != html:
+            outputs.append(str(raw))
+            html = new_html
+    return html, outputs
+
+
 async def _fail_job(job_id: str, e: Exception):
     logger.exception("generation failed")
     if isinstance(e, asyncio.TimeoutError):
@@ -197,7 +292,17 @@ async def _run_generation(job_id: str, user_id: str, fields: dict, mode: str = "
     cost_inputs = []
     build_model = (fields.get("model") or "").strip() or None
     try:
-        if mode == "edit":
+        if mode == "upgrade":
+            existing = await db.templates.find_one({"template_id": template_id, "user_id": user_id}, {"_id": 0})
+            html, outputs = await _premium_upgrade(existing.get("html", ""))
+            if not outputs:
+                await db.gen_jobs.update_one(
+                    {"job_id": job_id},
+                    {"$set": {"status": "error",
+                              "error": "The premium upgrade didn't complete this time — please try again."}})
+                return
+            cost_inputs = outputs
+        elif mode == "edit":
             existing = await db.templates.find_one({"template_id": template_id, "user_id": user_id}, {"_id": 0})
             prompt = (
                 "Here is an existing complete HTML website document. Apply the requested changes with the care "
@@ -249,9 +354,12 @@ async def _run_generation(job_id: str, user_id: str, fields: dict, mode: str = "
             "html": html, "created_at": datetime.now(timezone.utc),
         })
     else:
+        update = {"html": html, "updated_at": datetime.now(timezone.utc)}
+        if mode == "upgrade":
+            update["quality"] = "premium"
         await db.templates.update_one(
             {"template_id": template_id, "user_id": user_id},
-            {"$set": {"html": html, "updated_at": datetime.now(timezone.utc)}},
+            {"$set": update},
         )
     user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
     charged = 0 if free or user_is_unlimited(user) else cost

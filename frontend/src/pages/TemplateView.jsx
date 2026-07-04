@@ -4,7 +4,7 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { api, formatApiError, pollGenerationJob } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
-import { ArrowLeft, Download, Copy, Monitor, Smartphone, Code, RefreshCw, Wand2, Loader2, X, Globe, Share2, Check, ExternalLink, ChevronDown, FileArchive, FileCode, BarChart2, ShieldCheck, Clock, Store } from "lucide-react";
+import { ArrowLeft, Download, Copy, Monitor, Smartphone, Code, RefreshCw, Wand2, Loader2, X, Globe, Share2, Check, ExternalLink, ChevronDown, FileArchive, FileCode, BarChart2, ShieldCheck, Clock, Store, Gem } from "lucide-react";
 
 export default function TemplateView() {
   const { id } = useParams();
@@ -72,7 +72,7 @@ export default function TemplateView() {
   };
 
   const runJob = async (promise, label) => {
-    if (!tpl?.purchased && (user?.credits ?? 0) < 1 && !user?.unlimited) { toast.error("You're out of credits. Purchase a credit pack to continue."); navigate("/pricing"); return; }
+    if (!tpl?.purchased && (user?.credits ?? 0) < 1 && !user?.unlimited) { toast.error("You're out of credits. Purchase a credit pack to continue."); navigate("/pricing"); return false; }
     setBusy(true); setBusyLabel(label);
     try {
       const { data } = await promise;
@@ -80,14 +80,21 @@ export default function TemplateView() {
       setTpl((t) => ({ ...t, html: job.template.html }));
       await refreshUser();
       toast.success(job.unlimited || !job.cost ? `${label} complete!` : `${label} complete! ${job.cost} credits used.`);
+      return true;
     } catch (e) {
       const status = e.response?.status;
       if (status === 402) { toast.error("Not enough credits."); navigate("/pricing"); }
       else toast.error(e.message || "Failed. Please try again.");
+      return false;
     } finally { setBusy(false); setBusyLabel(""); }
   };
 
   const regenerate = () => runJob(api.post(`/templates/${id}/regenerate`), "Regenerate");
+  const upgradeToPremium = async () => {
+    if (!window.confirm("Upgrade this site to Premium tier? AI adds scroll animations, a gallery/slider, animated stats, an FAQ accordion and a richer contact form." + (tpl.purchased || user?.unlimited ? "" : " Credits are spent based on the work done."))) return;
+    const ok = await runJob(api.post(`/templates/${id}/upgrade`), "Premium upgrade");
+    if (ok) setTpl((t) => ({ ...t, quality: "premium" }));
+  };
   const submitEdit = async () => {
     if (!instructions.trim()) { toast.error("Describe what to change."); return; }
     setEditOpen(false);
@@ -219,6 +226,16 @@ export default function TemplateView() {
                 {listingBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Store className="w-4 h-4" />} Sell on Market
               </button>
             ))}
+            {tpl.quality === "premium" ? (
+              <span data-testid="premium-badge" className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider bg-amber-400/15 text-amber-300 border border-amber-400/40 px-2.5 py-2">
+                <Gem className="w-3.5 h-3.5" /> Premium
+              </span>
+            ) : (
+              <button data-testid="upgrade-premium-btn" onClick={upgradeToPremium} disabled={busy}
+                className="flex items-center gap-2 text-sm border border-amber-400/50 text-amber-300 hover:border-amber-300 px-3 py-2 transition-colors duration-300 disabled:opacity-50">
+                <Gem className="w-4 h-4" /> Upgrade to Premium
+              </button>
+            )}
             <button data-testid="regenerate-btn" onClick={regenerate} disabled={busy}
               className="flex items-center gap-2 text-sm border border-white/15 hover:border-brand hover:text-brand px-3 py-2 transition-colors duration-300 disabled:opacity-50">
               <RefreshCw className={`w-4 h-4 ${busy && busyLabel === "Regenerate" ? "animate-spin" : ""}`} /> Regenerate
@@ -269,7 +286,7 @@ export default function TemplateView() {
           {busy && (
             <div className="absolute inset-0 z-10 bg-base/80 backdrop-blur-sm flex flex-col items-center justify-center gap-3" data-testid="tpl-busy-overlay">
               <Loader2 className="w-10 h-10 text-brand animate-spin" />
-              <div className="font-mono text-sm text-white/70">{busyLabel === "Edit" ? "Applying your changes…" : "Regenerating your site…"}</div>
+              <div className="font-mono text-sm text-white/70">{busyLabel === "Edit" ? "Applying your changes…" : busyLabel === "Premium upgrade" ? "Upgrading to Premium — animations, gallery, FAQ, richer forms…" : "Regenerating your site…"}</div>
             </div>
           )}
           {showCode ? (

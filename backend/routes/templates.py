@@ -48,6 +48,17 @@ async def edit_template(template_id: str, input: EditInput, user: dict = Depends
                             free=bool(tpl.get("purchased")))
 
 
+@router.post("/templates/{template_id}/upgrade")
+async def upgrade_template(template_id: str, user: dict = Depends(get_current_user)):
+    tpl = await db.templates.find_one({"template_id": template_id, "user_id": user["user_id"]}, {"_id": 0})
+    if not tpl:
+        raise HTTPException(status_code=404, detail="Template not found")
+    if (tpl.get("quality") or "quality") == "premium":
+        raise HTTPException(status_code=409, detail="This site is already Premium tier.")
+    return await _start_job(user, {}, mode="upgrade", template_id=template_id,
+                            free=bool(tpl.get("purchased")))
+
+
 @router.get("/templates/job/{job_id}")
 async def generation_status(job_id: str, user: dict = Depends(get_current_user)):
     job = await db.gen_jobs.find_one({"job_id": job_id, "user_id": user["user_id"]}, {"_id": 0})

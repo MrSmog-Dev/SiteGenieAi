@@ -84,12 +84,19 @@ EXTRACT_SYSTEM = (
     "Agent ids: titan, nova, atlas, ledger, quill, ivy, blaze, mara, rex, halo, forge, zephyr.\n"
     "Reply ONLY JSON:\n"
     '{"decision": "<one-line final decision>", "action_items": [{"owner": "<agent id>", '
-    '"task": "<what to do>", "executable": "forge_build" | "ivy_blog" | null, '
-    '"brief": "<forge_build: the niche/theme to build; ivy_blog: article topic; else null>", '
+    '"task": "<what to do>", "executable": "forge_build" | "ivy_blog" | "rex_hunt" | null, '
+    '"brief": "<forge_build: the niche/theme to build; ivy_blog: article topic; '
+    'rex_hunt: \'<City, ST> | <business category>\'; else null>", '
     '"count": <int, how many templates to build, default 1, max 5>}]}\n'
     '"executable" rules: use "forge_build" ONLY when the item is to actually build website template(s) for '
     'the Template Market. Use "ivy_blog" ONLY when the item is to write and publish a blog article. '
-    "Everything else (copy, strategy, analysis, emails, pitches) is null — advisory assignments."
+    'Use "rex_hunt" ONLY when the item is to actually hunt/scrape for local business leads in a real '
+    "location. Everything else (copy, strategy, analysis, emails, pitches) is null — advisory assignments."
+)
+
+REX_PARSE_SYSTEM = (
+    "Extract a location and business category from the task text. "
+    'Reply ONLY JSON: {"location": "<City, ST>", "category": "<business category>"}'
 )
 
 NICHE_EXPAND_SYSTEM = (
@@ -185,12 +192,14 @@ async def _create_tasks(owner_id: str, meeting_id: str, items: list) -> list:
     for it in items:
         owner_agent = it.get("owner") if it.get("owner") in AGENT_MAP else "titan"
         ex = it.get("executable")
-        if ex not in ("forge_build", "ivy_blog"):
+        if ex not in ("forge_build", "ivy_blog", "rex_hunt"):
             ex = None
         if ex == "forge_build":
             owner_agent = "forge"
         if ex == "ivy_blog":
             owner_agent = "ivy"
+        if ex == "rex_hunt":
+            owner_agent = "rex"
         try:
             count = min(max(int(it.get("count") or 1), 1), 5) if ex == "forge_build" else 1
         except (TypeError, ValueError):
@@ -223,7 +232,8 @@ async def _create_tasks(owner_id: str, meeting_id: str, items: list) -> list:
 async def process_team_tasks(owner_id: str):
     while True:
         task = await db.team_tasks.find_one_and_update(
-            {"user_id": owner_id, "status": "queued", "executable": {"$in": ["forge_build", "ivy_blog"]}},
+            {"user_id": owner_id, "status": "queued",
+             "executable": {"$in": ["forge_build", "ivy_blog", "rex_hunt"]}},
             {"$set": {"status": "running", "updated_at": _now()}},
             sort=[("created_at", 1)])
         if not task:
@@ -231,6 +241,8 @@ async def process_team_tasks(owner_id: str):
         try:
             if task["executable"] == "forge_build":
                 await _exec_forge(owner_id, task)
+            elif task["executable"] == "rex_hunt":
+                await _exec_rex(owner_id, task)
             else:
                 await _exec_ivy(owner_id, task)
         except Exception as e:
@@ -280,3 +292,48 @@ async def _exec_ivy(owner_id: str, task: dict):
         {"task_id": task["task_id"]}, {"$set": {"status": "done", "updated_at": _now()}})
     await post_war_room(owner_id, "ivy",
                         f"✅ Task done — article written and published on the blog. (Task: {task['task']})")
+
+
+async def rex_hunt_and_report(owner_id: str, location: str, category: str,
+                              intro: str = "Hunt report") -> dict:
+    from services.leads import hunt_places
+    res = await hunt_places(location, category)
+    new_leads = []
+    if res["new_leads"]:
+        new_leads = await db.leads.find(
+            {"location": location, "category": category},
+            {"_id": 0, "business_name": 1, "reviews_count": 1, "rating": 1, "tier": 1}
+        ).sort("created_at", -1).to_list(res["new_leads"])
+    if new_leads:
+        lines = "\n".join(f"• {l['business_name']} — {l['reviews_count']} reviews, {l['rating']}★ "
+                          f"({(l.get('tier') or 'warm').upper()})" for l in new_leads)
+        msg = (f"🎯 {intro} — {category} in {location}: scanned {res['found']} businesses, bagged "
+               f"{res['new_leads']} new no-website lead(s):\n{lines}\n"
+               "They're on the Lead Board. Mark one Contacted and Forge auto-builds their demo site — "
+               "nothing closes like a finished product.")
+    else:
+        msg = (f"🎯 {intro} — {category} in {location}: scanned {res['found']} businesses, no new qualified "
+               f"no-website leads this time ({res['skipped_existing']} already on the board). "
+               "I'll pick a fresh spot next hunt.")
+    await post_agent_message(owner_id, "rex", msg)
+    return res
+
+
+async def _exec_rex(owner_id: str, task: dict):
+    from config import GOOGLE_PLACES_API_KEY
+    if not GOOGLE_PLACES_API_KEY:
+        raise RuntimeError("Google Places API key not configured")
+    brief = task.get("brief") or task.get("task") or ""
+    if "|" in brief:
+        location, category = [s.strip() for s in brief.split("|", 1)]
+    else:
+        parsed = _parse_json(await _call_llm(f"Task text: {brief}", REX_PARSE_SYSTEM, STRATEGY_MODEL))
+        location, category = parsed["location"], parsed["category"]
+    res = await rex_hunt_and_report(owner_id, location, category, intro="War Room hunt")
+    await db.team_tasks.update_one(
+        {"task_id": task["task_id"]},
+        {"$set": {"status": "done", "updated_at": _now(),
+                  "result": {"found": res["found"], "new_leads": res["new_leads"]}}})
+    await post_war_room(owner_id, "rex",
+                        f"✅ Task done — hunted {category} in {location}: {res['new_leads']} new lead(s) on "
+                        f"the board from {res['found']} businesses scanned. Full report in my chat.")
