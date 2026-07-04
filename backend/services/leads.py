@@ -166,7 +166,20 @@ async def hunt_places(location: str, category: str) -> dict:
                                        "X-Goog-FieldMask": PLACES_FIELDS})
     if r.status_code != 200:
         logger.error("places api error %s: %s", r.status_code, r.text[:300])
-        raise RuntimeError("Google Places rejected the request — check the API key and that 'Places API (New)' is enabled.")
+        # Bubble up the specific Google reason (IP restriction, API disabled, etc.)
+        try:
+            msg = r.json().get("error", {}).get("message", "").strip()
+        except Exception:
+            msg = ""
+        if r.status_code == 403 and "IP address restriction" in msg:
+            raise RuntimeError(
+                "Google Places rejected the key: it has an IP restriction that blocks our server. "
+                "Remove the IP restriction (or switch to an HTTP-referrer / no-restriction key) in Google Cloud Console → Credentials.")
+        if r.status_code == 403:
+            raise RuntimeError(
+                f"Google Places denied the request (403). {msg or 'Confirm the key is unrestricted and Places API (New) is enabled.'}")
+        raise RuntimeError(
+            f"Google Places rejected the request ({r.status_code}). {msg or 'Check the API key and that Places API (New) is enabled.'}")
     places = r.json().get("places", [])
     now = datetime.now(timezone.utc).isoformat()
     added, skipped, candidates = 0, 0, []

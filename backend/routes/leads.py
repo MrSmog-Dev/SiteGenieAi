@@ -40,7 +40,8 @@ async def hunt(input: LeadHuntInput, user: dict = Depends(get_current_user)):
     try:
         return await hunt_places(location, category)
     except RuntimeError as e:
-        raise HTTPException(status_code=502, detail=str(e))
+        # 424 (not 502) so Cloudflare doesn't hide our error message with its own 5xx page.
+        raise HTTPException(status_code=424, detail=str(e))
 
 
 @router.post("/leads/scan")
