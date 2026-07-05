@@ -1,0 +1,25 @@
+{
+  "summary": "Verified owner-only 'Reset business data' feature end-to-end in PREVIEW. 4/4 backend pytest tests passed and both frontend UI role-gate checks passed. Non-owner POST /api/auth/admin/reset-business-data -> 403. Owner with confirm='reset' -> 400. Owner reset with confirm='RESET', include_leads=false wipes users (only owner remains), payment_transactions, subscriptions, gen_jobs, agent_jobs, agent_chats, war_room, war_room_meetings, team_memos, team_tasks, and templates of removed users; owner templates count, market_listings count, blog_posts count and leads count all unchanged. Owner /api/auth/me still 200 after reset (session survives). Titan chat response contains no '$80' or '6 users'. UI: owner /billing shows [data-testid=danger-zone] + [data-testid=reset-business-btn]; freshly registered non-owner /billing does NOT show either.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": { "ui_bugs": [], "integration_issues": [], "design_issues": [] },
+  "test_report_links": [
+    "/app/backend/tests/test_reset_business.py",
+    "/app/test_reports/pytest/iter17_reset.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "reset_business_data only deletes user_sessions for non-owner users but leaves owner's session tokens intact -> good, owner stays logged in. Fine as implemented.",
+    "leads collection is optionally cleared via include_leads flag; the danger-zone UI uses window.confirm (OK=clear leads) which is correctly wired. No issues.",
+    "rate_events and login_attempts are wiped unconditionally — could theoretically reset brute-force lockout state, but low risk since owner is the only surviving user."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_reset_business.py (new)"
+  ],
+  "success_rate": { "backend": "100% (4/4)", "frontend": "100% (2/2 role-gate checks)" },
+  "test_credentials": "owner: neobeyondlegacy2@gmail.com / SoloLeveling21!; throwaway non-owners registered per-test as reset_nonowner_*, reset_toclear_*, nonowner_ui_*@example.com / TestPass123!",
+  "seed_data_creation": "Registered throwaway users during the run (wiped by the reset itself, which is the feature under test). One extra non-owner registered AFTER reset for the UI-hide check (nonowner_ui_10d1c73c@example.com) is left behind harmlessly.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Reset endpoint is /api/auth/admin/reset-business-data (POST, owner-only). Run: cd /app/backend && python -m pytest tests/test_reset_business.py -v -n 0 --asyncio-mode=auto. NOTE: this suite is destructive — it wipes payment_transactions, subscriptions, gen_jobs, agent_*, war_room*, team_* and all non-owner users. Only run in preview. Titan LLM check finished quickly (~8s total run) but did assert on absence of '$80' / '6 users' — reply visible via test's print(TITAN REPLY).",
+  "rca of the issue": "n/a — verification-only run, feature works as specified."
+}

@@ -5,10 +5,10 @@ import httpx
 from fastapi import APIRouter, Request, Response, HTTPException, Depends
 
 from database import db
-from models import RegisterInput, LoginInput, GoogleSessionInput
+from models import RegisterInput, LoginInput, GoogleSessionInput, ResetBusinessInput
 from security import (
     hash_password, verify_password, create_session, set_session_cookie, public_user,
-    process_subscription, get_current_user, client_ip,
+    process_subscription, get_current_user, client_ip, is_owner,
     login_is_locked, record_failed_login, clear_login_attempts,
 )
 
@@ -99,3 +99,28 @@ async def logout(request: Request, response: Response):
         await db.user_sessions.delete_one({"session_token": token})
     response.delete_cookie("session_token", path="/")
     return {"success": True}
+
+
+@router.post("/auth/admin/reset-business-data")
+async def reset_business_data(input: ResetBusinessInput, user: dict = Depends(get_current_user)):
+    """Owner-only: wipe test users/revenue/jobs/AI-chat history for a true fresh start.
+    Keeps: owner account, owner templates, Market listings, blog posts, automation state."""
+    if not is_owner(user):
+        raise HTTPException(status_code=403, detail="Owner only")
+    if input.confirm != "RESET":
+        raise HTTPException(status_code=400, detail='Type "RESET" to confirm')
+    owner_id = user["user_id"]
+    other_ids = [u["user_id"] async for u in db.users.find(
+        {"user_id": {"$ne": owner_id}}, {"_id": 0, "user_id": 1})]
+    await db.users.delete_many({"user_id": {"$ne": owner_id}})
+    await db.user_sessions.delete_many({"user_id": {"$ne": owner_id}})
+    await db.templates.delete_many({"user_id": {"$in": other_ids}})
+    for col in (db.payment_transactions, db.subscriptions, db.gen_jobs, db.agent_jobs,
+                db.team_tasks, db.team_memos, db.war_room, db.war_room_meetings,
+                db.agent_chats, db.rate_events, db.login_attempts):
+        await col.delete_many({})
+    leads_cleared = False
+    if input.include_leads:
+        await db.leads.delete_many({})
+        leads_cleared = True
+    return {"reset": True, "removed_users": len(other_ids), "leads_cleared": leads_cleared}

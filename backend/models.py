@@ -76,6 +76,11 @@ class WarRoomInput(BaseModel):
     topic: str
 
 
+class ResetBusinessInput(BaseModel):
+    confirm: str
+    include_leads: bool = False
+
+
 class LeadScanInput(BaseModel):
     url: str
 

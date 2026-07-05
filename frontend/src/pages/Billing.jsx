@@ -9,7 +9,7 @@ import { Zap, Calendar, RefreshCw, CreditCard, AlertTriangle, Check, Loader2, Re
 const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) : "—");
 
 export default function Billing() {
-  const { refreshUser } = useAuth();
+  const { user, refreshUser } = useAuth();
   const navigate = useNavigate();
   const [sub, setSub] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -139,6 +139,33 @@ export default function Billing() {
               ))}
             </div>
           )}
+        {user?.role === "owner" && (
+          <div className="mt-10 border border-red-500/30 bg-red-500/5 p-5" data-testid="danger-zone">
+            <div className="flex items-center gap-2 text-red-300 font-semibold text-sm">
+              <AlertTriangle className="w-4 h-4" /> Danger zone — owner only
+            </div>
+            <p className="text-white/50 text-sm mt-2">
+              Reset business data: removes all non-owner users, payment history, subscriptions, AI jobs and
+              agent chat history so Titan &amp; the team report from a true zero. Keeps your account, your
+              templates, Market listings and blog posts.
+            </p>
+            <button data-testid="reset-business-btn"
+              onClick={async () => {
+                const phrase = window.prompt('This wipes all test users, revenue records and AI chat history. Type RESET to confirm:');
+                if (phrase !== "RESET") return;
+                const includeLeads = window.confirm("Also clear Rex's lead board? (OK = yes, Cancel = keep leads)");
+                try {
+                  const { data } = await api.post("/auth/admin/reset-business-data", { confirm: "RESET", include_leads: includeLeads });
+                  toast.success(`Fresh start: ${data.removed_users} test user(s) removed${data.leads_cleared ? ", lead board cleared" : ""}.`);
+                } catch (e) {
+                  toast.error(e.response?.data?.detail || "Reset failed.");
+                }
+              }}
+              className="mt-3 text-sm border border-red-400/50 text-red-300 hover:border-red-300 px-4 py-2 transition-colors duration-300">
+              Reset business data
+            </button>
+          </div>
+        )}
         </div>
       </div>
     </DashboardLayout>
