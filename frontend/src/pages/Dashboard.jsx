@@ -3,15 +3,22 @@ import { Link } from "react-router-dom";
 import DashboardLayout from "@/components/DashboardLayout";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
-import { Sparkles, LayoutTemplate, Zap, CreditCard, ArrowRight, Calendar } from "lucide-react";
+import { Sparkles, LayoutTemplate, Zap, CreditCard, ArrowRight, Calendar, PartyPopper, CheckCircle2, Circle } from "lucide-react";
 
 export default function Dashboard() {
   const { user } = useAuth();
   const [templates, setTemplates] = useState([]);
+  const [milestones, setMilestones] = useState(null);
 
   useEffect(() => {
     api.get("/templates").then(({ data }) => setTemplates(data)).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (user?.role === "owner") {
+      api.get("/milestones").then(({ data }) => setMilestones(data.milestones)).catch(() => {});
+    }
+  }, [user?.role]);
 
   const planLabel = user?.plan_name || "Free";
   const expires = user?.plan_expires_at ? new Date(user.plan_expires_at).toLocaleDateString() : null;
@@ -50,6 +57,32 @@ export default function Dashboard() {
             <div className="font-mono text-4xl font-bold mt-3">{templates.length}</div>
           </div>
         </div>
+
+        {milestones && (
+          <div className="border border-white/10 bg-surface1 p-6 mb-6" data-testid="milestone-tracker">
+            <div className="flex items-center gap-2 mb-4">
+              <PartyPopper className="w-4 h-4 text-amber-300" />
+              <h2 className="font-display font-bold">Launch Day milestones</h2>
+              <span className="text-[10px] font-mono uppercase tracking-wider text-white/40 ml-1">
+                {milestones.filter((m) => m.achieved).length}/{milestones.length} unlocked
+              </span>
+            </div>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-3">
+              {milestones.map((m) => (
+                <div key={m.id} data-testid={`milestone-${m.id}`}
+                  className={`border p-3 ${m.achieved ? "border-emerald-400/40 bg-emerald-400/5" : "border-white/10 opacity-60"}`}>
+                  {m.achieved
+                    ? <CheckCircle2 className="w-4 h-4 text-emerald-300" />
+                    : <Circle className="w-4 h-4 text-white/30" />}
+                  <div className="text-sm font-semibold mt-2 leading-tight">{m.title}</div>
+                  <div className={`text-[11px] mt-1 ${m.achieved ? "text-emerald-300/90" : "text-white/35"}`}>
+                    {m.achieved ? `🎉 ${m.detail}${m.date ? ` · ${m.date}` : ""}` : m.hint}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* CTA row */}
         <div className="grid md:grid-cols-2 gap-4 mb-10">
