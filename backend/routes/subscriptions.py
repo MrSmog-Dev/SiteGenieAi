@@ -84,10 +84,10 @@ async def subscription_checkout(input: SubCheckoutInput, user: dict = Depends(ge
     plan = SUBSCRIPTION_PLANS.get(input.plan_id)
     if not price or not plan:
         raise HTTPException(status_code=400, detail="Invalid plan")
-    customer_id = await _get_or_create_customer(user)
     use_native_stripe()
     origin = validate_origin(input.origin_url)
     try:
+        customer_id = await _get_or_create_customer(user)
         session = stripe_sdk.checkout.Session.create(
             mode="subscription", customer=customer_id,
             line_items=[{"price": price, "quantity": 1}],
@@ -96,6 +96,11 @@ async def subscription_checkout(input: SubCheckoutInput, user: dict = Depends(ge
             metadata={"user_id": user["user_id"], "plan_id": input.plan_id},
             subscription_data={"metadata": {"user_id": user["user_id"], "plan_id": input.plan_id}},
         )
+    except stripe_sdk.error.AuthenticationError:
+        logger.exception("subscription checkout failed: stripe key invalid/expired")
+        raise HTTPException(status_code=503,
+                            detail="Payments are temporarily unavailable — our Stripe connection needs to be "
+                                   "refreshed. Please try again soon.")
     except Exception:
         logger.exception("subscription checkout failed")
         raise HTTPException(status_code=502, detail="Could not start checkout. Please try again.")
