@@ -108,3 +108,5 @@ An online store that creates website templates for businesses without a website.
 
 ## Test Credentials
 See `/app/memory/test_credentials.md` (Owner: neobeyondlegacy2@gmail.com)
+
+- 2026-06-16: **Live Stripe key fix** — Replaced expired `STRIPE_SECRET_KEY` in backend/.env with user's validated live key (ends hJa48rI8); live `STRIPE_WEBHOOK_SECRET` (whsec_n2ow...) confirmed in place. Verified via curl in preview: all 3 subscription plans (monthly/quarterly/annual) create `cs_live_` checkout sessions. User must Redeploy to push to production.
