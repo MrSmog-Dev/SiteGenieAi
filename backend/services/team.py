@@ -34,6 +34,14 @@ async def create_memo(owner_id: str, from_agent: str, to_agents: list, kind: str
     frm = AGENT_MAP.get(from_agent, {}).get("name", "Team")
     for t in to_agents:
         await post_agent_message(owner_id, t, f"📨 Memo from {frm} ({kind}): {content[:1800]}")
+    try:
+        from services.activity import log_activity
+        to_names = ", ".join(AGENT_MAP.get(t, {}).get("name", t) for t in to_agents)
+        await log_activity(owner_id, from_agent, "memo",
+                           f"Sent a {kind} memo to {to_names}.", detail=content[:400],
+                           link=f"/team?agent={to_agents[0]}")
+    except Exception:
+        pass
 
 
 MEMO_DETECT_SYSTEM = (
@@ -176,6 +184,10 @@ async def run_war_room_meeting(meeting_id: str, owner_id: str, topic: str):
                           "; ".join(f"{AGENT_MAP.get(i.get('owner'), {}).get('name', i.get('owner'))}: "
                                     f"{i.get('task')}" for i in items), source="war_room")
         await _set_meeting(meeting_id, status="done", decision=decision)
+        from services.activity import log_activity
+        await log_activity(owner_id, "titan", "meeting",
+                           f"Chaired a War Room on '{topic[:60]}'.",
+                           detail=f"Decision: {decision}", link="/team")
         exec_n = sum(1 for t in created if t.get("executable"))
         if exec_n:
             await post_war_room(owner_id, "titan",
@@ -317,6 +329,10 @@ async def rex_hunt_and_report(owner_id: str, location: str, category: str,
                f"no-website leads this time ({res['skipped_existing']} already on the board). "
                "I'll pick a fresh spot next hunt.")
     await post_agent_message(owner_id, "rex", msg)
+    from services.activity import log_activity
+    await log_activity(owner_id, "rex", "hunt",
+                       f"Hunted {category} in {location} — {res['new_leads']} new lead(s) from "
+                       f"{res['found']} scanned.", detail=msg[:600], link="/team?agent=rex")
     return res
 
 

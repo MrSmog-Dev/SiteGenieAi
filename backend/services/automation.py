@@ -10,6 +10,8 @@ from services.agents import (AGENT_MAP, agent_reply, post_agent_message, run_for
 from services.llm import (_build_brief_prompt, _build_site_prompt, _call_llm, _call_build_llm,
                           clean_html, GEN_STRATEGY_SYSTEM)
 from services.blog import run_ivy_blog
+from services.activity import (log_activity, start_working, stop_working,
+                               maybe_proactive_pulse)
 
 BRIEFING_UTC_HOUR = 11
 BLOG_UTC_HOUR = 9
@@ -99,16 +101,24 @@ async def _tick():
         {"$set": {"last_run": now.isoformat()}})
     if claimed:
         await run_forge_weekly(owner["user_id"])
+    # Subtle proactive pulse — keeps the team visibly on-duty between scheduled jobs.
+    try:
+        await maybe_proactive_pulse(owner["user_id"])
+    except Exception:
+        logger.exception("proactive pulse tick failed")
 
 
 async def run_titan_briefing(owner_id: str):
     date_str = datetime.now(timezone.utc).strftime("%A, %B %d, %Y")
+    await start_working(owner_id, "titan", "compiling your morning briefing")
     prompt = (f"AUTOMATED MORNING BRIEFING for {date_str}. Compile the owner's daily briefing now: "
               "1) a one-line business health verdict, 2) the key numbers, 3) anything that needs the "
               "owner's attention, 4) top 3 priorities today with which teammate should own each. "
               f"Open with 'Morning Briefing — {date_str}'.")
     reply = await agent_reply(AGENT_MAP["titan"], [], prompt)
     await post_agent_message(owner_id, "titan", reply)
+    await log_activity(owner_id, "titan", "briefing", f"Posted the morning briefing for {date_str}.",
+                       detail=reply[:600], link="/team?agent=titan")
     logger.info("automation: titan morning briefing posted")
 
 
@@ -216,6 +226,9 @@ async def rex_demo_watch(owner_id: str):
         await post_agent_message(owner_id, "rex",
                                  f"🔥 {l['business_name']} just viewed their demo site ({views - seen} new "
                                  f"view(s), {views} total). They're interested — strike NOW.{phone}")
+        await log_activity(owner_id, "rex", "alert",
+                           f"{l['business_name']} viewed their demo site — hot signal, strike now.",
+                           detail=f"{views} total views on the demo.", link="/team?agent=rex")
 
 
 async def run_rex_nudge(owner_id: str):
@@ -235,6 +248,9 @@ async def run_rex_nudge(owner_id: str):
                                  f"⏰ Pipeline check — these HOT leads have sat untouched for 5+ days:\n{lines}\n"
                                  "Hot leads go cold fast. Hit the Pitch button on the Lead Board — I've got "
                                  "your opener ready.")
+        await log_activity(owner_id, "rex", "nudge",
+                           f"Pipeline check — {len(stale)} HOT lead(s) untouched 5+ days.",
+                           detail=lines[:600], link="/team?agent=rex")
     dead_cutoff = (now - timedelta(days=30)).isoformat()
     res = await db.leads.update_many(
         {"status": "lost", "archived": {"$ne": True}, "updated_at": {"$lt": dead_cutoff}},
@@ -245,6 +261,7 @@ async def run_rex_nudge(owner_id: str):
 
 async def run_mara_digest(owner_id: str):
     date_str = datetime.now(timezone.utc).strftime("%B %d, %Y")
+    await start_working(owner_id, "mara", "drafting the weekly analytics digest")
     prompt = (f"AUTOMATED WEEKLY ANALYTICS DIGEST for the week ending {date_str}. Write the owner's weekly "
               "digest now, in your voice, as a ready-to-send email: a subject line, then a short skimmable "
               "body covering 1) users (total + new this week), 2) revenue by stream, 3) site views + top "
@@ -252,6 +269,8 @@ async def run_mara_digest(owner_id: str):
               f"recommendation for next week. Open with 'Weekly Digest — {date_str}'.")
     reply = await agent_reply(AGENT_MAP["mara"], [], prompt)
     await post_agent_message(owner_id, "mara", reply)
+    await log_activity(owner_id, "mara", "digest", f"Drafted the weekly analytics digest ({date_str}).",
+                       detail=reply[:600], link="/team?agent=mara")
     logger.info("automation: mara weekly digest posted")
 
 
@@ -270,6 +289,7 @@ async def run_forge_weekly(owner_id: str):
                                     "brief": niche, "status": "queued", "auto": True,
                                     "created_at": datetime.now(timezone.utc).isoformat()})
     logger.info("automation: forge weekly build starting for niche '%s'", niche)
+    await start_working(owner_id, "forge", f'building this week\'s template: "{niche}"')
     await run_forge_build(job_id, owner_id, niche)
     job = await db.agent_jobs.find_one({"job_id": job_id}, {"_id": 0})
     if job and job.get("status") == "done":
@@ -277,10 +297,14 @@ async def run_forge_weekly(owner_id: str):
         await post_agent_message(owner_id, "forge",
             f'Weekly drop, done while you were away: I picked the niche "{niche}", built "{r["title"]}" '
             f'and listed it on the Market at ${r["price_usd"]} ({r["tier"]}). Lineup stays fresh.')
+        await log_activity(owner_id, "forge", "build",
+                           f'Built & listed "{r["title"]}" on the Market at ${r["price_usd"]} ({r["tier"]}).',
+                           detail=f'Weekly template drop — niche "{niche}".', link="/market")
     else:
         await post_agent_message(owner_id, "forge",
             f'My automated weekly build for "{niche}" failed: {(job or {}).get("error", "unknown error")}. '
             "I'll try again next week.")
+        await stop_working(owner_id, "forge", last_action=f'Weekly build for "{niche}" failed.')
 
 
 DEMO_SPEC_SYSTEM = (
@@ -336,6 +360,10 @@ async def run_lead_demo(lead_id: str):
             f"Handoff complete — Forge just finished the demo site for {lead['business_name']} and it's "
             f"live (hit 'Demo' on the Lead Board, path /api/p/{slug}). My opener: \"We already built your "
             "new website — want to see it?\" Nothing closes like a finished product.")
+        await log_activity(owner["user_id"], "forge", "demo",
+                           f"Built a live demo site for lead {lead['business_name']}.",
+                           detail="Rex → Forge handoff. Demo is published and ready to pitch.",
+                           link=f"/api/p/{slug}")
     except Exception as e:
         logger.exception("lead demo build failed")
         await db.leads.update_one({"lead_id": lead_id}, {"$set": {"demo_status": "error"}})

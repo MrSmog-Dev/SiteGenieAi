@@ -9,6 +9,7 @@ from models import AgentChatInput, ForgeBuildInput, WarRoomInput
 from security import get_current_user, is_owner
 from services.agents import AGENTS, AGENT_MAP, agent_reply, run_forge_build
 from services.team import detect_and_route_memos, post_war_room, run_war_room_meeting
+from services.activity import get_activity_feed, get_status_board
 
 router = APIRouter()
 
@@ -45,6 +46,22 @@ async def agent_job_status(job_id: str, user: dict = Depends(get_current_user)):
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     return job
+
+
+@router.get("/agents/activity")
+async def agent_activity_feed(limit: int = 40, before: str = None, agent_id: str = None,
+                             user: dict = Depends(get_current_user)):
+    _require_owner(user)
+    limit = max(1, min(int(limit or 40), 100))
+    items = await get_activity_feed(user["user_id"], limit=limit, before=before, agent_id=agent_id)
+    return {"activities": items, "agents": {a["id"]: {"name": a["name"], "color": a["color"],
+                                                       "role": a["role"]} for a in AGENTS}}
+
+
+@router.get("/agents/status")
+async def agent_status_board(user: dict = Depends(get_current_user)):
+    _require_owner(user)
+    return await get_status_board(user["user_id"])
 
 
 @router.post("/agents/forge/build")

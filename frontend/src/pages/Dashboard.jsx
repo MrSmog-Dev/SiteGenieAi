@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import DashboardLayout from "@/components/DashboardLayout";
+import { TeamPulse } from "@/components/TeamPulse";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { Sparkles, LayoutTemplate, Zap, CreditCard, ArrowRight, Calendar, PartyPopper, CheckCircle2, Circle } from "lucide-react";
@@ -81,6 +82,12 @@ export default function Dashboard() {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {user?.role === "owner" && (
+          <div className="mb-6" data-testid="owner-team-pulse">
+            <TeamPulse compact />
           </div>
         )}
 

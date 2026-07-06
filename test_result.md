@@ -101,3 +101,120 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+user_problem_statement: "Test the new Team Pulse feature on the SiteGenie app (a live activity feed making the AI Team feel continuously active)"
+
+frontend:
+  - task: "Dashboard Widget - Team Pulse compact view"
+    implemented: true
+    working: true
+    file: "frontend/src/pages/Dashboard.jsx, frontend/src/components/TeamPulse.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✓ PASSED - Dashboard widget (data-testid='owner-team-pulse') renders correctly with 'Team Pulse — live' heading, 6 seeded activity rows, and 'Open the AI Team →' link. Widget is only visible to owner role."
+  
+  - task: "Team Pulse Tab - Full activity feed view"
+    implemented: true
+    working: true
+    file: "frontend/src/pages/AiTeam.jsx, frontend/src/components/TeamPulse.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✓ PASSED - Team Pulse tab (data-testid='team-pulse') loads by default on /team page. Shows 'Team Pulse' header with status line 'all idle · on standby · 6 updates today'. Pulse-item (data-testid='pulse-item') appears at top of roster. Activity feed (data-testid='activity-feed') displays 6 activity rows correctly."
+  
+  - task: "Filter Chips - Agent filtering functionality"
+    implemented: true
+    working: true
+    file: "frontend/src/components/TeamPulse.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✓ PASSED - Filter chips working correctly. Found 'All activity' chip and 13 agent filter buttons. Tested filtering by 'Titan' agent (narrowed to 1 activity), then reset with 'All activity' (back to 6 activities). Filter state management working as expected."
+  
+  - task: "Deep Link / Click-Through - Activity to agent chat"
+    implemented: true
+    working: true
+    file: "frontend/src/components/TeamPulse.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✓ PASSED - Click-through functionality working. Clicked a non-blog activity (Zephyr Check-in), URL updated with ?agent=zephyr parameter, and agent chat header (data-testid='agent-chat-header') appeared correctly. Deep linking to individual agent chats works as expected."
+  
+  - task: "Agent Chat - No regression on existing functionality"
+    implemented: true
+    working: true
+    file: "frontend/src/pages/AiTeam.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✓ PASSED - Existing agent chat functionality intact. Clicked Titan agent from roster, chat loaded (data-testid='agent-messages' visible), sent message 'hi' via data-testid='agent-chat-input' and data-testid='agent-send-btn', received agent reply successfully. No regression detected."
+  
+  - task: "Working-Now Indicator - Live status display"
+    implemented: true
+    working: true
+    file: "frontend/src/components/TeamPulse.jsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✓ PASSED - Working-now area (data-testid='working-now') implementation correct. Area not visible when all agents idle (expected behavior per code logic). Status line correctly shows 'all idle · on standby'. Component only renders working-now section when agents have status='working'."
+
+backend:
+  - task: "Activity Feed API - GET /api/agents/activity"
+    implemented: true
+    working: true
+    file: "backend/routes/agents.py, backend/services/activity.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✓ PASSED - Activity feed API working correctly. Returns 6 seeded activities with proper structure (activity_id, agent_id, kind, summary, detail, created_at). Frontend successfully fetches and displays activities. No network errors on this endpoint."
+  
+  - task: "Status Board API - GET /api/agents/status"
+    implemented: true
+    working: true
+    file: "backend/routes/agents.py, backend/services/activity.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✓ PASSED - Status board API working correctly. Returns status information including working_now count and today_count. Frontend correctly displays status line and working-now indicators based on API response."
+
+metadata:
+  created_by: "testing_agent"
+  version: "1.0"
+  test_sequence: 1
+  run_ui: true
+
+test_plan:
+  current_focus:
+    - "All Team Pulse features tested and passing"
+  stuck_tasks: []
+  test_all: true
+  test_priority: "high_first"
+
+agent_communication:
+    - agent: "testing"
+      message: "Completed comprehensive testing of Team Pulse feature. All 6 test scenarios PASSED. Dashboard widget, Team Pulse tab, filter chips, deep linking, agent chat regression, and working-now indicator all working correctly. Found 6 seeded activities as expected. Minor non-critical issue: 2x 401 errors on /api/auth/me during initial page load (before auth completes) - does not affect functionality. Screenshots captured for dashboard widget and Team Pulse tab. Feature is ready for production."

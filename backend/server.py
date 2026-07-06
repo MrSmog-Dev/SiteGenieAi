@@ -125,6 +125,8 @@ async def _run_db_init():
         except Exception:
             logger.warning("index creation skipped for %s %s", col.name, keys)
     await db.blog_images.create_index("image_id", unique=True)
+    await db.agent_activity.create_index([("user_id", 1), ("created_at", -1)])
+    await db.agent_status.create_index([("user_id", 1), ("agent_id", 1)], unique=True)
     await db.rate_events.create_index("ts", expireAfterSeconds=GEN_WINDOW_SECONDS + 60)
     await db.login_attempts.create_index("ts", expireAfterSeconds=LOGIN_WINDOW_SECONDS + 60)
     await db.login_attempts.create_index("identifier")

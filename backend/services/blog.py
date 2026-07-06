@@ -79,6 +79,12 @@ async def write_blog_post(owner_id: str | None = None) -> dict:
             f'Today\'s article is live: "{art["title"]}" — read it at /api/blog/{slug}. '
             f'Target keywords: {", ".join(art["keywords"][:3])}. {images_used} images embedded, '
             f"{internal_links} links pointing readers back to SiteGenie. Compounding content, one day at a time.")
+        from services.activity import log_activity
+        await log_activity(owner_id, "ivy", "article",
+                           f'Published a new SEO article: "{art["title"]}".',
+                           detail=f'{images_used} images, {internal_links} internal links. '
+                                  f'Keywords: {", ".join(art["keywords"][:3])}.',
+                           link=f"/api/blog/{slug}")
         await _blaze_social_draft(owner_id, art["title"], slug, art["keywords"])
     logger.info("ivy published blog post '%s'", slug)
     return post
@@ -95,6 +101,11 @@ async def _blaze_social_draft(owner_id: str, title: str, slug: str, keywords: li
             STRATEGY_MODEL)
         await post_agent_message(owner_id, "blaze",
             f"Ivy just dropped a new article — today's distribution kit, ready to post:\n\n{str(raw).strip()}")
+        from services.activity import log_activity
+        await log_activity(owner_id, "blaze", "social",
+                           f'Prepared an X + LinkedIn distribution kit for "{title}".',
+                           detail="Ready-to-post promos for the new blog article.",
+                           link="/team?agent=blaze")
     except Exception:
         logger.exception("blaze social draft failed")
 

@@ -235,6 +235,14 @@ async def run_forge_build(job_id: str, owner_id: str, niche_brief: str):
             "market_id": listing["market_id"], "title": listing["title"],
             "price_usd": listing["price_usd"], "tier": listing["tier"],
             "template_id": tpl["template_id"]})
+        try:
+            from services.activity import log_activity
+            await log_activity(owner_id, "forge", "build",
+                               f'Built & listed "{listing["title"]}" on the Market at ${listing["price_usd"]} '
+                               f'({listing["tier"]}).', detail=f'Niche brief: "{niche_brief[:120]}".',
+                               link="/market")
+        except Exception:
+            pass
     except Exception as e:
         logger.exception("forge build failed")
         detail = f"{type(e).__name__}: {e}"[:300].strip(": ")

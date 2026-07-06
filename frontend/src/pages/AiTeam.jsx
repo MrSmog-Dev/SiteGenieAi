@@ -1,18 +1,20 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import DashboardLayout from "@/components/DashboardLayout";
 import { RexLeadPanel } from "@/components/RexLeadPanel";
 import { WarRoom } from "@/components/WarRoom";
+import { TeamPulse } from "@/components/TeamPulse";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
-import { Send, Loader2, Trash2, Hammer, Sparkles, X, Crosshair, BookOpen, PenLine, Users } from "lucide-react";
+import { Send, Loader2, Trash2, Hammer, Sparkles, X, Crosshair, BookOpen, PenLine, Users, Activity } from "lucide-react";
 
 export default function AiTeam() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [agents, setAgents] = useState([]);
-  const [activeId, setActiveId] = useState("titan");
+  const [activeId, setActiveId] = useState(searchParams.get("agent") || "pulse");
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [thinking, setThinking] = useState(false);
@@ -20,6 +22,7 @@ export default function AiTeam() {
   const [showForge, setShowForge] = useState(false);
   const [showRex, setShowRex] = useState(false);
   const [ivyWriting, setIvyWriting] = useState(false);
+  const [statusBoard, setStatusBoard] = useState(null);
   const scrollRef = useRef(null);
 
   const isOwner = !!user && (user.role === "owner" || user.role === "admin");
@@ -34,8 +37,23 @@ export default function AiTeam() {
     api.get("/agents").then(({ data }) => setAgents(data)).catch(() => {});
   }, [isOwner]);
 
+  // live working-status for the roster dots (polls every 10s)
+  useEffect(() => {
+    if (!isOwner) return;
+    let t;
+    const poll = () => api.get("/agents/status").then(({ data }) => setStatusBoard(data.statuses)).catch(() => {});
+    poll();
+    t = setInterval(poll, 10000);
+    return () => clearInterval(t);
+  }, [isOwner]);
+
+  const selectAgent = useCallback((id) => {
+    setActiveId(id);
+    setSearchParams(id === "pulse" ? {} : { agent: id }, { replace: true });
+  }, [setSearchParams]);
+
   const loadChat = useCallback((silent = false) => {
-    if (!isOwner || !activeId || activeId === "war_room") return;
+    if (!isOwner || !activeId || activeId === "war_room" || activeId === "pulse") return;
     if (!silent) setMessages(null);
     api.get(`/agents/${activeId}/chat`)
       .then(({ data }) => setMessages(data.messages))
@@ -115,7 +133,23 @@ export default function AiTeam() {
             <p className="text-white/40 text-xs mt-1">Your autonomous staff of 12</p>
             <p data-testid="automation-status" className="text-[10px] font-mono text-emerald-300/70 mt-2 uppercase tracking-wider">● Automation on — daily briefing · daily article · weekly template · 3x/wk hunts · Monday digest</p>
           </div>
-          <button data-testid="war-room-item" onClick={() => setActiveId("war_room")}
+          <button data-testid="pulse-item" onClick={() => selectAgent("pulse")}
+            className={`flex items-center gap-3 px-4 py-3 text-left transition-colors duration-300 border-l-2 ${
+              activeId === "pulse" ? "bg-surface2 border-l-emerald-400" : "border-l-transparent hover:bg-surface2/50"}`}>
+            <div className="w-10 h-10 rounded-full shrink-0 flex items-center justify-center bg-emerald-400/15 border border-emerald-400/40">
+              <Activity className="w-5 h-5 text-emerald-300" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-semibold flex items-center gap-2">Team Pulse
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
+                </span>
+              </div>
+              <div className="text-[11px] text-white/40 truncate">Live activity — what everyone's doing</div>
+            </div>
+          </button>
+          <button data-testid="war-room-item" onClick={() => selectAgent("war_room")}
             className={`flex items-center gap-3 px-4 py-3 text-left transition-colors duration-300 border-l-2 ${
               activeId === "war_room" ? "bg-surface2 border-l-brand" : "border-l-transparent hover:bg-surface2/50"}`}>
             <div className="w-10 h-10 rounded-full shrink-0 flex items-center justify-center bg-brand/20 border border-brand/40">
@@ -126,34 +160,54 @@ export default function AiTeam() {
               <div className="text-[11px] text-white/40 truncate">Team meetings, memos & tasks</div>
             </div>
           </button>
-          {agents.map((a) => (
-            <button key={a.id} data-testid={`agent-item-${a.id}`} onClick={() => setActiveId(a.id)}
+          {agents.map((a) => {
+            const st = statusBoard?.[a.id];
+            const working = st?.status === "working";
+            return (
+            <button key={a.id} data-testid={`agent-item-${a.id}`} onClick={() => selectAgent(a.id)}
               className={`flex items-center gap-3 px-4 py-3 text-left transition-colors duration-300 border-l-2 ${
                 a.id === activeId ? "bg-surface2 border-l-brand" : "border-l-transparent hover:bg-surface2/50"}`}>
-              <img src={`/agents/${a.id}.png`} alt={a.name} className="w-10 h-10 rounded-full object-cover shrink-0"
-                style={{ backgroundColor: `${a.color}22` }} />
+              <div className="relative shrink-0">
+                <img src={`/agents/${a.id}.png`} alt={a.name} className="w-10 h-10 rounded-full object-cover"
+                  style={{ backgroundColor: `${a.color}22` }} />
+                {working && (
+                  <span className="absolute -bottom-0.5 -right-0.5 flex h-3 w-3" title={st.current_task}>
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-400 border-2 border-surface1" />
+                  </span>
+                )}
+              </div>
               <div className="min-w-0">
                 <div className="text-sm font-semibold">{a.name}</div>
-                <div className="text-[11px] text-white/40 truncate">{a.role}</div>
+                <div className="text-[11px] text-white/40 truncate">{working ? `${st.current_task}…` : a.role}</div>
               </div>
             </button>
-          ))}
+          );})}
         </aside>
 
         {/* Chat area */}
         <div className="flex-1 flex flex-col min-w-0">
           {/* mobile roster strip */}
           <div className="lg:hidden flex gap-2 overflow-x-auto p-3 border-b border-white/10 bg-surface1">
-            <button onClick={() => setActiveId("war_room")}
+            <button onClick={() => selectAgent("pulse")}
+              className={`shrink-0 rounded-full p-0.5 ${activeId === "pulse" ? "ring-2 ring-emerald-400" : ""}`}>
+              <div className="w-10 h-10 rounded-full flex items-center justify-center bg-emerald-400/15 border border-emerald-400/40">
+                <Activity className="w-5 h-5 text-emerald-300" />
+              </div>
+            </button>
+            <button onClick={() => selectAgent("war_room")}
               className={`shrink-0 rounded-full p-0.5 ${activeId === "war_room" ? "ring-2 ring-brand" : ""}`}>
               <div className="w-10 h-10 rounded-full flex items-center justify-center bg-brand/20 border border-brand/40">
                 <Users className="w-5 h-5 text-brand" />
               </div>
             </button>
             {agents.map((a) => (
-              <button key={a.id} onClick={() => setActiveId(a.id)}
-                className={`shrink-0 rounded-full p-0.5 ${a.id === activeId ? "ring-2 ring-brand" : ""}`}>
+              <button key={a.id} onClick={() => selectAgent(a.id)}
+                className={`shrink-0 rounded-full p-0.5 relative ${a.id === activeId ? "ring-2 ring-brand" : ""}`}>
                 <img src={`/agents/${a.id}.png`} alt={a.name} className="w-10 h-10 rounded-full object-cover" />
+                {statusBoard?.[a.id]?.status === "working" && (
+                  <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-400 border-2 border-surface1" />
+                )}
               </button>
             ))}
           </div>
@@ -205,7 +259,8 @@ export default function AiTeam() {
 
           {active?.id === "rex" && showRex && <RexLeadPanel onClose={() => setShowRex(false)} />}
 
-          {activeId === "war_room" ? <WarRoom agents={agents} /> : (<>
+          {activeId === "pulse" ? <TeamPulse onOpenAgent={selectAgent} /> :
+           activeId === "war_room" ? <WarRoom agents={agents} /> : (<>
           <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-6 space-y-4" data-testid="agent-messages">
             {messages === null ? (
               <div className="font-mono text-white/30 text-sm">Loading conversation…</div>
