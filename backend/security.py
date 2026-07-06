@@ -56,7 +56,7 @@ async def check_rate_limit(key: str, max_count: int, window_seconds: int):
 
 
 _ALLOWED_ORIGINS = {o.strip().rstrip("/") for o in os.environ.get("CORS_ORIGINS", "").split(",") if o.strip()}
-_PLATFORM_ORIGIN_RE = re.compile(r"^https://[a-z0-9.-]+\.(emergentagent\.com|emergent\.host)$")
+_PLATFORM_ORIGIN_RE = re.compile(r"^https://([a-z0-9-]+\.)*(sitegenie-ai\.com|sitegenie\.dev|emergentagent\.com|emergent\.host)$")
 
 
 def validate_origin(origin_url: str) -> str:

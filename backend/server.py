@@ -192,7 +192,7 @@ _cors_origins = [o.strip() for o in os.environ.get("CORS_ORIGINS", "").split(","
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins or ["http://localhost:3000"],
-    allow_origin_regex=r"https://.*\.(emergentagent\.com|emergent\.host)",
+    allow_origin_regex=r"https://([a-z0-9-]+\.)*(sitegenie-ai\.com|sitegenie\.dev|emergentagent\.com|emergent\.host)",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

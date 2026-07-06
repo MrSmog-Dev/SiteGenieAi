@@ -27,7 +27,10 @@ import { useAuth } from "@/context/AuthContext";
 const backendHost = (() => {
   try { return new URL(process.env.REACT_APP_BACKEND_URL).hostname; } catch (e) { return window.location.hostname; }
 })();
-const isCustomDomain = window.location.hostname !== backendHost && window.location.hostname !== "localhost";
+// Hostnames that always serve the MAIN SiteGenie app (never a published customer site).
+const APP_HOSTS = ["localhost", "sitegenie-ai.com", "www.sitegenie-ai.com", "sitegenie.dev", "www.sitegenie.dev"];
+const currentHost = window.location.hostname;
+const isCustomDomain = currentHost !== backendHost && !APP_HOSTS.includes(currentHost);
 
 function AppRouter() {
   const location = useLocation();
