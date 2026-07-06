@@ -27,6 +27,7 @@ from routes.market import router as market_router
 from routes.agents import router as agents_router
 from routes.leads import router as leads_router
 from routes.blog import router as blog_router
+from routes.support import router as support_router
 
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
@@ -61,6 +62,7 @@ api_router.include_router(market_router)
 api_router.include_router(agents_router)
 api_router.include_router(leads_router)
 api_router.include_router(blog_router)
+api_router.include_router(support_router)
 
 
 @app.on_event("startup")
@@ -89,6 +91,11 @@ async def _initialize():
     except Exception:
         logger.exception("ensure_automation_state failed")
     asyncio.create_task(automation_loop())
+    try:
+        from services.support import ensure_pages
+        asyncio.create_task(ensure_pages())
+    except Exception:
+        logger.exception("ensure_pages scheduling failed")
 
 
 async def _run_db_init():
@@ -127,6 +134,9 @@ async def _run_db_init():
     await db.blog_images.create_index("image_id", unique=True)
     await db.agent_activity.create_index([("user_id", 1), ("created_at", -1)])
     await db.agent_status.create_index([("user_id", 1), ("agent_id", 1)], unique=True)
+    await db.site_pages.create_index("kind", unique=True)
+    await db.support_chats.create_index("session_id", unique=True)
+    await db.customer_feedback.create_index([("created_at", -1)])
     await db.rate_events.create_index("ts", expireAfterSeconds=GEN_WINDOW_SECONDS + 60)
     await db.login_attempts.create_index("ts", expireAfterSeconds=LOGIN_WINDOW_SECONDS + 60)
     await db.login_attempts.create_index("identifier")

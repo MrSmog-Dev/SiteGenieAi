@@ -413,7 +413,11 @@ export default function Landing() {
       <footer className="border-t border-white/10 px-6 py-10">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-white/40">
           <div className="flex items-center gap-2"><img src="/sitegenie_logo_mark.png" alt="SiteGenie" className="w-6 h-6 object-contain" /> SiteGenie © 2026</div>
-          <div className="font-mono">Websites, generated.</div>
+          <div className="flex items-center gap-5">
+            <Link to="/faq" className="hover:text-white transition-colors duration-300" data-testid="footer-faq">FAQ</Link>
+            <Link to="/refund-policy" className="hover:text-white transition-colors duration-300" data-testid="footer-refund">Refund Policy</Link>
+            <Link to="/terms" className="hover:text-white transition-colors duration-300" data-testid="footer-terms">Terms</Link>
+          </div>
         </div>
       </footer>
     </div>

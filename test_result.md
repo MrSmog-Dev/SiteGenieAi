@@ -102,119 +102,95 @@
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
 
-user_problem_statement: "Test the new Team Pulse feature on the SiteGenie app (a live activity feed making the AI Team feel continuously active)"
+user_problem_statement: "Test the new Halo Customer Support AI feature on SiteGenie (floating support chat for anonymous visitors and customers, with feedback routing to Team Pulse)"
 
 frontend:
-  - task: "Dashboard Widget - Team Pulse compact view"
+  - task: "Halo Widget - Anonymous user support chat"
     implemented: true
     working: true
-    file: "frontend/src/pages/Dashboard.jsx, frontend/src/components/TeamPulse.jsx"
+    file: "frontend/src/components/HaloWidget.jsx, frontend/src/App.js"
     stuck_count: 0
     priority: "high"
     needs_retesting: false
     status_history:
         - working: true
           agent: "testing"
-          comment: "✓ PASSED - Dashboard widget (data-testid='owner-team-pulse') renders correctly with 'Team Pulse — live' heading, 6 seeded activity rows, and 'Open the AI Team →' link. Widget is only visible to owner role."
+          comment: "✓ PASSED - Halo launcher (data-testid='halo-launcher') visible on landing page for anonymous users. Panel (data-testid='halo-panel') opens correctly with greeting message. Input (data-testid='halo-input') and send button (data-testid='halo-send') working. Tested with question 'What is SiteGenie and how much does it cost?' - Halo replied within 20s with pricing information mentioning plans, credits, and pricing ($149 annual, $20 monthly). Messages container (data-testid='halo-messages') displays conversation correctly."
   
-  - task: "Team Pulse Tab - Full activity feed view"
+  - task: "Feedback Routing - Customer feedback to Team Pulse"
     implemented: true
     working: true
-    file: "frontend/src/pages/AiTeam.jsx, frontend/src/components/TeamPulse.jsx"
+    file: "frontend/src/components/HaloWidget.jsx, backend/routes/support.py"
     stuck_count: 0
     priority: "high"
     needs_retesting: false
     status_history:
         - working: true
           agent: "testing"
-          comment: "✓ PASSED - Team Pulse tab (data-testid='team-pulse') loads by default on /team page. Shows 'Team Pulse' header with status line 'all idle · on standby · 6 updates today'. Pulse-item (data-testid='pulse-item') appears at top of roster. Activity feed (data-testid='activity-feed') displays 6 activity rows correctly."
+          comment: "✓ PASSED - E2E feedback flow working. Sent feedback message 'This is great but you really should add a mobile app version, that would be a killer feature!' as anonymous user. Halo acknowledged the feedback. After logging in as owner (neobeyondlegacy2@gmail.com) and navigating to /team, the customer feedback appeared in Team Pulse activity feed (data-testid='activity-feed') with 'Customer' badge mentioning mobile app feature request. Background task processed feedback successfully within expected timeframe."
   
-  - task: "Filter Chips - Agent filtering functionality"
+  - task: "Policy Pages - FAQ, Refund Policy, Terms"
     implemented: true
     working: true
-    file: "frontend/src/components/TeamPulse.jsx"
+    file: "frontend/src/pages/PolicyPage.jsx"
     stuck_count: 0
     priority: "high"
     needs_retesting: false
     status_history:
         - working: true
           agent: "testing"
-          comment: "✓ PASSED - Filter chips working correctly. Found 'All activity' chip and 13 agent filter buttons. Tested filtering by 'Titan' agent (narrowed to 1 activity), then reset with 'All activity' (back to 6 activities). Filter state management working as expected."
+          comment: "✓ PASSED - All three policy pages working correctly. FAQ page (/faq) accessible via footer link (data-testid='footer-faq'), displays 'Frequently Asked Questions' title (data-testid='policy-title') with full content. Refund Policy (/refund-policy) via data-testid='footer-refund' shows 'Refund Policy' title with content. Terms (/terms) via data-testid='footer-terms' shows 'Terms of Service' title with content. All pages use data-testid='policy-page' container and render Halo-drafted content correctly."
   
-  - task: "Deep Link / Click-Through - Activity to agent chat"
+  - task: "Widget Visibility Rules - Hidden for owner/admin"
     implemented: true
     working: true
-    file: "frontend/src/components/TeamPulse.jsx"
+    file: "frontend/src/App.js (SupportWidget component)"
     stuck_count: 0
     priority: "high"
     needs_retesting: false
     status_history:
         - working: true
           agent: "testing"
-          comment: "✓ PASSED - Click-through functionality working. Clicked a non-blog activity (Zephyr Check-in), URL updated with ?agent=zephyr parameter, and agent chat header (data-testid='agent-chat-header') appeared correctly. Deep linking to individual agent chats works as expected."
-  
-  - task: "Agent Chat - No regression on existing functionality"
-    implemented: true
-    working: true
-    file: "frontend/src/pages/AiTeam.jsx"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-        - working: true
-          agent: "testing"
-          comment: "✓ PASSED - Existing agent chat functionality intact. Clicked Titan agent from roster, chat loaded (data-testid='agent-messages' visible), sent message 'hi' via data-testid='agent-chat-input' and data-testid='agent-send-btn', received agent reply successfully. No regression detected."
-  
-  - task: "Working-Now Indicator - Live status display"
-    implemented: true
-    working: true
-    file: "frontend/src/components/TeamPulse.jsx"
-    stuck_count: 0
-    priority: "medium"
-    needs_retesting: false
-    status_history:
-        - working: true
-          agent: "testing"
-          comment: "✓ PASSED - Working-now area (data-testid='working-now') implementation correct. Area not visible when all agents idle (expected behavior per code logic). Status line correctly shows 'all idle · on standby'. Component only renders working-now section when agents have status='working'."
+          comment: "✓ PASSED - Halo widget visibility rules working correctly. Widget visible for anonymous users and customers. When logged in as owner on /dashboard, Halo launcher (data-testid='halo-launcher') is NOT present (count=0), confirming correct behavior. Widget also hidden on /team page as expected per implementation logic."
 
 backend:
-  - task: "Activity Feed API - GET /api/agents/activity"
+  - task: "Support Chat API - POST /api/support/chat"
     implemented: true
     working: true
-    file: "backend/routes/agents.py, backend/services/activity.py"
+    file: "backend/routes/support.py"
     stuck_count: 0
     priority: "high"
     needs_retesting: false
     status_history:
         - working: true
           agent: "testing"
-          comment: "✓ PASSED - Activity feed API working correctly. Returns 6 seeded activities with proper structure (activity_id, agent_id, kind, summary, detail, created_at). Frontend successfully fetches and displays activities. No network errors on this endpoint."
+          comment: "✓ PASSED - Support chat endpoint working correctly. Public endpoint (no auth required) accepts messages, maintains session_id, and returns AI-generated replies grounded in SiteGenie facts. Tested with pricing question and feedback message - both processed successfully. Auto-detects customer feedback and routes to Team Pulse as expected."
   
-  - task: "Status Board API - GET /api/agents/status"
+  - task: "Policy Pages API - GET /api/support/pages/{kind}"
     implemented: true
     working: true
-    file: "backend/routes/agents.py, backend/services/activity.py"
+    file: "backend/routes/support.py"
     stuck_count: 0
     priority: "high"
     needs_retesting: false
     status_history:
         - working: true
           agent: "testing"
-          comment: "✓ PASSED - Status board API working correctly. Returns status information including working_now count and today_count. Frontend correctly displays status line and working-now indicators based on API response."
+          comment: "✓ PASSED - Policy pages API working correctly. Endpoints for /api/support/pages/faq, /api/support/pages/refund, and /api/support/pages/terms all return properly formatted HTML content with titles and updated_at timestamps. Frontend successfully fetches and renders all three policy types."
 
 metadata:
   created_by: "testing_agent"
-  version: "1.0"
-  test_sequence: 1
+  version: "1.1"
+  test_sequence: 2
   run_ui: true
 
 test_plan:
   current_focus:
-    - "All Team Pulse features tested and passing"
+    - "All Halo Customer Support AI features tested and passing"
   stuck_tasks: []
   test_all: true
   test_priority: "high_first"
 
 agent_communication:
     - agent: "testing"
-      message: "Completed comprehensive testing of Team Pulse feature. All 6 test scenarios PASSED. Dashboard widget, Team Pulse tab, filter chips, deep linking, agent chat regression, and working-now indicator all working correctly. Found 6 seeded activities as expected. Minor non-critical issue: 2x 401 errors on /api/auth/me during initial page load (before auth completes) - does not affect functionality. Screenshots captured for dashboard widget and Team Pulse tab. Feature is ready for production."
+      message: "Completed comprehensive testing of Halo Customer Support AI feature. All 4 test scenarios PASSED: (1) Halo widget for anonymous users with AI chat working, (2) Feedback routing from Halo to Team Pulse E2E flow confirmed, (3) All three policy pages (FAQ, Refund, Terms) rendering correctly, (4) Widget correctly hidden for owner/admin users. Minor non-critical issue: 4x 401 errors on /api/auth/me during initial page loads (before auth completes) - does not affect functionality. Screenshots captured for Halo widget with pricing reply, Team Pulse showing customer feedback, FAQ page, and dashboard without Halo. Feature is production-ready."

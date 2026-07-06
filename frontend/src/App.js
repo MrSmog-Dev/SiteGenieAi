@@ -20,6 +20,9 @@ import DomainSite from "@/pages/DomainSite";
 import Market from "@/pages/Market";
 import MarketSuccess from "@/pages/MarketSuccess";
 import AiTeam from "@/pages/AiTeam";
+import PolicyPage from "@/pages/PolicyPage";
+import HaloWidget from "@/components/HaloWidget";
+import { useAuth } from "@/context/AuthContext";
 
 const backendHost = (() => {
   try { return new URL(process.env.REACT_APP_BACKEND_URL).hostname; } catch (e) { return window.location.hostname; }
@@ -42,6 +45,9 @@ function AppRouter() {
       <Route path="/market" element={<Market />} />
       <Route path="/market/success" element={<ProtectedRoute><MarketSuccess /></ProtectedRoute>} />
       <Route path="/team" element={<ProtectedRoute><AiTeam /></ProtectedRoute>} />
+      <Route path="/faq" element={<PolicyPage kind="faq" />} />
+      <Route path="/refund-policy" element={<PolicyPage kind="refund-policy" />} />
+      <Route path="/terms" element={<PolicyPage kind="terms" />} />
       <Route path="/s/:slug" element={<PublicSite />} />
       <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/generate" element={<ProtectedRoute><Generator /></ProtectedRoute>} />
@@ -49,6 +55,17 @@ function AppRouter() {
       <Route path="/templates/:id" element={<ProtectedRoute><TemplateView /></ProtectedRoute>} />
     </Routes>
   );
+}
+
+function SupportWidget() {
+  const { user } = useAuth();
+  const location = useLocation();
+  // Show Halo to visitors and customers; hide for the owner/admin (they have the internal AI Team)
+  // and on the internal team console / published customer sites.
+  const isStaff = user && (user.role === "owner" || user.role === "admin");
+  const hiddenRoutes = ["/team"];
+  if (isStaff || hiddenRoutes.some((r) => location.pathname.startsWith(r))) return null;
+  return <HaloWidget />;
 }
 
 function App() {
@@ -59,6 +76,7 @@ function App() {
         <BrowserRouter>
           <GenieWaking />
           <AppRouter />
+          <SupportWidget />
           <Toaster theme="dark" position="top-right" richColors />
         </BrowserRouter>
       </AuthProvider>

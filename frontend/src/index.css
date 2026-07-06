@@ -81,3 +81,14 @@ body {
 @layer base {
     * { @apply border-border; }
 }
+
+/* Halo-drafted policy pages (FAQ / Refund / Terms) */
+.policy-content { color: rgba(255,255,255,0.72); line-height: 1.75; font-size: 0.975rem; }
+.policy-content h2 { font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 1.4rem; color: #fff; margin: 2rem 0 0.75rem; }
+.policy-content h3 { font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 1.075rem; color: rgba(255,255,255,0.92); margin: 1.4rem 0 0.4rem; }
+.policy-content p { margin: 0.6rem 0; }
+.policy-content ul { margin: 0.6rem 0 0.9rem; padding-left: 1.25rem; list-style: disc; }
+.policy-content ol { margin: 0.6rem 0 0.9rem; padding-left: 1.25rem; list-style: decimal; }
+.policy-content li { margin: 0.35rem 0; }
+.policy-content a { color: #4d8bff; text-decoration: underline; }
+.policy-content strong { color: #fff; }

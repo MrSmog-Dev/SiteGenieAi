@@ -96,3 +96,10 @@ class LeadStatusInput(BaseModel):
 
 class DomainInput(BaseModel):
     domain: str
+
+
+class SupportChatInput(BaseModel):
+    message: str
+    session_id: Optional[str] = None
+    history: Optional[list] = None
+    contact_email: Optional[str] = None
