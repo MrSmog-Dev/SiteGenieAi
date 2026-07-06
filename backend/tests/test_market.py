@@ -5,7 +5,7 @@ import uuid
 import requests
 import pytest
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://builder-hub-795.preview.emergentagent.com").rstrip("/")
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://genie-deploy-1.preview.emergentagent.com").rstrip("/")
 API = f"{BASE_URL}/api"
 
 OWNER_EMAIL = "neobeyondlegacy2@gmail.com"
@@ -162,7 +162,7 @@ class TestMarketCheckout:
         assert len(listings) > 0
         mkt_id = listings[0]["market_id"]
         r = buyer_client.post(f"{API}/market/{mkt_id}/checkout",
-                              json={"origin_url": "https://builder-hub-795.preview.emergentagent.com"})
+                              json={"origin_url": "https://genie-deploy-1.preview.emergentagent.com"})
         assert r.status_code == 200, f"checkout failed: {r.status_code} {r.text}"
         data = r.json()
         assert "url" in data and data["url"].startswith("http")

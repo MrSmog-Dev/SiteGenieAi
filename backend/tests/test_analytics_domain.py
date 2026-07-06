@@ -3,7 +3,7 @@ import os
 import pytest
 import requests
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://builder-hub-795.preview.emergentagent.com").rstrip("/")
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://genie-deploy-1.preview.emergentagent.com").rstrip("/")
 EMAIL = "neobeyondlegacy2@gmail.com"
 PASSWORD = "SoloLeveling21!"
 TEMPLATE_ID = "tpl_908bc5299b9e"

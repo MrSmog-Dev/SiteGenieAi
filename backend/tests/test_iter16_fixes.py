@@ -14,7 +14,7 @@ from datetime import datetime, timezone, timedelta
 import pytest
 import requests
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://builder-hub-795.preview.emergentagent.com").rstrip("/")
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://genie-deploy-1.preview.emergentagent.com").rstrip("/")
 API = f"{BASE_URL}/api"
 
 OWNER_EMAIL = "neobeyondlegacy2@gmail.com"

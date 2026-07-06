@@ -18,7 +18,7 @@ API = f"{BASE_URL}/api"
 ADMIN_EMAIL = "admin@sitegenie.com"
 ADMIN_PASSWORD = "Sg!Adm1n_9f3kQ2xL7vB"
 OLD_ADMIN_PASSWORD = "admin123"
-ALLOWED_ORIGIN = "https://builder-hub-795.preview.emergentagent.com"
+ALLOWED_ORIGIN = "https://genie-deploy-1.preview.emergentagent.com"
 EVIL_ORIGIN = "https://evil.example.com"
 
 MONGO_URL = os.environ.get("MONGO_URL", "mongodb://localhost:27017")

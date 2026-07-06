@@ -13,7 +13,7 @@ import requests
 import pytest
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/") or \
-    "https://builder-hub-795.preview.emergentagent.com"
+    "https://genie-deploy-1.preview.emergentagent.com"
 OWNER_EMAIL = "neobeyondlegacy2@gmail.com"
 OWNER_PASSWORD = "SoloLeveling21!"
 PREMIUM_TPL = "tpl_908bc5299b9e"           # already premium
