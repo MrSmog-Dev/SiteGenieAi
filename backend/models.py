@@ -103,3 +103,7 @@ class SupportChatInput(BaseModel):
     session_id: Optional[str] = None
     history: Optional[list] = None
     contact_email: Optional[str] = None
+
+
+class FeedbackStatusInput(BaseModel):
+    status: str   # "new" | "reviewed" | "actioned" | "dismissed"

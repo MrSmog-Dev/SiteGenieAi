@@ -102,7 +102,7 @@
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
 
-user_problem_statement: "Test the new Halo Customer Support AI feature on SiteGenie (floating support chat for anonymous visitors and customers, with feedback routing to Team Pulse)"
+user_problem_statement: "Test the new owner-side Customer Feedback Inbox for SiteGenie (owner can view, filter, and manage customer feedback from Halo in a dedicated inbox panel)"
 
 frontend:
   - task: "Halo Widget - Anonymous user support chat"
@@ -152,6 +152,18 @@ frontend:
         - working: true
           agent: "testing"
           comment: "✓ PASSED - Halo widget visibility rules working correctly. Widget visible for anonymous users and customers. When logged in as owner on /dashboard, Halo launcher (data-testid='halo-launcher') is NOT present (count=0), confirming correct behavior. Widget also hidden on /team page as expected per implementation logic."
+  
+  - task: "Customer Feedback Inbox - Owner panel for managing feedback"
+    implemented: true
+    working: true
+    file: "frontend/src/components/FeedbackInbox.jsx, frontend/src/pages/AiTeam.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✓ PASSED - Customer Feedback Inbox fully functional. Tested 6 scenarios: (1) Inbox opens correctly from Halo agent via 'halo-inbox-toggle' button, displays header with 'Customer Feedback Inbox' title and shows 2 feedback items with total/new counts. (2) All status tabs (All, New, Reviewed, Actioned, Dismissed) working correctly with proper filtering and empty state messages. (3) Status transitions working bidirectionally - successfully tested New→Reviewed→Dismissed→New cycle with item fb_0c4e7db7a4, toasts appear, counts update correctly. (4) Type filter working - 'Feature request' filter narrows list correctly, 'All types' resets filter. (5) Deep link from Team Pulse: clicking customer feedback activity in Team Pulse navigates to Halo (URL contains agent=halo) but inbox does NOT auto-open (minor issue - user can manually click toggle). (6) No delete operations performed as instructed. Minor issues: 2x 401 console errors (non-critical auth checks), 1x CDN network error (Cloudflare RUM). Core functionality working perfectly."
 
 backend:
   - task: "Support Chat API - POST /api/support/chat"
@@ -177,16 +189,28 @@ backend:
         - working: true
           agent: "testing"
           comment: "✓ PASSED - Policy pages API working correctly. Endpoints for /api/support/pages/faq, /api/support/pages/refund, and /api/support/pages/terms all return properly formatted HTML content with titles and updated_at timestamps. Frontend successfully fetches and renders all three policy types."
+  
+  - task: "Feedback Management API - GET/PATCH/DELETE /api/support/feedback"
+    implemented: true
+    working: true
+    file: "backend/routes/support.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✓ PASSED - Feedback management APIs working correctly. GET /api/support/feedback returns feedback list with proper filtering by status and kind, includes summary counts (total, new_count, by_status, by_kind). PATCH /api/support/feedback/{id} successfully updates status (tested new→reviewed→dismissed→new transitions). DELETE endpoint available but not tested per instructions. Owner-only authentication enforced correctly."
 
 metadata:
   created_by: "testing_agent"
-  version: "1.1"
-  test_sequence: 2
+  version: "1.2"
+  test_sequence: 3
   run_ui: true
 
 test_plan:
   current_focus:
-    - "All Halo Customer Support AI features tested and passing"
+    - "Customer Feedback Inbox feature tested and passing"
   stuck_tasks: []
   test_all: true
   test_priority: "high_first"
@@ -194,3 +218,5 @@ test_plan:
 agent_communication:
     - agent: "testing"
       message: "Completed comprehensive testing of Halo Customer Support AI feature. All 4 test scenarios PASSED: (1) Halo widget for anonymous users with AI chat working, (2) Feedback routing from Halo to Team Pulse E2E flow confirmed, (3) All three policy pages (FAQ, Refund, Terms) rendering correctly, (4) Widget correctly hidden for owner/admin users. Minor non-critical issue: 4x 401 errors on /api/auth/me during initial page loads (before auth completes) - does not affect functionality. Screenshots captured for Halo widget with pricing reply, Team Pulse showing customer feedback, FAQ page, and dashboard without Halo. Feature is production-ready."
+    - agent: "testing"
+      message: "Completed testing of Customer Feedback Inbox feature. RESULTS: 5 of 6 test scenarios PASSED with 1 minor issue. ✅ PASSED: (1) Inbox opens correctly with feedback items and counts, (2) All status tabs working with proper filtering, (3) Status transitions working bidirectionally (new→reviewed→dismissed→new), (4) Type filters working correctly, (5) No deletions performed. ⚠️ MINOR ISSUE: Deep link from Team Pulse navigates to Halo correctly but inbox doesn't auto-open (requires manual toggle click). Root cause: AiTeam.jsx expects 'inbox=1' URL parameter but TeamPulse.jsx doesn't set it when navigating. This is a convenience feature issue, not a blocker - all core functionality works perfectly. Feature is production-ready."

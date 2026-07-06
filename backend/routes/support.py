@@ -2,14 +2,19 @@ import asyncio
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Depends
 
 from database import db
-from models import SupportChatInput
-from security import check_rate_limit
+from models import SupportChatInput, FeedbackStatusInput
+from security import check_rate_limit, get_current_user, is_owner
 from services.support import halo_reply, detect_customer_feedback, get_page
 
 router = APIRouter()
+
+
+def _require_owner(user: dict):
+    if not is_owner(user):
+        raise HTTPException(status_code=403, detail="The feedback inbox is available to the store owner only.")
 
 
 def _now() -> str:
@@ -59,3 +64,53 @@ async def support_page(kind: str):
     if not page:
         raise HTTPException(status_code=404, detail="Page not found")
     return page
+
+
+
+FEEDBACK_STATUSES = {"new", "reviewed", "actioned", "dismissed"}
+FEEDBACK_KINDS = {"feature", "bug", "complaint", "praise", "feedback"}
+
+
+@router.get("/support/feedback")
+async def list_feedback(status: str = None, kind: str = None, limit: int = 100,
+                        user: dict = Depends(get_current_user)):
+    """Owner-only Customer Feedback inbox with filters + summary counts."""
+    _require_owner(user)
+    q = {}
+    if status and status in FEEDBACK_STATUSES:
+        q["status"] = status
+    if kind and kind in FEEDBACK_KINDS:
+        q["kind"] = kind
+    limit = max(1, min(int(limit or 100), 300))
+    items = await db.customer_feedback.find(q, {"_id": 0}).sort("created_at", -1).to_list(limit)
+    by_status = {s["_id"]: s["n"] async for s in db.customer_feedback.aggregate(
+        [{"$group": {"_id": "$status", "n": {"$sum": 1}}}])}
+    by_kind = {s["_id"]: s["n"] async for s in db.customer_feedback.aggregate(
+        [{"$group": {"_id": "$kind", "n": {"$sum": 1}}}])}
+    total = await db.customer_feedback.count_documents({})
+    new_count = by_status.get("new", 0)
+    return {"feedback": items, "total": total, "new_count": new_count,
+            "by_status": by_status, "by_kind": by_kind}
+
+
+@router.patch("/support/feedback/{feedback_id}")
+async def update_feedback(feedback_id: str, input: FeedbackStatusInput,
+                          user: dict = Depends(get_current_user)):
+    _require_owner(user)
+    if input.status not in FEEDBACK_STATUSES:
+        raise HTTPException(status_code=400, detail="Invalid status")
+    res = await db.customer_feedback.update_one(
+        {"feedback_id": feedback_id},
+        {"$set": {"status": input.status, "updated_at": datetime.now(timezone.utc).isoformat()}})
+    if not res.matched_count:
+        raise HTTPException(status_code=404, detail="Feedback not found")
+    return {"feedback_id": feedback_id, "status": input.status}
+
+
+@router.delete("/support/feedback/{feedback_id}")
+async def delete_feedback(feedback_id: str, user: dict = Depends(get_current_user)):
+    _require_owner(user)
+    res = await db.customer_feedback.delete_one({"feedback_id": feedback_id})
+    if not res.deleted_count:
+        raise HTTPException(status_code=404, detail="Feedback not found")
+    return {"deleted": True}

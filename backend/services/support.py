@@ -108,7 +108,7 @@ async def detect_customer_feedback(session_id: str, message: str, reply: str,
         await log_activity(
             owner_id, "halo", "feedback",
             f"{label} from a customer: {summary}",
-            detail=f'They said: "{message[:280]}"', link="/team?agent=halo")
+            detail=f'They said: "{message[:280]}"', link="/team?agent=halo&inbox=1")
         logger.info("halo: routed customer %s to team pulse", kind)
     except Exception:
         logger.exception("customer feedback detection failed")

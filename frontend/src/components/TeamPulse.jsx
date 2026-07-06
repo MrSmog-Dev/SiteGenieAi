@@ -99,7 +99,7 @@ export function TeamPulse({ compact = false, onOpenAgent, limit }) {
     if (act.link?.startsWith("/api/")) {
       window.open(act.link, "_blank", "noopener");
     } else if (onOpenAgent) {
-      onOpenAgent(act.agent_id);
+      onOpenAgent(act.agent_id, act.link);
     }
   };
 

@@ -4,10 +4,11 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { RexLeadPanel } from "@/components/RexLeadPanel";
 import { WarRoom } from "@/components/WarRoom";
 import { TeamPulse } from "@/components/TeamPulse";
+import { FeedbackInbox } from "@/components/FeedbackInbox";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
-import { Send, Loader2, Trash2, Hammer, Sparkles, X, Crosshair, BookOpen, PenLine, Users, Activity } from "lucide-react";
+import { Send, Loader2, Trash2, Hammer, Sparkles, X, Crosshair, BookOpen, PenLine, Users, Activity, Inbox } from "lucide-react";
 
 export default function AiTeam() {
   const { user } = useAuth();
@@ -21,6 +22,7 @@ export default function AiTeam() {
   const [forgeJob, setForgeJob] = useState(null);
   const [showForge, setShowForge] = useState(false);
   const [showRex, setShowRex] = useState(false);
+  const [showInbox, setShowInbox] = useState(false);
   const [ivyWriting, setIvyWriting] = useState(false);
   const [statusBoard, setStatusBoard] = useState(null);
   const scrollRef = useRef(null);
@@ -47,9 +49,11 @@ export default function AiTeam() {
     return () => clearInterval(t);
   }, [isOwner]);
 
-  const selectAgent = useCallback((id) => {
+  const selectAgent = useCallback((id, link) => {
     setActiveId(id);
-    setSearchParams(id === "pulse" ? {} : { agent: id }, { replace: true });
+    const extra = {};
+    if (link && link.includes("inbox=1")) extra.inbox = "1";
+    setSearchParams(id === "pulse" ? {} : { agent: id, ...extra }, { replace: true });
   }, [setSearchParams]);
 
   const loadChat = useCallback((silent = false) => {
@@ -61,6 +65,11 @@ export default function AiTeam() {
   }, [activeId, isOwner]);
 
   useEffect(() => { loadChat(); }, [loadChat]);
+
+  // Auto-open Halo's feedback inbox when arriving via a customer-feedback deep-link
+  useEffect(() => {
+    if (activeId === "halo" && searchParams.get("inbox") === "1") setShowInbox(true);
+  }, [activeId, searchParams]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -246,6 +255,12 @@ export default function AiTeam() {
                   </button>
                 </>
               )}
+              {active.id === "halo" && (
+                <button data-testid="halo-inbox-toggle" onClick={() => setShowInbox(!showInbox)}
+                  className="flex items-center gap-2 text-sm border border-sky-400/50 text-sky-300 hover:border-sky-300 px-3 py-2 transition-colors duration-300">
+                  <Inbox className="w-4 h-4" /> Feedback inbox
+                </button>
+              )}
               <button data-testid="clear-chat-btn" onClick={clearChat} title="Clear conversation"
                 className="p-2 text-white/40 hover:text-neon transition-colors duration-300">
                 <Trash2 className="w-4 h-4" />
@@ -258,6 +273,8 @@ export default function AiTeam() {
           )}
 
           {active?.id === "rex" && showRex && <RexLeadPanel onClose={() => setShowRex(false)} />}
+
+          {active?.id === "halo" && showInbox && <FeedbackInbox onClose={() => setShowInbox(false)} />}
 
           {activeId === "pulse" ? <TeamPulse onOpenAgent={selectAgent} /> :
            activeId === "war_room" ? <WarRoom agents={agents} /> : (<>
