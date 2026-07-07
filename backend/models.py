@@ -6,6 +6,7 @@ class RegisterInput(BaseModel):
     name: str
     email: EmailStr
     password: str
+    consent: bool = False           # clickwrap: user affirmatively agreed to Terms/Privacy/Refund
 
 
 class LoginInput(BaseModel):

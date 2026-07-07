@@ -9,6 +9,7 @@ const META = {
   faq: { kind: "faq", fallback: "Frequently Asked Questions" },
   "refund-policy": { kind: "refund", fallback: "Refund Policy" },
   terms: { kind: "terms", fallback: "Terms of Service" },
+  privacy: { kind: "privacy", fallback: "Privacy Policy" },
 };
 
 export default function PolicyPage({ kind: fixedKind }) {

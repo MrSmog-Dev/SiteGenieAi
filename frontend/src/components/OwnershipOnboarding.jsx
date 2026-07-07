@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { toast } from "sonner";
-import { X, Loader2, Wand2, Globe, FileArchive, CheckCircle2, ShieldCheck, Sparkles, ArrowRight } from "lucide-react";
+import { X, Loader2, Wand2, Globe, FileArchive, CheckCircle2, ShieldCheck, Sparkles, ArrowRight, Download } from "lucide-react";
 
 /**
  * "Make it yours" — post-purchase onboarding for an exclusively-owned site.
@@ -170,12 +170,29 @@ export function OwnershipOnboarding({ tpl, onClose, onUpdated }) {
 export function OwnershipCertificate({ templateId, onClose }) {
   const [cert, setCert] = useState(null);
   const [error, setError] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
     api.get(`/templates/${templateId}/certificate`)
       .then(({ data }) => setCert(data))
       .catch(() => setError(true));
   }, [templateId]);
+
+  const downloadPdf = async () => {
+    setDownloading(true);
+    try {
+      const res = await api.get(`/templates/${templateId}/certificate.pdf`, { responseType: "blob" });
+      const url = URL.createObjectURL(res.data);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `ownership-certificate-${(cert?.title || "site").replace(/\s+/g, "-").toLowerCase()}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Certificate PDF downloaded");
+    } catch {
+      toast.error("Could not generate the PDF. Please try again.");
+    } finally { setDownloading(false); }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/75 backdrop-blur-sm" onClick={onClose} data-testid="certificate-modal">
@@ -207,6 +224,10 @@ export function OwnershipCertificate({ templateId, onClose }) {
               </div>
             </div>
             <p className="text-white/30 text-[11px] mt-5">This site is one-of-one and no longer sold on the Market. You own it in full with free unlimited AI edits.</p>
+            <button data-testid="download-cert-pdf" onClick={downloadPdf} disabled={downloading}
+              className="mt-5 w-full flex items-center justify-center gap-2 bg-amber-400 text-black hover:bg-amber-300 py-2.5 text-sm font-semibold transition-colors duration-300 disabled:opacity-50">
+              {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />} Download PDF certificate
+            </button>
           </>
         )}
       </div>

@@ -14,25 +14,46 @@ from security import (
 
 router = APIRouter()
 
+# Bump this when the Terms/Privacy/Refund policies materially change so consent is re-captured.
+LEGAL_TERMS_VERSION = "2026-07-07"
+
 
 @router.post("/auth/register")
-async def register(input: RegisterInput, response: Response):
+async def register(input: RegisterInput, request: Request, response: Response):
+    if not input.consent:
+        raise HTTPException(status_code=400,
+                            detail="Please agree to the Terms of Service, Privacy and Refund Policy to continue.")
     email = input.email.lower()
     if await db.users.find_one({"email": email}):
         raise HTTPException(status_code=400, detail="Email already registered")
     user_id = f"user_{uuid.uuid4().hex[:12]}"
+    now = datetime.now(timezone.utc)
+    consent_record = {
+        "agreed": True,
+        "terms_version": LEGAL_TERMS_VERSION,
+        "documents": ["terms", "refund", "privacy"],
+        "method": "clickwrap_checkbox",
+        "ip": client_ip(request),
+        "user_agent": request.headers.get("user-agent", "")[:300],
+        "agreed_at": now.isoformat(),
+    }
     doc = {
         "user_id": user_id, "email": email, "name": input.name,
         "password_hash": hash_password(input.password), "picture": "",
         "role": "user", "plan_credits": 0, "extra_credits": 15,
         "plan": None, "plan_name": None, "subscription_status": "none",
         "current_period_end": None, "next_credit_reset": None, "cancel_at_period_end": False,
-        "created_at": datetime.now(timezone.utc),
+        "legal_consent": consent_record,
+        "created_at": now,
     }
     try:
         await db.users.insert_one(doc)
     except Exception:
         raise HTTPException(status_code=400, detail="Email already registered")
+    # Immutable audit trail of the consent event (kept even if the user is later deleted from users).
+    await db.consent_events.insert_one({
+        "consent_id": f"consent_{uuid.uuid4().hex[:12]}", "user_id": user_id,
+        "email": email, **consent_record})
     token = await create_session(user_id)
     set_session_cookie(response, token)
     return public_user(doc)
@@ -56,7 +77,7 @@ async def login(input: LoginInput, request: Request, response: Response):
 
 
 @router.post("/auth/google-session")
-async def google_session(input: GoogleSessionInput, response: Response):
+async def google_session(input: GoogleSessionInput, request: Request, response: Response):
     async with httpx.AsyncClient() as hc:
         r = await hc.get(
             "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data",
@@ -69,15 +90,26 @@ async def google_session(input: GoogleSessionInput, response: Response):
     user = await db.users.find_one({"email": email})
     if not user:
         user_id = f"user_{uuid.uuid4().hex[:12]}"
+        now = datetime.now(timezone.utc)
+        consent_record = {
+            "agreed": True, "terms_version": LEGAL_TERMS_VERSION,
+            "documents": ["terms", "refund", "privacy"], "method": "clickwrap_google_signup",
+            "ip": client_ip(request), "user_agent": request.headers.get("user-agent", "")[:300],
+            "agreed_at": now.isoformat(),
+        }
         user = {
             "user_id": user_id, "email": email, "name": data.get("name", ""),
             "picture": data.get("picture", ""), "role": "user",
             "plan_credits": 0, "extra_credits": 15,
             "plan": None, "plan_name": None, "subscription_status": "none",
             "current_period_end": None, "next_credit_reset": None, "cancel_at_period_end": False,
-            "created_at": datetime.now(timezone.utc),
+            "legal_consent": consent_record,
+            "created_at": now,
         }
         await db.users.insert_one(user)
+        await db.consent_events.insert_one({
+            "consent_id": f"consent_{uuid.uuid4().hex[:12]}", "user_id": user_id,
+            "email": email, **consent_record})
     else:
         await db.users.update_one({"email": email}, {"$set": {"picture": data.get("picture", user.get("picture", ""))}})
     token = await create_session(user["user_id"])

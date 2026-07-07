@@ -225,6 +225,54 @@ frontend:
         - working: true
           agent: "testing"
           comment: "✓ PASSED - Customer Feedback Inbox fully functional. Tested 6 scenarios: (1) Inbox opens correctly from Halo agent via 'halo-inbox-toggle' button, displays header with 'Customer Feedback Inbox' title and shows 2 feedback items with total/new counts. (2) All status tabs (All, New, Reviewed, Actioned, Dismissed) working correctly with proper filtering and empty state messages. (3) Status transitions working bidirectionally - successfully tested New→Reviewed→Dismissed→New cycle with item fb_0c4e7db7a4, toasts appear, counts update correctly. (4) Type filter working - 'Feature request' filter narrows list correctly, 'All types' resets filter. (5) Deep link from Team Pulse: clicking customer feedback activity in Team Pulse navigates to Halo (URL contains agent=halo) but inbox does NOT auto-open (minor issue - user can manually click toggle). (6) No delete operations performed as instructed. Minor issues: 2x 401 console errors (non-critical auth checks), 1x CDN network error (Cloudflare RUM). Core functionality working perfectly."
+  
+  - task: "Register Clickwrap Consent"
+    implemented: true
+    working: true
+    file: "frontend/src/pages/Register.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✓ PASSED - Register page clickwrap consent working correctly. Consent checkbox (data-testid='register-consent') exists and is functional. Submit button (data-testid='register-submit') is correctly DISABLED when consent is unchecked and becomes ENABLED when consent is checked. Consent text contains all required links: Terms of Service (/terms), Privacy Policy (/privacy), and Refund Policy (/refund-policy). Backend requires consent:true (400 error if not provided). Screenshot captured showing consent checked and submit button enabled."
+  
+  - task: "Privacy Policy Page"
+    implemented: true
+    working: true
+    file: "frontend/src/pages/PolicyPage.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✓ PASSED - Privacy Policy page accessible at /privacy with correct rendering. Page uses data-testid='policy-page' container and data-testid='policy-title' showing 'Privacy Policy'. Content article contains 7428 characters of visible policy content (not an error box). Also verified Terms page (/terms) shows 'Terms of Service' and Refund Policy page (/refund-policy) shows 'Refund Policy'. All policy pages fetch from /api/support/pages/{kind} endpoint and render correctly."
+  
+  - task: "Footer Policy Links"
+    implemented: true
+    working: true
+    file: "frontend/src/pages/Landing.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✓ PASSED - Footer links on landing page working correctly. All four footer links present: data-testid='footer-privacy' (Privacy), data-testid='footer-terms' (Terms), data-testid='footer-refund' (Refund Policy), and data-testid='footer-faq' (FAQ). Clicking footer-privacy correctly navigates to /privacy page and displays Privacy Policy content. Footer is visible at bottom of landing page."
+  
+  - task: "Ownership Certificate PDF Download"
+    implemented: true
+    working: true
+    file: "frontend/src/components/OwnershipOnboarding.jsx, frontend/src/pages/TemplateView.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✓ PASSED - Ownership certificate PDF download working correctly. On purchased template page (/templates/tpl_ownedtest01), 'Ownership' button (data-testid='ownership-cert-btn') is present and opens certificate modal (data-testid='certificate-modal'). Modal displays all required information: 'CERTIFICATE OF OWNERSHIP' title, business name 'Bella Vista Trattoria', owner name 'Owner', transferred date '7/7/2026', price '$340', and certificate ID 'cert_demo123'. 'Download PDF certificate' button (data-testid='download-cert-pdf') triggers successful PDF download (filename: ownership-certificate-bella-vista-trattoria.pdf) with success toast 'Certificate PDF downloaded'. No error toast appeared. Screenshot captured showing certificate modal with all details."
 
 backend:
   - task: "Support Chat API - POST /api/support/chat"
@@ -265,13 +313,13 @@ backend:
 
 metadata:
   created_by: "testing_agent"
-  version: "1.3"
-  test_sequence: 4
+  version: "1.4"
+  test_sequence: 5
   run_ui: true
 
 test_plan:
   current_focus:
-    - "Ownership onboarding flow tested and passing"
+    - "P1 legal/ownership features tested and passing"
   stuck_tasks: []
   test_all: true
   test_priority: "high_first"
@@ -279,3 +327,5 @@ test_plan:
 agent_communication:
     - agent: "testing"
       message: "Completed comprehensive testing of ownership onboarding + certificate flow for SiteGenie. ALL 5 TEST SCENARIOS PASSED: (1) Ownership certificate modal displays correctly with all required information (business name, price $340, certificate ID, transfer date), (2) Onboarding modal auto-opens with ?onboard=1 parameter and shows all input fields, (3) Step 1 details saving works correctly - successfully updated business name to 'Bella Vista Ristorante' and email to 'hello@bellavista.com' with success toast and step transition, (4) Step 2 publish functionality works - site published successfully with public URL displayed in step 3, (5) Details persistence verified - updated business name appears in page header and template iframe immediately after onboarding completion. Minor non-critical issue: 2x 401 console errors during page load (auth checks). Screenshots captured for all 3 onboarding steps and final state. Feature is production-ready and working perfectly."
+    - agent: "testing"
+      message: "Completed P1 legal/ownership features testing. ALL 4 TEST SCENARIOS PASSED: (1) Clickwrap gate on register page - consent checkbox (data-testid='register-consent') exists, submit button (data-testid='register-submit') correctly disabled until consent checked, consent text contains links to Terms, Privacy, and Refund Policy. (2) Privacy page - accessible at /privacy with correct title 'Privacy Policy' and 7428 characters of content, Terms and Refund Policy pages also verified. (3) Footer links - all footer links present (footer-privacy, footer-terms, footer-refund, footer-faq), footer-privacy correctly navigates to /privacy. (4) Ownership certificate + PDF download - ownership button (data-testid='ownership-cert-btn') present on purchased template tpl_ownedtest01, certificate modal (data-testid='certificate-modal') opens with correct content (business name 'Bella Vista Trattoria', price '$340', certificate ID 'cert_demo123'), download PDF button (data-testid='download-cert-pdf') triggers successful PDF download with success toast 'Certificate PDF downloaded'. Minor non-critical issues: 12x 401 console errors (auth checks), 9x CDN network errors (Cloudflare RUM). All core functionality working perfectly."

@@ -172,6 +172,23 @@ async def ownership_certificate(template_id: str, user: dict = Depends(get_curre
     return cert
 
 
+@router.get("/templates/{template_id}/certificate.pdf")
+async def ownership_certificate_pdf(template_id: str, user: dict = Depends(get_current_user)):
+    cert = await db.ownership_certificates.find_one(
+        {"template_id": template_id, "buyer_user_id": user["user_id"]}, {"_id": 0})
+    if not cert:
+        raise HTTPException(status_code=404, detail="No ownership certificate for this site.")
+    if isinstance(cert.get("transferred_at"), datetime):
+        cert["transferred_at"] = cert["transferred_at"].isoformat()
+    cert["owner_name"] = user.get("name") or user.get("email")
+    cert["owner_email"] = user.get("email")
+    from services.certificate_pdf import build_certificate_pdf
+    pdf = await run_in_threadpool(build_certificate_pdf, cert)
+    fname = f"ownership-certificate-{(cert.get('title') or 'site')}".replace(" ", "-").lower()[:60]
+    return Response(content=pdf, media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="{fname}.pdf"'})
+
+
 # ---------------- Publish / hosting ----------------
 def slugify(text: str) -> str:
     s = re.sub(r"[^a-z0-9]+", "-", (text or "site").lower().strip()).strip("-")

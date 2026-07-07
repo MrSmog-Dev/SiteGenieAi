@@ -106,6 +106,12 @@ async def _tick():
         await maybe_proactive_pulse(owner["user_id"])
     except Exception:
         logger.exception("proactive pulse tick failed")
+    # Failed/abandoned payment recovery — Rex surfaces it, Mara drafts the win-back.
+    try:
+        from services.recovery import run_payment_recovery
+        await run_payment_recovery(owner["user_id"])
+    except Exception:
+        logger.exception("payment recovery tick failed")
 
 
 async def run_titan_briefing(owner_id: str):

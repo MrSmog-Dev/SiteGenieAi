@@ -139,6 +139,7 @@ async def _run_db_init():
     await db.customer_feedback.create_index([("created_at", -1)])
     await db.ownership_certificates.create_index("template_id")
     await db.ownership_certificates.create_index("cert_id", unique=True)
+    await db.consent_events.create_index([("user_id", 1), ("agreed_at", -1)])
     await db.rate_events.create_index("ts", expireAfterSeconds=GEN_WINDOW_SECONDS + 60)
     await db.login_attempts.create_index("ts", expireAfterSeconds=LOGIN_WINDOW_SECONDS + 60)
     await db.login_attempts.create_index("identifier")

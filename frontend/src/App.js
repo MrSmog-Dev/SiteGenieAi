@@ -30,7 +30,10 @@ const backendHost = (() => {
 // Hostnames that always serve the MAIN SiteGenie app (never a published customer site).
 const APP_HOSTS = ["localhost", "sitegenie-ai.com", "www.sitegenie-ai.com", "sitegenie.dev", "www.sitegenie.dev"];
 const currentHost = window.location.hostname;
-const isCustomDomain = currentHost !== backendHost && !APP_HOSTS.includes(currentHost);
+// A "custom domain" (published customer site) is any host that is NOT our backend host, NOT a known
+// app host, and NOT an Emergent platform host (preview/deploy URLs can differ from the backend host).
+const isEmergentHost = /\.(emergentagent\.com|emergent\.host)$/.test(currentHost);
+const isCustomDomain = currentHost !== backendHost && !APP_HOSTS.includes(currentHost) && !isEmergentHost;
 
 function AppRouter() {
   const location = useLocation();
@@ -51,6 +54,7 @@ function AppRouter() {
       <Route path="/faq" element={<PolicyPage kind="faq" />} />
       <Route path="/refund-policy" element={<PolicyPage kind="refund-policy" />} />
       <Route path="/terms" element={<PolicyPage kind="terms" />} />
+      <Route path="/privacy" element={<PolicyPage kind="privacy" />} />
       <Route path="/s/:slug" element={<PublicSite />} />
       <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/generate" element={<ProtectedRoute><Generator /></ProtectedRoute>} />

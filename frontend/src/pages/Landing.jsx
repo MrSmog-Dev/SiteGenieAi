@@ -416,6 +416,7 @@ export default function Landing() {
           <div className="flex items-center gap-5">
             <Link to="/faq" className="hover:text-white transition-colors duration-300" data-testid="footer-faq">FAQ</Link>
             <Link to="/refund-policy" className="hover:text-white transition-colors duration-300" data-testid="footer-refund">Refund Policy</Link>
+            <Link to="/privacy" className="hover:text-white transition-colors duration-300" data-testid="footer-privacy">Privacy</Link>
             <Link to="/terms" className="hover:text-white transition-colors duration-300" data-testid="footer-terms">Terms</Link>
           </div>
         </div>

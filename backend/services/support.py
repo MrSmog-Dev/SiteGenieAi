@@ -143,6 +143,16 @@ PAGE_SPECS = {
               "purchased templates, AI-generated content disclaimer (review before publishing), "
               "intellectual property, service availability, limitation of liability, changes to the "
               "service/terms, and how to contact us. Readable, section headings, not scary boilerplate."),
+    "privacy": ("Privacy Policy",
+                "Write a clear, plain-language Privacy Policy for SiteGenie. Cover: what information we "
+                "collect (account details like name/email, payment info processed by Stripe, usage data, "
+                "content you generate, support chats), how we use it (provide and improve the service, "
+                "process payments, support, security), AI processing (prompts/content may be processed by "
+                "third-party AI providers to generate sites), cookies & sessions, data sharing (payment "
+                "processors, infrastructure, AI providers — never sold), data retention, your rights "
+                "(access, correction, deletion, export), security measures, children's privacy (not for "
+                "under 18), international transfers, changes to the policy, and how to contact us. "
+                "Reassuring and honest, with clear section headings."),
 }
 
 PAGE_WRITER_SYSTEM = (

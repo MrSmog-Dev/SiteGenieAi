@@ -31,6 +31,7 @@ const KIND_META = {
   digest: { icon: Mail, label: "Digest", tint: "text-pink-300" },
   pulse: { icon: Lightbulb, label: "Check-in", tint: "text-yellow-300" },
   feedback: { icon: MessageSquare, label: "Customer", tint: "text-sky-300" },
+  recovery: { icon: Bell, label: "Recovery", tint: "text-emerald-300" },
 };
 
 function ActivityRow({ act, agents, onOpen }) {

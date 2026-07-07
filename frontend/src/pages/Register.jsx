@@ -10,6 +10,7 @@ export default function Register() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [consent, setConsent] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const { setUser } = useAuth();
@@ -17,9 +18,10 @@ export default function Register() {
 
   const submit = async (e) => {
     e.preventDefault();
+    if (!consent) { setError("Please agree to the Terms, Privacy and Refund Policy to continue."); return; }
     setError(""); setLoading(true);
     try {
-      const { data } = await api.post("/auth/register", { name, email, password });
+      const { data } = await api.post("/auth/register", { name, email, password, consent });
       setUser(data);
       navigate(sessionStorage.getItem("sg_pending_brief") ? "/generate" : "/dashboard");
     } catch (e) {
@@ -28,6 +30,7 @@ export default function Register() {
   };
 
   const googleLogin = () => {
+    if (!consent) { setError("Please agree to the Terms, Privacy and Refund Policy before continuing with Google."); return; }
     // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
     const redirectUrl = window.location.origin + "/dashboard";
     window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
@@ -76,7 +79,19 @@ export default function Register() {
               <input data-testid="register-password" type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)}
                 className="mt-1 w-full bg-surface1 border border-white/10 focus:border-brand px-4 py-3 outline-none transition-colors duration-300" placeholder="Min 6 characters" />
             </div>
-            <button data-testid="register-submit" disabled={loading} className="w-full bg-brand hover:bg-brand-hover py-3 font-medium transition-colors duration-300 disabled:opacity-50">
+            <label className="flex items-start gap-2.5 cursor-pointer select-none" data-testid="consent-label">
+              <input type="checkbox" data-testid="register-consent" checked={consent}
+                onChange={(e) => setConsent(e.target.checked)}
+                className="mt-0.5 h-4 w-4 shrink-0 accent-brand cursor-pointer" />
+              <span className="text-xs text-white/60 leading-relaxed">
+                I agree to SiteGenie's{" "}
+                <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">Terms of Service</a>,{" "}
+                <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">Privacy Policy</a>{" "}and{" "}
+                <a href="/refund-policy" target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">Refund Policy</a>.
+              </span>
+            </label>
+            <button data-testid="register-submit" disabled={loading || !consent}
+              className="w-full bg-brand hover:bg-brand-hover py-3 font-medium transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed">
               {loading ? "Creating…" : "Create account"}
             </button>
           </form>
