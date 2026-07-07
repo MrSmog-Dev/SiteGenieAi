@@ -36,16 +36,44 @@ def use_native_stripe():
         stripe_sdk.api_key = STRIPE_SECRET_KEY
 
 # ---------------- Business config ----------------
+# Emergent-style plans: Free / Standard / Pro / Team, with monthly + annual (~15% off) pricing.
+# amount = monthly price; annual_amount = per-MONTH price when billed annually (charged x12).
 SUBSCRIPTION_PLANS = {
-    "monthly":   {"name": "Monthly",  "amount": 20.00,  "monthly_credits": 50,  "billing_days": 30,  "interval": "month",   "unlimited": False},
-    "quarterly": {"name": "3-Month",  "amount": 49.00,  "monthly_credits": 120, "billing_days": 90,  "interval": "quarter", "unlimited": False},
-    "annual":    {"name": "Annual",   "amount": 149.00, "monthly_credits": 300, "billing_days": 365, "interval": "year",    "unlimited": True},
+    "free": {
+        "name": "Free", "amount": 0.00, "annual_amount": 0.00,
+        "monthly_credits": 15, "billing_days": 30, "interval": "month",
+        "unlimited": False, "team_members": 1, "purchasable": False, "annual_available": False,
+        "tagline": "Try SiteGenie and generate your first site.",
+    },
+    "standard": {
+        "name": "Standard", "amount": 20.00, "annual_amount": 17.00,
+        "monthly_credits": 50, "billing_days": 30, "interval": "month",
+        "unlimited": False, "team_members": 1, "purchasable": True, "annual_available": True,
+        "tagline": "For solo founders shipping a real website.",
+    },
+    "pro": {
+        "name": "Pro", "amount": 200.00, "annual_amount": 167.00,
+        "monthly_credits": 120, "billing_days": 30, "interval": "month",
+        "unlimited": False, "team_members": 1, "purchasable": True, "annual_available": True,
+        "tagline": "For power users building & selling many sites.",
+    },
+    "team": {
+        "name": "Team", "amount": 300.00, "annual_amount": 250.00,
+        "monthly_credits": 750, "billing_days": 30, "interval": "month",
+        "unlimited": False, "team_members": 5, "purchasable": True, "annual_available": True,
+        "tagline": "Shared credits for a whole team (up to 5).",
+    },
 }
+# New signups get 15 credits once (kept). Plan monthly_credits reset every billing cycle.
 CREDIT_RESET_DAYS = 30
+# Top-up packs (one-time, never expire) — mirrors Emergent's tiers.
 CREDIT_PACKS = {
-    "pack_25":  {"name": "Starter Pack", "amount": 9.00,  "credits": 25},
-    "pack_60":  {"name": "Growth Pack",  "amount": 19.00, "credits": 60},
-    "pack_150": {"name": "Pro Pack",     "amount": 39.00, "credits": 150},
+    "pack_5":    {"name": "Starter",   "amount": 1.00,    "credits": 5,    "note": "Intro offer"},
+    "pack_100":  {"name": "Standard",  "amount": 20.00,   "credits": 100,  "note": ""},
+    "pack_250":  {"name": "Builder",   "amount": 50.00,   "credits": 250,  "note": ""},
+    "pack_500":  {"name": "Popular",   "amount": 100.00,  "credits": 500,  "note": "Most popular"},
+    "pack_3000": {"name": "Best value","amount": 500.00,  "credits": 3000, "note": "20% bonus"},
+    "pack_6000": {"name": "Enterprise","amount": 1000.00, "credits": 6000, "note": "20% off"},
 }
 # Usage-based metering: credits are a currency consumed per AI operation based on
 # the amount of work (tokens processed), similar to Emergent's own credit system.

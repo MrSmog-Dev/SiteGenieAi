@@ -43,6 +43,7 @@ class CheckoutInput(BaseModel):
 class SubCheckoutInput(BaseModel):
     plan_id: str
     origin_url: str
+    billing: Optional[str] = "monthly"   # "monthly" | "annual"
 
 
 class EditInput(BaseModel):

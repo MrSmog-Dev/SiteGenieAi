@@ -80,21 +80,36 @@ async def reactivate_subscription(user: dict = Depends(get_current_user)):
 async def subscription_checkout(input: SubCheckoutInput, user: dict = Depends(get_current_user)):
     if not STRIPE_SECRET_KEY:
         raise HTTPException(status_code=503, detail="Subscriptions are not configured yet.")
-    price = STRIPE_PRICE_IDS.get(input.plan_id)
     plan = SUBSCRIPTION_PLANS.get(input.plan_id)
-    if not price or not plan:
+    if not plan or not plan.get("purchasable"):
         raise HTTPException(status_code=400, detail="Invalid plan")
+    billing = "annual" if (input.billing == "annual" and plan.get("annual_available")) else "monthly"
+    # Dynamic pricing — no pre-created Stripe Price IDs required.
+    if billing == "annual":
+        unit_amount = int(round(float(plan["annual_amount"]) * 12 * 100))  # per-month * 12, billed yearly
+        recurring = {"interval": "year"}
+    else:
+        unit_amount = int(round(float(plan["amount"]) * 100))
+        recurring = {"interval": "month"}
     use_native_stripe()
     origin = validate_origin(input.origin_url)
     try:
         customer_id = await _get_or_create_customer(user)
         session = stripe_sdk.checkout.Session.create(
             mode="subscription", customer=customer_id,
-            line_items=[{"price": price, "quantity": 1}],
+            line_items=[{
+                "quantity": 1,
+                "price_data": {
+                    "currency": "usd",
+                    "unit_amount": unit_amount,
+                    "recurring": recurring,
+                    "product_data": {"name": f"SiteGenie {plan['name']} ({billing})"},
+                },
+            }],
             success_url=f"{origin}/payment-return?type=subscription&session_id={{CHECKOUT_SESSION_ID}}",
             cancel_url=f"{origin}/pricing",
-            metadata={"user_id": user["user_id"], "plan_id": input.plan_id},
-            subscription_data={"metadata": {"user_id": user["user_id"], "plan_id": input.plan_id}},
+            metadata={"user_id": user["user_id"], "plan_id": input.plan_id, "billing": billing},
+            subscription_data={"metadata": {"user_id": user["user_id"], "plan_id": input.plan_id, "billing": billing}},
         )
     except stripe_sdk.error.AuthenticationError:
         logger.exception("subscription checkout failed: stripe key invalid/expired")
@@ -105,8 +120,9 @@ async def subscription_checkout(input: SubCheckoutInput, user: dict = Depends(ge
         logger.exception("subscription checkout failed")
         raise HTTPException(status_code=502, detail="Could not start checkout. Please try again.")
     await db.payment_transactions.insert_one({
-        "session_id": session.id, "user_id": user["user_id"], "amount": plan["amount"],
-        "currency": "usd", "kind": "subscription", "plan_id": input.plan_id,
+        "session_id": session.id, "user_id": user["user_id"],
+        "amount": round(unit_amount / 100, 2),
+        "currency": "usd", "kind": "subscription", "plan_id": input.plan_id, "billing": billing,
         "credits": plan["monthly_credits"], "payment_status": "initiated", "status": "open",
         "processed": False, "provider": "stripe_native", "created_at": datetime.now(timezone.utc),
     })
