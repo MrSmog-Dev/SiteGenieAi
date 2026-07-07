@@ -32,6 +32,7 @@ const KIND_META = {
   pulse: { icon: Lightbulb, label: "Check-in", tint: "text-yellow-300" },
   feedback: { icon: MessageSquare, label: "Customer", tint: "text-sky-300" },
   recovery: { icon: Bell, label: "Recovery", tint: "text-emerald-300" },
+  seo: { icon: Newspaper, label: "SEO", tint: "text-green-300" },
 };
 
 function ActivityRow({ act, agents, onOpen }) {

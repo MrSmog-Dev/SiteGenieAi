@@ -6,10 +6,11 @@ import { WarRoom } from "@/components/WarRoom";
 import { TeamPulse } from "@/components/TeamPulse";
 import { FeedbackInbox } from "@/components/FeedbackInbox";
 import { AgentMemory } from "@/components/AgentMemory";
+import { SeoCenter } from "@/components/SeoCenter";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
-import { Send, Loader2, Trash2, Hammer, Sparkles, X, Crosshair, BookOpen, PenLine, Users, Activity, Inbox, Brain } from "lucide-react";
+import { Send, Loader2, Trash2, Hammer, Sparkles, X, Crosshair, BookOpen, PenLine, Users, Activity, Inbox, Brain, TrendingUp } from "lucide-react";
 
 export default function AiTeam() {
   const { user } = useAuth();
@@ -25,6 +26,7 @@ export default function AiTeam() {
   const [showRex, setShowRex] = useState(false);
   const [showInbox, setShowInbox] = useState(false);
   const [showMemory, setShowMemory] = useState(false);
+  const [showSeo, setShowSeo] = useState(false);
   const [ivyWriting, setIvyWriting] = useState(false);
   const [statusBoard, setStatusBoard] = useState(null);
   const scrollRef = useRef(null);
@@ -53,9 +55,10 @@ export default function AiTeam() {
 
   const selectAgent = useCallback((id, link) => {
     setActiveId(id);
-    setShowMemory(false); setShowInbox(false); setShowRex(false); setShowForge(false);
+    setShowMemory(false); setShowInbox(false); setShowRex(false); setShowForge(false); setShowSeo(false);
     const extra = {};
     if (link && link.includes("inbox=1")) extra.inbox = "1";
+    if (link && link.includes("seo=1")) extra.seo = "1";
     setSearchParams(id === "pulse" ? {} : { agent: id, ...extra }, { replace: true });
   }, [setSearchParams]);
 
@@ -72,6 +75,7 @@ export default function AiTeam() {
   // Auto-open Halo's feedback inbox when arriving via a customer-feedback deep-link
   useEffect(() => {
     if (activeId === "halo" && searchParams.get("inbox") === "1") setShowInbox(true);
+    if (activeId === "ivy" && searchParams.get("seo") === "1") setShowSeo(true);
   }, [activeId, searchParams]);
 
   useEffect(() => {
@@ -265,6 +269,11 @@ export default function AiTeam() {
               )}
               {active.id === "ivy" && (
                 <>
+                  <button data-testid="ivy-seo-toggle" onClick={() => setShowSeo((s) => !s)}
+                    className={`flex items-center gap-2 text-sm border px-3 py-2 transition-colors duration-300 ${
+                      showSeo ? "border-green-300 text-green-200" : "border-green-400/50 text-green-300 hover:border-green-300"}`}>
+                    <TrendingUp className="w-4 h-4" /> SEO Center
+                  </button>
                   <a data-testid="ivy-view-blog" href="/api/blog" target="_blank" rel="noopener noreferrer"
                     className="flex items-center gap-2 text-sm border border-white/15 hover:border-green-300 hover:text-green-300 px-3 py-2 transition-colors duration-300">
                     <BookOpen className="w-4 h-4" /> View blog
@@ -300,6 +309,8 @@ export default function AiTeam() {
           {active?.id === "rex" && showRex && <RexLeadPanel onClose={() => setShowRex(false)} />}
 
           {active?.id === "halo" && showInbox && <FeedbackInbox onClose={() => setShowInbox(false)} />}
+
+          {active?.id === "ivy" && showSeo && <SeoCenter onClose={() => setShowSeo(false)} />}
 
           {active && showMemory && (
             <AgentMemory agentId={active.id} agentName={active.name} onClose={() => setShowMemory(false)} />

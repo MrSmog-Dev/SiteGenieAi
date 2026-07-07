@@ -75,6 +75,15 @@ async def _tick():
             {"job": "ivy_daily_blog", "last_run_date": {"$ne": today}},
             {"$set": {"last_run_date": today}})
         if claimed:
+            # Keep Ivy's content calendar stocked so the daily article follows the keyword plan.
+            try:
+                planned = await db.seo_calendar.count_documents(
+                    {"user_id": owner["user_id"], "status": "planned"})
+                if planned < 3:
+                    from services.seo import build_content_calendar
+                    await build_content_calendar(owner["user_id"], days=30)
+            except Exception:
+                logger.exception("calendar auto-refill failed")
             await run_ivy_blog(owner["user_id"])
     if now.weekday() == 0 and now.hour >= DIGEST_UTC_HOUR:
         claimed = await db.automation_state.find_one_and_update(

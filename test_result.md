@@ -407,19 +407,114 @@ backend:
         - working: true
           agent: "testing"
           comment: "✓ PASSED - Feedback management APIs working correctly. GET /api/support/feedback returns feedback list with proper filtering by status and kind, includes summary counts (total, new_count, by_status, by_kind). PATCH /api/support/feedback/{id} successfully updates status (tested new→reviewed→dismissed→new transitions). DELETE endpoint available but not tested per instructions. Owner-only authentication enforced correctly."
+  
+  - task: "Ivy SEO Autopilot - Overview API"
+    implemented: true
+    working: true
+    file: "backend/routes/agents.py, backend/services/seo.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✅ PASSED - GET /api/agents/ivy/seo/overview endpoint working correctly. Owner-gated authentication enforced. Returns 200 with all required keys: calendar_total (12), calendar_planned (12), articles_published (0), avg_article_score (None), last_geo_visibility (None). JSON shape matches specification."
+  
+  - task: "Ivy SEO Autopilot - Content Calendar API"
+    implemented: true
+    working: true
+    file: "backend/routes/agents.py, backend/services/seo.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✅ PASSED - GET /api/agents/ivy/seo/calendar endpoint working correctly. Owner-gated authentication enforced. Returns 200 with {calendar: [...]} containing 12 seeded planned topics. Each item has required fields: title, target_keyword, intent, scheduled_for, status. Sample: 'AI Website Builder for Small Business: 2025 Guide' with target_keyword 'AI website builder for small business', status 'planned'."
+  
+  - task: "Ivy SEO Autopilot - GEO Audit API"
+    implemented: true
+    working: true
+    file: "backend/routes/agents.py, backend/services/seo.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✅ PASSED - POST /api/agents/ivy/seo/geo-audit endpoint working correctly. Owner-gated authentication enforced. Tested with query 'best AI website builder for a small bakery'. Returns 200 with all required keys: query (matches input), answer (non-empty, 100+ chars), sitegenie_cited (boolean: False), visibility (int 0-100: 15), content_gap (non-empty suggestion). LLM integration working, completed in ~30s as expected. Audit stored in database and retrievable via audits endpoint."
+  
+  - task: "Ivy SEO Autopilot - Technical Audit API"
+    implemented: true
+    working: true
+    file: "backend/routes/agents.py, backend/services/seo.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✅ PASSED - POST /api/agents/ivy/seo/tech-audit endpoint working correctly. Owner-gated authentication enforced. Tested with url 'https://example.com'. Returns 200 with all required keys: url (final URL), signals (object with title='Example Domain', has_meta_description, h1_count=1, etc.), summary (non-empty, 80+ chars), fixes (array with 6 items). URL fetch + LLM integration working, completed in ~40s as expected. Audit stored in database."
+  
+  - task: "Ivy SEO Autopilot - Audits List API"
+    implemented: true
+    working: true
+    file: "backend/routes/agents.py, backend/services/seo.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✅ PASSED - GET /api/agents/ivy/seo/audits endpoint working correctly. Owner-gated authentication enforced. Returns 200 with {audits: [...]} containing 2 audits (geo + technical audits created in previous tests). Verified both audit types present in list with correct kind field. Database storage and retrieval working correctly."
+  
+  - task: "Ivy SEO Autopilot - Reddit Opportunities API"
+    implemented: true
+    working: true
+    file: "backend/routes/agents.py, backend/services/seo.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✅ PASSED - POST /api/agents/ivy/seo/reddit endpoint working correctly. Owner-gated authentication enforced. Returns 200 with {opportunities: [...]} containing 5 opportunities. Each item has required fields: subreddit (e.g., 'r/freelance'), angle (60+ chars), reply_draft (non-empty). LLM integration working, completed in ~30s as expected."
+  
+  - task: "Ivy SEO Autopilot - Link Map API"
+    implemented: true
+    working: true
+    file: "backend/routes/agents.py, backend/services/seo.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✅ PASSED - GET /api/agents/ivy/seo/link-map endpoint working correctly. Owner-gated authentication enforced. Returns 200 with all required keys: pillars (array), total_posts (0), suggestions (array). Pillars and suggestions are empty as expected since no blog posts exist yet. JSON shape matches specification."
+  
+  - task: "Ivy SEO Autopilot - Auth Guard"
+    implemented: true
+    working: true
+    file: "backend/routes/agents.py, backend/security.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✅ PASSED - Owner-gated authentication working correctly. Tested GET /api/agents/ivy/seo/overview WITHOUT session cookie. Returns 401 (Unauthorized) as expected. Unauthenticated requests are correctly rejected. All Ivy SEO endpoints properly protected."
 
 metadata:
   created_by: "testing_agent"
-  version: "1.6"
-  test_sequence: 7
-  run_ui: true
+  version: "1.7"
+  test_sequence: 8
+  run_ui: false
 
 test_plan:
   current_focus:
-    - "Team Shared Brain feature tested and passing"
-    - "War Room auto-capture feature tested and passing"
+    - "Ivy SEO Autopilot backend endpoints tested and passing"
   stuck_tasks: []
-  test_all: true
+  test_all: false
   test_priority: "high_first"
 
 agent_communication:
@@ -431,3 +526,5 @@ agent_communication:
       message: "Completed comprehensive testing of Agent Memory / brain feature for SiteGenie. ALL 4 TEST SCENARIOS PASSED: (1) Open Memory Panel - Successfully logged in as owner (neobeyondlegacy2@gmail.com), navigated to AI Team page, selected Nova agent (data-testid='agent-item-nova'), clicked Memory button (data-testid='memory-toggle'), memory panel (data-testid='agent-memory') opened showing all required sections: 'Where we left off' with rolling summary about Oct 1st premium launch, 'What they remember' with 4 seeded facts (October 1st launch goal, bullet-point preference, sitegenie-ai.com domain, One Piece fan), and 'Open threads' with 1 thread about go-to-market plan. (2) Add Memory - Clicked 'Remember something' (data-testid='memory-add-toggle'), typed 'Always CC the owner on big decisions' into input (data-testid='memory-add-input'), clicked save (data-testid='memory-add-save'), success toast 'Nova will remember that.' appeared, new fact appeared in list with 'you' tag. (3) Delete Memory - Found newly added fact (ID: m_a3d7504b), hovered to reveal delete button (data-testid='memory-delete-m_a3d7504b'), clicked delete, 'Forgotten.' toast appeared, fact disappeared from list. (4) Per-Agent Isolation - Switched to Titan agent (data-testid='agent-item-titan'), opened Titan's memory panel, verified 0 facts and NO Nova seeded content present (correct isolation). Minor non-critical issues: 4x 401 console errors (auth checks before login), 1x CDN error (Cloudflare RUM). All backend endpoints working correctly: GET/POST /api/agents/{agent_id}/memory, DELETE /api/agents/{agent_id}/memory/{mem_id}. Screenshots captured for Nova's memory panel with seeded facts, after adding memory, after deletion, and Titan's empty memory panel. Feature is production-ready and working perfectly."
     - agent: "testing"
       message: "Completed comprehensive testing of NEW Team Shared Brain + War Room auto-capture memory features for SiteGenie. ALL 6 TEST SCENARIOS PASSED: (1) Login - Successfully logged in as owner (neobeyondlegacy2@gmail.com / OwnerGenie2025!) and redirected to dashboard. (2) Open Team Brain - Navigated to AI Team page, clicked Team Brain roster item (data-testid='team-brain-item'), Team Brain panel (data-testid='team-brain') opened successfully with title 'Team Shared Brain'. (3) Verify Seeded Facts - Found all 3 seeded facts: 'Brand voice is luxury-but-approachable; never use jargon', 'Company domain is sitegenie-ai.com', and 'War Room decision (Jul 07) on Premium tier launch: Ship the premium tier on October 1st with a new hero and an SEO push'. All required seeded content verified present. (4) Add Shared Fact - Clicked add toggle (data-testid='memory-add-toggle'), typed 'We prioritize mobile-first design on every site' into input (data-testid='memory-add-input'), clicked save (data-testid='memory-add-save'), success toast 'The whole team will remember that.' appeared, new fact appeared in list (count went from 3 to 4). (5) Delete Shared Fact - Found newly added fact (mem_id: m_04a9996b), hovered to reveal delete button (data-testid='memory-delete-m_04a9996b'), clicked delete, 'Forgotten.' toast appeared, fact successfully removed from list. (6) War Room Decision in Agent Memory - Selected Quill agent (data-testid='agent-item-quill'), opened memory panel (data-testid='memory-toggle'), verified 'Open threads' section exists with War Room decision thread visible. Also verified Ivy agent shows same War Room thread in her memory. Minor non-critical issues: 4x 401 console errors (auth checks), 1x CDN error (Cloudflare RUM). All backend endpoints working correctly: GET/POST /api/agents/team-memory, DELETE /api/agents/team-memory/{id}. Screenshots captured for Team Brain with seeded facts, after adding fact, after deletion, Quill's memory with War Room thread, and Ivy's memory with War Room thread. Both new features (Team Shared Brain + War Room auto-capture) are production-ready and working perfectly."
+    - agent: "testing"
+      message: "Completed comprehensive testing of Ivy SEO Autopilot backend endpoints. ALL 9 TEST SCENARIOS PASSED: (1) Login - Successfully authenticated with neobeyondlegacy2@gmail.com / OwnerGenie2025! and captured session cookie. (2) GET /api/agents/ivy/seo/overview - Returns 200 with all required keys: calendar_total (12), calendar_planned (12), articles_published (0), avg_article_score (None), last_geo_visibility (None). (3) GET /api/agents/ivy/seo/calendar - Returns 200 with 12 seeded planned topics, each with title, target_keyword, intent, scheduled_for, status='planned'. Sample: 'AI Website Builder for Small Business: 2025 Guide'. (4) POST /api/agents/ivy/seo/geo-audit - Tested with query 'best AI website builder for a small bakery'. Returns 200 with query, answer (non-empty), sitegenie_cited (False), visibility (15/100), content_gap (non-empty). LLM integration working, completed in ~30s. (5) POST /api/agents/ivy/seo/tech-audit - Tested with url 'https://example.com'. Returns 200 with url, signals (title='Example Domain', has_meta_description, h1_count=1, etc.), summary (non-empty), fixes (6 items). URL fetch + LLM working, completed in ~40s. (6) GET /api/agents/ivy/seo/audits - Returns 200 with 2 audits (geo + tech audits just created), verified both present in list. (7) POST /api/agents/ivy/seo/reddit - Returns 200 with 5 opportunities, each with subreddit (e.g., 'r/freelance'), angle, reply_draft. LLM working, completed in ~30s. (8) GET /api/agents/ivy/seo/link-map - Returns 200 with pillars (empty), total_posts (0), suggestions (empty) - expected since no blog posts exist. (9) Auth Guard - Unauthenticated request to overview endpoint correctly rejected with 401. All endpoints owner-gated and working correctly. All LLM integrations functional. Database operations (calendar seeding, audit storage/retrieval) working correctly. Feature is production-ready."

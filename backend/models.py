@@ -82,6 +82,14 @@ class AgentMemoryInput(BaseModel):
     kind: Optional[str] = "fact"   # fact | preference | goal | context
 
 
+class GeoAuditInput(BaseModel):
+    query: str
+
+
+class TechAuditInput(BaseModel):
+    url: str
+
+
 class ResetBusinessInput(BaseModel):
     confirm: str
     include_leads: bool = False

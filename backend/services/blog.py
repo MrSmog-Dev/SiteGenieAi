@@ -55,15 +55,47 @@ def _parse_article(raw: str) -> dict:
 async def write_blog_post(owner_id: str | None = None) -> dict:
     existing = await db.blog_posts.find({}, {"_id": 0, "title": 1, "slug": 1}).sort(
         "created_at", -1).to_list(40)
+    # Use the next planned calendar topic if Ivy has a content plan; else pick a fresh topic.
+    cal_item = None
+    if owner_id:
+        try:
+            from services.seo import next_planned_topic
+            cal_item = await next_planned_topic(owner_id)
+        except Exception:
+            logger.exception("calendar lookup failed")
+    if cal_item:
+        directive = (
+            f"Write TODAY'S PLANNED article. Follow this brief exactly:\n"
+            f"- Title: {cal_item['title']}\n- Primary keyword: {cal_item.get('target_keyword')}\n"
+            f"- Secondary keywords: {', '.join(cal_item.get('secondary_keywords', []))}\n"
+            f"- Search intent: {cal_item.get('intent')} · Format: {cal_item.get('format')}\n"
+            f"- Should also rank for the AI-search question: \"{cal_item.get('ai_prompt')}\"\n"
+        )
+    else:
+        directive = ("Pick a FRESH high-demand topic NOT in the existing list. ")
     prompt = (
         f"Existing articles (do NOT repeat or overlap these topics): {[p['title'] for p in existing]}\n"
         f"Related articles you may interlink (title, slug): {[(p['title'], p['slug']) for p in existing[:6]]}\n"
-        "Write today's article now in the exact output format."
+        f"{directive}Write the article now in the exact output format."
     )
     raw = str(await _call_llm(prompt, IVY_WRITER_SYSTEM, STRATEGY_MODEL))
     art = _parse_article(raw)
     from services.blog_images import resolve_article_images
     art["body"] = await resolve_article_images(art["body"])
+
+    # Score the article and auto-improve if it falls short of a strong SEO bar.
+    seo_score = None
+    try:
+        from services.seo import score_article, improve_article
+        scored = score_article({**art})
+        if scored["score"] < 80:
+            gaps = [c["check"] for c in scored["checks"] if c["points"] == 0]
+            art["body"] = await improve_article({**art}, gaps)
+            scored = score_article({**art})
+        seo_score = scored["score"]
+    except Exception:
+        logger.exception("article scoring failed")
+
     slug = art["slug"]
     if await db.blog_posts.find_one({"slug": slug}, {"_id": 1}):
         slug = f"{slug}-{uuid.uuid4().hex[:4]}"
@@ -71,17 +103,27 @@ async def write_blog_post(owner_id: str | None = None) -> dict:
     post = {"post_id": f"post_{uuid.uuid4().hex[:12]}", "slug": slug, "title": art["title"],
             "meta_description": art["meta_description"], "keywords": art["keywords"],
             "body": art["body"], "author": "ivy", "created_at": now}
+    if seo_score is not None:
+        post["seo_score"] = seo_score
     await db.blog_posts.insert_one(dict(post))
+    if owner_id and cal_item:
+        try:
+            from services.seo import mark_topic_published
+            await mark_topic_published(owner_id, cal_item["cal_id"], slug, seo_score or 0)
+        except Exception:
+            logger.exception("calendar publish mark failed")
     internal_links = art["body"].count("<a ")
     images_used = art["body"].count("<figure")
     if owner_id:
+        score_txt = f" SEO score {seo_score}/100." if seo_score is not None else ""
         await post_agent_message(owner_id, "ivy",
-            f'Today\'s article is live: "{art["title"]}" — read it at /api/blog/{slug}. '
+            f'Today\'s article is live: "{art["title"]}" — read it at /api/blog/{slug}.{score_txt} '
             f'Target keywords: {", ".join(art["keywords"][:3])}. {images_used} images embedded, '
             f"{internal_links} links pointing readers back to SiteGenie. Compounding content, one day at a time.")
         from services.activity import log_activity
         await log_activity(owner_id, "ivy", "article",
-                           f'Published a new SEO article: "{art["title"]}".',
+                           f'Published a new SEO article: "{art["title"]}"'
+                           + (f" (SEO {seo_score}/100)." if seo_score is not None else "."),
                            detail=f'{images_used} images, {internal_links} internal links. '
                                   f'Keywords: {", ".join(art["keywords"][:3])}.',
                            link=f"/api/blog/{slug}")

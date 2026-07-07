@@ -5,7 +5,7 @@ from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, HTTPException, Depends
 
 from database import db
-from models import AgentChatInput, ForgeBuildInput, WarRoomInput, AgentMemoryInput
+from models import AgentChatInput, ForgeBuildInput, WarRoomInput, AgentMemoryInput, GeoAuditInput, TechAuditInput
 from security import get_current_user, is_owner
 from services.agents import AGENTS, AGENT_MAP, agent_reply, run_forge_build
 from services.team import detect_and_route_memos, post_war_room, run_war_room_meeting
@@ -149,6 +149,75 @@ async def ivy_write_blog(user: dict = Depends(get_current_user)):
     from services.blog import run_ivy_blog
     asyncio.create_task(run_ivy_blog(user["user_id"]))
     return {"status": "writing"}
+
+
+# ---------------- Ivy SEO Autopilot ----------------
+
+@router.get("/agents/ivy/seo/overview")
+async def ivy_seo_overview(user: dict = Depends(get_current_user)):
+    _require_owner(user)
+    from services.seo import seo_overview
+    return await seo_overview(user["user_id"])
+
+
+@router.get("/agents/ivy/seo/calendar")
+async def ivy_seo_calendar(user: dict = Depends(get_current_user)):
+    _require_owner(user)
+    from services.seo import get_calendar
+    return {"calendar": await get_calendar(user["user_id"])}
+
+
+@router.post("/agents/ivy/seo/calendar")
+async def ivy_build_calendar(user: dict = Depends(get_current_user)):
+    _require_owner(user)
+    from services.seo import build_content_calendar
+    return await build_content_calendar(user["user_id"], days=30)
+
+
+@router.post("/agents/ivy/seo/geo-audit")
+async def ivy_geo_audit(input: GeoAuditInput, user: dict = Depends(get_current_user)):
+    _require_owner(user)
+    q = (input.query or "").strip()
+    if len(q) < 3:
+        raise HTTPException(status_code=400, detail="Enter a buyer question to audit.")
+    from services.seo import geo_audit
+    return await geo_audit(user["user_id"], q)
+
+
+@router.post("/agents/ivy/seo/tech-audit")
+async def ivy_tech_audit(input: TechAuditInput, user: dict = Depends(get_current_user)):
+    _require_owner(user)
+    url = (input.url or "").strip()
+    if len(url) < 4:
+        raise HTTPException(status_code=400, detail="Enter a URL to audit.")
+    from services.seo import technical_audit
+    try:
+        return await technical_audit(user["user_id"], url)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=502, detail="Couldn't fetch that URL. Check it and try again.")
+
+
+@router.get("/agents/ivy/seo/audits")
+async def ivy_seo_audits(user: dict = Depends(get_current_user)):
+    _require_owner(user)
+    from services.seo import recent_audits
+    return {"audits": await recent_audits(user["user_id"])}
+
+
+@router.get("/agents/ivy/seo/link-map")
+async def ivy_link_map(user: dict = Depends(get_current_user)):
+    _require_owner(user)
+    from services.seo import internal_link_map
+    return await internal_link_map(user["user_id"])
+
+
+@router.post("/agents/ivy/seo/reddit")
+async def ivy_reddit(user: dict = Depends(get_current_user)):
+    _require_owner(user)
+    from services.seo import reddit_opportunities
+    return await reddit_opportunities(user["user_id"])
 
 
 @router.get("/agents/war-room")
