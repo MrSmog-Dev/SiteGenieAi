@@ -23,7 +23,7 @@ export function SeoCenter({ onClose }) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <TrendingUp className="w-4 h-4 text-green-300" />
-          <p className="text-sm font-semibold text-green-100">Ivy's SEO Command Center</p>
+          <p className="text-sm font-semibold text-green-100">Ivy&apos;s SEO Command Center</p>
           <span className="text-[10px] font-mono uppercase tracking-wider text-green-300/60">Google + AI search · autopilot</span>
         </div>
         <button onClick={onClose} className="text-white/40 hover:text-white p-1"><X className="w-4 h-4" /></button>
@@ -145,7 +145,7 @@ function Geo() {
   };
   return (
     <div data-testid="seo-geo">
-      <p className="text-xs text-white/50 mb-2">Check if AI assistants (ChatGPT/Perplexity/Gemini) would recommend SiteGenie for a buyer's question.</p>
+      <p className="text-xs text-white/50 mb-2">Check if AI assistants (ChatGPT/Perplexity/Gemini) would recommend SiteGenie for a buyer&apos;s question.</p>
       <div className="flex gap-2">
         <input data-testid="seo-geo-input" value={q} onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && run()}
@@ -228,7 +228,7 @@ function Links() {
   const [data, setData] = useState(null);
   useEffect(() => { api.get("/agents/ivy/seo/link-map").then(({ data }) => setData(data)).catch(() => setData({ pillars: [], total_posts: 0 })); }, []);
   if (!data) return <Loading />;
-  if (!data.total_posts) return <Empty text="No published articles yet to map. Once Ivy publishes a few, she'll build a pillar/cluster internal-link map here." />;
+  if (!data.total_posts) return <div data-testid="seo-links"><Empty text="No published articles yet to map. Once Ivy publishes a few, she'll build a pillar/cluster internal-link map here." /></div>;
   return (
     <div data-testid="seo-links">
       <div className="text-xs text-white/50 mb-3">{data.total_posts} articles · {data.posts_with_links} with internal links</div>
