@@ -5,11 +5,12 @@ from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, HTTPException, Depends
 
 from database import db
-from models import AgentChatInput, ForgeBuildInput, WarRoomInput
+from models import AgentChatInput, ForgeBuildInput, WarRoomInput, AgentMemoryInput
 from security import get_current_user, is_owner
 from services.agents import AGENTS, AGENT_MAP, agent_reply, run_forge_build
 from services.team import detect_and_route_memos, post_war_room, run_war_room_meeting
 from services.activity import get_activity_feed, get_status_board
+from services.memory import get_memory, add_fact, delete_memory_item
 
 router = APIRouter()
 
@@ -62,6 +63,39 @@ async def agent_activity_feed(limit: int = 40, before: str = None, agent_id: str
 async def agent_status_board(user: dict = Depends(get_current_user)):
     _require_owner(user)
     return await get_status_board(user["user_id"])
+
+
+@router.get("/agents/{agent_id}/memory")
+async def get_agent_memory(agent_id: str, user: dict = Depends(get_current_user)):
+    _require_owner(user)
+    if agent_id not in AGENT_MAP:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    mem = await get_memory(user["user_id"], agent_id)
+    return {"agent": _public(AGENT_MAP[agent_id]),
+            "facts": mem.get("facts", []),
+            "open_threads": [t for t in mem.get("open_threads", []) if t.get("status") != "done"],
+            "rolling_summary": mem.get("rolling_summary", "")}
+
+
+@router.post("/agents/{agent_id}/memory")
+async def add_agent_memory(agent_id: str, input: AgentMemoryInput, user: dict = Depends(get_current_user)):
+    _require_owner(user)
+    if agent_id not in AGENT_MAP:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    text = (input.text or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Memory text is empty.")
+    await add_fact(user["user_id"], agent_id, text, input.kind or "fact")
+    return await get_memory(user["user_id"], agent_id)
+
+
+@router.delete("/agents/{agent_id}/memory/{mem_id}")
+async def delete_agent_memory(agent_id: str, mem_id: str, user: dict = Depends(get_current_user)):
+    _require_owner(user)
+    ok = await delete_memory_item(user["user_id"], agent_id, mem_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Memory item not found")
+    return {"deleted": True}
 
 
 @router.post("/agents/forge/build")
@@ -153,7 +187,7 @@ async def send_agent_chat(agent_id: str, input: AgentChatInput, user: dict = Dep
         {"user_id": user["user_id"], "agent_id": agent_id}, {"_id": 0, "messages": 1})
     history = (chat or {}).get("messages", [])
     try:
-        reply = await agent_reply(agent, history, message)
+        reply = await agent_reply(agent, history, message, user_id=user["user_id"])
     except asyncio.TimeoutError:
         raise HTTPException(status_code=504, detail=f"{agent['name']} took too long to reply. Try again.")
     except Exception as e:
@@ -168,6 +202,8 @@ async def send_agent_chat(agent_id: str, input: AgentChatInput, user: dict = Dep
         {"user_id": user["user_id"], "agent_id": agent_id},
         {"$push": {"messages": {"$each": new_msgs, "$slice": -200}}, "$set": {"updated_at": now}}, upsert=True)
     asyncio.create_task(detect_and_route_memos(user["user_id"], agent_id, message, reply))
+    from services.memory import extract_and_store_memory
+    asyncio.create_task(extract_and_store_memory(user["user_id"], agent_id, message, reply))
     return {"reply": reply}
 
 

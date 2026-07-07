@@ -115,17 +115,26 @@ NICHE_EXPAND_SYSTEM = (
 )
 
 
-def _war_system(agent: dict, snapshot_json: str, team_ctx: str) -> str:
+def _war_system(agent: dict, snapshot_json: str, team_ctx: str, memory_ctx: str = "") -> str:
     return (
         f"You are {agent['name']} — {agent['role']} — speaking in SiteGenie's WAR ROOM, a live team meeting "
         "attended by the business Owner and fellow AI teammates.\n"
         f"PERSONALITY: {agent['personality']}\n\n{BASE_CONTEXT}\n\n"
+        f"{memory_ctx}\n\n"
         f"LIVE BUSINESS DATA:\n{snapshot_json}\n\n{team_ctx}\n\n"
         f"Rules: speak ONLY as {agent['name']} — never write other people's lines. React to what teammates "
         "already said, bring your specialty's angle, cite live numbers, disagree when warranted. Short and "
         "punchy — this is a meeting, not an essay. No markdown tables. Do NOT prefix your message with your "
         "name or any speaker label — the interface already shows who is talking."
     )
+
+
+async def _agent_mem(owner_id: str, agent_id: str) -> str:
+    try:
+        from services.memory import agent_memory_context
+        return await agent_memory_context(owner_id, agent_id)
+    except Exception:
+        return ""
 
 
 async def _war_turn(agent: dict, system: str, transcript: str, instruction: str) -> str:
@@ -154,7 +163,7 @@ async def run_war_room_meeting(meeting_id: str, owner_id: str, topic: str):
         titan = AGENT_MAP["titan"]
         names = ", ".join(AGENT_MAP[i]["name"] for i in ids)
         transcript = f"Owner: {topic}"
-        msg = await _war_turn(titan, _war_system(titan, snapshot_json, team_ctx), transcript,
+        msg = await _war_turn(titan, _war_system(titan, snapshot_json, team_ctx, await _agent_mem(owner_id, "titan")), transcript,
                               f"Open the meeting: restate the objective in 1-2 lines and call on {names} "
                               "for input. Max 60 words.")
         transcript += f"\nTitan: {msg}"
@@ -163,7 +172,7 @@ async def run_war_room_meeting(meeting_id: str, owner_id: str, topic: str):
         for aid in ids:
             a = AGENT_MAP[aid]
             await _set_meeting(meeting_id, status="running")
-            msg = await _war_turn(a, _war_system(a, snapshot_json, team_ctx), transcript,
+            msg = await _war_turn(a, _war_system(a, snapshot_json, team_ctx, await _agent_mem(owner_id, aid)), transcript,
                                   f"It's your turn, {a['name']}. Give your specialty's take on the topic, "
                                   "reacting to what teammates said. Max 110 words.")
             transcript += f"\n{a['name']}: {msg}"

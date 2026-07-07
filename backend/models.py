@@ -77,6 +77,11 @@ class WarRoomInput(BaseModel):
     topic: str
 
 
+class AgentMemoryInput(BaseModel):
+    text: str
+    kind: Optional[str] = "fact"   # fact | preference | goal | context
+
+
 class ResetBusinessInput(BaseModel):
     confirm: str
     include_leads: bool = False

@@ -162,11 +162,12 @@ async def business_snapshot() -> dict:
     }
 
 
-def _system_prompt(agent: dict, snapshot_json: str, team_ctx: str = "") -> str:
+def _system_prompt(agent: dict, snapshot_json: str, team_ctx: str = "", memory_ctx: str = "") -> str:
     return (
         f"You are {agent['name']} — {agent['role']} on SiteGenie's private AI executive team. "
         "You report directly to the business OWNER, who is chatting with you now.\n"
         f"PERSONALITY: {agent['personality']}\n\n{BASE_CONTEXT}\n\n"
+        f"{memory_ctx}\n\n"
         f"LIVE BUSINESS DATA (real-time from the production database):\n{snapshot_json}\n\n"
         f"{team_ctx}\n\n"
         "TEAM MESSAGING (real, not roleplay): memos on the board above were ACTUALLY delivered between "
@@ -175,6 +176,9 @@ def _system_prompt(agent: dict, snapshot_json: str, team_ctx: str = "") -> str:
         "sent you something and no such memo exists, say honestly that nothing has arrived yet. When you "
         "tell the Owner you'll send or hand something to a teammate, include the FULL deliverable in that "
         "same reply — it will be automatically delivered to them as a memo.\n\n"
+        "MEMORY: the persistent memory above is real and yours — it survives data resets. Treat its facts "
+        "as true, honor the owner's stored preferences, and if it lists open threads, proactively continue "
+        "them. Never claim to have forgotten something that's in your memory.\n\n"
         "Rules: ground your advice in the live data and cite real numbers when relevant. Stay in character "
         "but be genuinely useful and specific to SiteGenie. Be concise — short paragraphs and tight lists, "
         "no fluff, no markdown tables. If a question falls outside your specialty, give a quick take and "
@@ -183,10 +187,14 @@ def _system_prompt(agent: dict, snapshot_json: str, team_ctx: str = "") -> str:
     )
 
 
-async def agent_reply(agent: dict, history: list, user_msg: str) -> str:
+async def agent_reply(agent: dict, history: list, user_msg: str, user_id: str = None) -> str:
     snapshot = await business_snapshot()
     team_ctx = await team_memory_context()
-    system = _system_prompt(agent, json.dumps(snapshot, default=str), team_ctx)
+    memory_ctx = ""
+    if user_id:
+        from services.memory import agent_memory_context
+        memory_ctx = await agent_memory_context(user_id, agent["id"])
+    system = _system_prompt(agent, json.dumps(snapshot, default=str), team_ctx, memory_ctx)
     convo = "\n\n".join(
         f"{'Owner' if m['role'] == 'user' else agent['name']}: {m['content']}" for m in history[-12:])
     prompt = (f"CONVERSATION SO FAR:\n{convo}\n\n" if convo else "") + f"Owner: {user_msg}"

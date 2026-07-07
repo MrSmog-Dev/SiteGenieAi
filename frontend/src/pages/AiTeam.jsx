@@ -5,10 +5,11 @@ import { RexLeadPanel } from "@/components/RexLeadPanel";
 import { WarRoom } from "@/components/WarRoom";
 import { TeamPulse } from "@/components/TeamPulse";
 import { FeedbackInbox } from "@/components/FeedbackInbox";
+import { AgentMemory } from "@/components/AgentMemory";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
-import { Send, Loader2, Trash2, Hammer, Sparkles, X, Crosshair, BookOpen, PenLine, Users, Activity, Inbox } from "lucide-react";
+import { Send, Loader2, Trash2, Hammer, Sparkles, X, Crosshair, BookOpen, PenLine, Users, Activity, Inbox, Brain } from "lucide-react";
 
 export default function AiTeam() {
   const { user } = useAuth();
@@ -23,6 +24,7 @@ export default function AiTeam() {
   const [showForge, setShowForge] = useState(false);
   const [showRex, setShowRex] = useState(false);
   const [showInbox, setShowInbox] = useState(false);
+  const [showMemory, setShowMemory] = useState(false);
   const [ivyWriting, setIvyWriting] = useState(false);
   const [statusBoard, setStatusBoard] = useState(null);
   const scrollRef = useRef(null);
@@ -51,6 +53,7 @@ export default function AiTeam() {
 
   const selectAgent = useCallback((id, link) => {
     setActiveId(id);
+    setShowMemory(false); setShowInbox(false); setShowRex(false); setShowForge(false);
     const extra = {};
     if (link && link.includes("inbox=1")) extra.inbox = "1";
     setSearchParams(id === "pulse" ? {} : { agent: id, ...extra }, { replace: true });
@@ -261,6 +264,11 @@ export default function AiTeam() {
                   <Inbox className="w-4 h-4" /> Feedback inbox
                 </button>
               )}
+              <button data-testid="memory-toggle" onClick={() => setShowMemory((s) => !s)} title={`${active.name}'s memory`}
+                className={`flex items-center gap-2 text-sm border px-3 py-2 transition-colors duration-300 ${
+                  showMemory ? "border-violet-300 text-violet-200" : "border-violet-400/40 text-violet-300 hover:border-violet-300"}`}>
+                <Brain className="w-4 h-4" /> Memory
+              </button>
               <button data-testid="clear-chat-btn" onClick={clearChat} title="Clear conversation"
                 className="p-2 text-white/40 hover:text-neon transition-colors duration-300">
                 <Trash2 className="w-4 h-4" />
@@ -275,6 +283,10 @@ export default function AiTeam() {
           {active?.id === "rex" && showRex && <RexLeadPanel onClose={() => setShowRex(false)} />}
 
           {active?.id === "halo" && showInbox && <FeedbackInbox onClose={() => setShowInbox(false)} />}
+
+          {active && showMemory && (
+            <AgentMemory agentId={active.id} agentName={active.name} onClose={() => setShowMemory(false)} />
+          )}
 
           {activeId === "pulse" ? <TeamPulse onOpenAgent={selectAgent} /> :
            activeId === "war_room" ? <WarRoom agents={agents} /> : (<>

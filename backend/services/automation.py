@@ -121,7 +121,7 @@ async def run_titan_briefing(owner_id: str):
               "1) a one-line business health verdict, 2) the key numbers, 3) anything that needs the "
               "owner's attention, 4) top 3 priorities today with which teammate should own each. "
               f"Open with 'Morning Briefing — {date_str}'.")
-    reply = await agent_reply(AGENT_MAP["titan"], [], prompt)
+    reply = await agent_reply(AGENT_MAP["titan"], [], prompt, user_id=owner_id)
     await post_agent_message(owner_id, "titan", reply)
     await log_activity(owner_id, "titan", "briefing", f"Posted the morning briefing for {date_str}.",
                        detail=reply[:600], link="/team?agent=titan")
@@ -273,7 +273,7 @@ async def run_mara_digest(owner_id: str):
               "body covering 1) users (total + new this week), 2) revenue by stream, 3) site views + top "
               "published sites, 4) Template Market activity, 5) lead-board movement, and 6) ONE clear "
               f"recommendation for next week. Open with 'Weekly Digest — {date_str}'.")
-    reply = await agent_reply(AGENT_MAP["mara"], [], prompt)
+    reply = await agent_reply(AGENT_MAP["mara"], [], prompt, user_id=owner_id)
     await post_agent_message(owner_id, "mara", reply)
     await log_activity(owner_id, "mara", "digest", f"Drafted the weekly analytics digest ({date_str}).",
                        detail=reply[:600], link="/team?agent=mara")

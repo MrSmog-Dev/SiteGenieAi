@@ -136,7 +136,9 @@ async def logout(request: Request, response: Response):
 @router.post("/auth/admin/reset-business-data")
 async def reset_business_data(input: ResetBusinessInput, user: dict = Depends(get_current_user)):
     """Owner-only: wipe test users/revenue/jobs/AI-chat history for a true fresh start.
-    Keeps: owner account, owner templates, Market listings, blog posts, automation state."""
+    Keeps: owner account, owner templates, Market listings, blog posts, automation state.
+    IMPORTANT: `agent_memory` (the 12 agents' persistent brain) is intentionally PRESERVED so
+    the team remembers your preferences and open work across resets — never add it here."""
     if not is_owner(user):
         raise HTTPException(status_code=403, detail="Owner only")
     if input.confirm != "RESET":

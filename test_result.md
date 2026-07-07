@@ -273,6 +273,54 @@ frontend:
         - working: true
           agent: "testing"
           comment: "✓ PASSED - Ownership certificate PDF download working correctly. On purchased template page (/templates/tpl_ownedtest01), 'Ownership' button (data-testid='ownership-cert-btn') is present and opens certificate modal (data-testid='certificate-modal'). Modal displays all required information: 'CERTIFICATE OF OWNERSHIP' title, business name 'Bella Vista Trattoria', owner name 'Owner', transferred date '7/7/2026', price '$340', and certificate ID 'cert_demo123'. 'Download PDF certificate' button (data-testid='download-cert-pdf') triggers successful PDF download (filename: ownership-certificate-bella-vista-trattoria.pdf) with success toast 'Certificate PDF downloaded'. No error toast appeared. Screenshot captured showing certificate modal with all details."
+  
+  - task: "Agent Memory Panel - Open and View"
+    implemented: true
+    working: true
+    file: "frontend/src/components/AgentMemory.jsx, frontend/src/pages/AiTeam.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✅ PASSED - Agent Memory panel opens correctly for Nova agent. After login and navigating to AI Team page (/team), selected Nova agent (data-testid='agent-item-nova'), clicked Memory button (data-testid='memory-toggle'), and memory panel (data-testid='agent-memory') opened successfully. Panel displays all required sections: 'Where we left off' with rolling summary about Oct 1st premium launch and GTM plan, 'What they remember' section showing 4 seeded memory facts (October 1st launch goal, bullet-point preference, sitegenie-ai.com domain context, One Piece fan fact), and 'Open threads' section with 1 thread about go-to-market plan. All seeded content verified present (October=True, Domain=True, Bullet=True). Screenshots captured."
+  
+  - task: "Agent Memory - Add Memory"
+    implemented: true
+    working: true
+    file: "frontend/src/components/AgentMemory.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✅ PASSED - Add memory functionality working correctly. In Nova's open memory panel, clicked 'Remember something' button (data-testid='memory-add-toggle'), input field (data-testid='memory-add-input') appeared, typed 'Always CC the owner on big decisions', clicked save button (data-testid='memory-add-save'). Success toast 'Nova will remember that.' appeared, new memory fact appeared in the list with 'you' tag indicating manual memory source. POST /api/agents/nova/memory endpoint working correctly."
+  
+  - task: "Agent Memory - Delete Memory"
+    implemented: true
+    working: true
+    file: "frontend/src/components/AgentMemory.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✅ PASSED - Delete memory functionality working correctly. Found newly added memory fact (ID: m_a3d7504b), hovered over the fact row to reveal delete button (data-testid='memory-delete-m_a3d7504b'), clicked delete button. Success toast 'Forgotten.' appeared, memory fact row disappeared from the list. DELETE /api/agents/nova/memory/{mem_id} endpoint working correctly. Memory count returned to 4 facts after deletion."
+  
+  - task: "Agent Memory - Per-Agent Isolation"
+    implemented: true
+    working: true
+    file: "frontend/src/components/AgentMemory.jsx, frontend/src/pages/AiTeam.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✅ PASSED - Per-agent memory isolation verified. Closed Nova's memory panel, switched to Titan agent (data-testid='agent-item-titan'), opened Titan's memory panel (data-testid='memory-toggle'). Titan's memory panel opened successfully showing 0 memory facts with empty state message 'Nothing yet — chat with Titan or add a memory.' Verified Titan's memory does NOT contain any of Nova's seeded facts (no October launch, no sitegenie-ai.com domain, no bullet-point preference). Memory is correctly isolated per agent. Screenshot captured showing Titan's empty memory panel."
 
 backend:
   - task: "Support Chat API - POST /api/support/chat"
@@ -313,13 +361,13 @@ backend:
 
 metadata:
   created_by: "testing_agent"
-  version: "1.4"
-  test_sequence: 5
+  version: "1.5"
+  test_sequence: 6
   run_ui: true
 
 test_plan:
   current_focus:
-    - "P1 legal/ownership features tested and passing"
+    - "Agent Memory feature tested and passing"
   stuck_tasks: []
   test_all: true
   test_priority: "high_first"
@@ -329,3 +377,5 @@ agent_communication:
       message: "Completed comprehensive testing of ownership onboarding + certificate flow for SiteGenie. ALL 5 TEST SCENARIOS PASSED: (1) Ownership certificate modal displays correctly with all required information (business name, price $340, certificate ID, transfer date), (2) Onboarding modal auto-opens with ?onboard=1 parameter and shows all input fields, (3) Step 1 details saving works correctly - successfully updated business name to 'Bella Vista Ristorante' and email to 'hello@bellavista.com' with success toast and step transition, (4) Step 2 publish functionality works - site published successfully with public URL displayed in step 3, (5) Details persistence verified - updated business name appears in page header and template iframe immediately after onboarding completion. Minor non-critical issue: 2x 401 console errors during page load (auth checks). Screenshots captured for all 3 onboarding steps and final state. Feature is production-ready and working perfectly."
     - agent: "testing"
       message: "Completed P1 legal/ownership features testing. ALL 4 TEST SCENARIOS PASSED: (1) Clickwrap gate on register page - consent checkbox (data-testid='register-consent') exists, submit button (data-testid='register-submit') correctly disabled until consent checked, consent text contains links to Terms, Privacy, and Refund Policy. (2) Privacy page - accessible at /privacy with correct title 'Privacy Policy' and 7428 characters of content, Terms and Refund Policy pages also verified. (3) Footer links - all footer links present (footer-privacy, footer-terms, footer-refund, footer-faq), footer-privacy correctly navigates to /privacy. (4) Ownership certificate + PDF download - ownership button (data-testid='ownership-cert-btn') present on purchased template tpl_ownedtest01, certificate modal (data-testid='certificate-modal') opens with correct content (business name 'Bella Vista Trattoria', price '$340', certificate ID 'cert_demo123'), download PDF button (data-testid='download-cert-pdf') triggers successful PDF download with success toast 'Certificate PDF downloaded'. Minor non-critical issues: 12x 401 console errors (auth checks), 9x CDN network errors (Cloudflare RUM). All core functionality working perfectly."
+    - agent: "testing"
+      message: "Completed comprehensive testing of Agent Memory / brain feature for SiteGenie. ALL 4 TEST SCENARIOS PASSED: (1) Open Memory Panel - Successfully logged in as owner (neobeyondlegacy2@gmail.com), navigated to AI Team page, selected Nova agent (data-testid='agent-item-nova'), clicked Memory button (data-testid='memory-toggle'), memory panel (data-testid='agent-memory') opened showing all required sections: 'Where we left off' with rolling summary about Oct 1st premium launch, 'What they remember' with 4 seeded facts (October 1st launch goal, bullet-point preference, sitegenie-ai.com domain, One Piece fan), and 'Open threads' with 1 thread about go-to-market plan. (2) Add Memory - Clicked 'Remember something' (data-testid='memory-add-toggle'), typed 'Always CC the owner on big decisions' into input (data-testid='memory-add-input'), clicked save (data-testid='memory-add-save'), success toast 'Nova will remember that.' appeared, new fact appeared in list with 'you' tag. (3) Delete Memory - Found newly added fact (ID: m_a3d7504b), hovered to reveal delete button (data-testid='memory-delete-m_a3d7504b'), clicked delete, 'Forgotten.' toast appeared, fact disappeared from list. (4) Per-Agent Isolation - Switched to Titan agent (data-testid='agent-item-titan'), opened Titan's memory panel, verified 0 facts and NO Nova seeded content present (correct isolation). Minor non-critical issues: 4x 401 console errors (auth checks before login), 1x CDN error (Cloudflare RUM). All backend endpoints working correctly: GET/POST /api/agents/{agent_id}/memory, DELETE /api/agents/{agent_id}/memory/{mem_id}. Screenshots captured for Nova's memory panel with seeded facts, after adding memory, after deletion, and Titan's empty memory panel. Feature is production-ready and working perfectly."
