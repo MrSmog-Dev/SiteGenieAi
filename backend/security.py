@@ -9,7 +9,7 @@ from fastapi import Request, Response, HTTPException
 from database import db
 from config import (
     SUBSCRIPTION_PLANS, CREDIT_RESET_DAYS, TOKENS_PER_CREDIT, MIN_OPERATION_COST,
-    OWNER_EMAIL, LOGIN_MAX_ATTEMPTS, LOGIN_WINDOW_SECONDS,
+    OWNER_EMAIL, LOGIN_MAX_ATTEMPTS, LOGIN_WINDOW_SECONDS, logger,
 )
 
 
@@ -115,6 +115,17 @@ async def deduct_credits(user_id: str, amount: int):
             {"$inc": {"plan_credits": -from_plan, "extra_credits": -from_extra}})
 
 
+async def billing_user(user: dict) -> dict:
+    """Resolve the account that owns the credit pool for this user. Team MEMBERS draw from (and
+    are billed against) their team owner's account; everyone else bills to themselves."""
+    tid = user.get("team_id")
+    if tid and user.get("team_role") == "member":
+        owner = await db.users.find_one({"user_id": user.get("team_owner_id")}, {"_id": 0})
+        if owner:
+            return owner
+    return user
+
+
 async def process_subscription(user: dict) -> dict:
     """Lazy subscription lifecycle: migrate legacy credits, apply 30-day credit resets,
     handle billing-period renewal (simulated) and cancellation."""
@@ -142,6 +153,13 @@ async def process_subscription(user: dict) -> dict:
             user["plan_name"] = None
             user["plan_credits"] = 0
             changed.update(subscription_status="cancelled", plan=None, plan_name=None, plan_credits=0)
+            if user.get("team_role") == "owner" and user.get("team_id"):
+                try:
+                    from services.teams import disband_team
+                    await disband_team(user["user_id"])
+                    user["team_id"] = None; user["team_owner_id"] = None; user["team_role"] = None
+                except Exception:
+                    logger.exception("team disband on lapse failed")
         # 30-day credit resets (applies to both native and simulated)
         if user.get("subscription_status") == "active" and plan:
             ncr = parse_dt(user.get("next_credit_reset"))
@@ -177,6 +195,22 @@ def public_user(u: dict) -> dict:
         "next_credit_reset": u.get("next_credit_reset"),
         "cancel_at_period_end": bool(u.get("cancel_at_period_end", False)),
     }
+
+
+async def public_user_view(u: dict) -> dict:
+    """public_user, but a team MEMBER sees the shared team pool (owner's credits/plan)."""
+    pub = public_user(u)
+    if u.get("team_id") and u.get("team_role") == "member" and u.get("team_owner_id"):
+        owner = await db.users.find_one({"user_id": u["team_owner_id"]}, {"_id": 0})
+        if owner:
+            pub["credits"] = total_credits(owner)
+            pub["plan_credits"] = int(owner.get("plan_credits", 0))
+            pub["extra_credits"] = int(owner.get("extra_credits", 0))
+            pub["unlimited"] = user_is_unlimited(owner)
+            pub["shared_pool"] = True
+    pub["team_id"] = u.get("team_id")
+    pub["team_role"] = u.get("team_role")
+    return pub
 
 
 # ---------------- Sessions ----------------

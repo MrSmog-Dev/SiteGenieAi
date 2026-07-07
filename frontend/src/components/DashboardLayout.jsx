@@ -1,6 +1,8 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { LayoutDashboard, Sparkles, LayoutTemplate, CreditCard, LogOut, Store, Bot } from "lucide-react";
+import { TopUpModal } from "@/components/TopUpModal";
+import { LayoutDashboard, Sparkles, LayoutTemplate, CreditCard, LogOut, Store, Bot, Plus } from "lucide-react";
 
 const nav = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -14,6 +16,7 @@ export default function DashboardLayout({ children }) {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  const [topUpOpen, setTopUpOpen] = useState(false);
   const items = user && (user.role === "owner" || user.role === "admin")
     ? [...nav, { to: "/team", label: "AI Team", icon: Bot }]
     : nav;
@@ -48,7 +51,15 @@ export default function DashboardLayout({ children }) {
         </nav>
         <div className="p-3 border-t border-white/10">
           <div className="px-4 py-3 mb-2 bg-surface2">
-            <div className="text-xs text-white/40 uppercase tracking-wider">Credits</div>
+            <div className="flex items-center justify-between">
+              <div className="text-xs text-white/40 uppercase tracking-wider">Credits</div>
+              {!user?.unlimited && (
+                <button data-testid="sidebar-buy-credits" onClick={() => setTopUpOpen(true)} title="Buy more credits"
+                  className="flex items-center gap-1 text-[10px] font-mono text-brand hover:text-brand-hover border border-brand/40 hover:border-brand px-1.5 py-0.5 transition-colors duration-200">
+                  <Plus className="w-3 h-3" /> Top up
+                </button>
+              )}
+            </div>
             <div className="font-mono text-2xl font-bold text-brand" data-testid="sidebar-credits">{user?.unlimited ? "∞" : (user?.credits ?? 0)}</div>
           </div>
           <button
@@ -70,12 +81,14 @@ export default function DashboardLayout({ children }) {
             <span className="font-display font-bold">SiteGenie</span>
           </Link>
           <div className="flex items-center gap-3">
-            <span className="font-mono text-brand font-bold" data-testid="mobile-credits">{user?.unlimited ? "∞" : (user?.credits ?? 0)} cr</span>
+            <button data-testid="mobile-credits" onClick={() => !user?.unlimited && setTopUpOpen(true)}
+              className="font-mono text-brand font-bold">{user?.unlimited ? "∞" : (user?.credits ?? 0)} cr</button>
             <button onClick={() => navigate("/generate")} className="text-xs bg-brand px-3 py-1.5">New</button>
           </div>
         </header>
         <main className="flex-1 min-w-0">{children}</main>
       </div>
+      {topUpOpen && <TopUpModal onClose={() => setTopUpOpen(false)} />}
     </div>
   );
 }

@@ -7,7 +7,7 @@ from fastapi import APIRouter, Request, Response, HTTPException, Depends
 from database import db
 from models import RegisterInput, LoginInput, GoogleSessionInput, ResetBusinessInput
 from security import (
-    hash_password, verify_password, create_session, set_session_cookie, public_user,
+    hash_password, verify_password, create_session, set_session_cookie, public_user, public_user_view,
     process_subscription, get_current_user, client_ip, is_owner,
     login_is_locked, record_failed_login, clear_login_attempts,
 )
@@ -73,7 +73,7 @@ async def login(input: LoginInput, request: Request, response: Response):
     token = await create_session(user["user_id"])
     set_session_cookie(response, token)
     user = await process_subscription(user)
-    return public_user(user)
+    return await public_user_view(user)
 
 
 @router.post("/auth/google-session")
@@ -121,7 +121,7 @@ async def google_session(input: GoogleSessionInput, request: Request, response: 
 
 @router.get("/auth/me")
 async def me(user: dict = Depends(get_current_user)):
-    return public_user(user)
+    return await public_user_view(user)
 
 
 @router.post("/auth/logout")
@@ -151,7 +151,8 @@ async def reset_business_data(input: ResetBusinessInput, user: dict = Depends(ge
     await db.templates.delete_many({"user_id": {"$in": other_ids}})
     for col in (db.payment_transactions, db.subscriptions, db.gen_jobs, db.agent_jobs,
                 db.team_tasks, db.team_memos, db.war_room, db.war_room_meetings,
-                db.agent_chats, db.rate_events, db.login_attempts):
+                db.agent_chats, db.rate_events, db.login_attempts, db.teams, db.team_invites,
+                db.build_sessions):
         await col.delete_many({})
     leads_cleared = False
     if input.include_leads:

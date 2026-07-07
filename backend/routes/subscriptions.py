@@ -194,6 +194,11 @@ async def stripe_native_webhook(request: Request):
                 await db.users.update_one({"user_id": meta["user_id"]}, {"$set": {
                     "subscription_status": "cancelled", "plan": None, "plan_name": None,
                     "plan_credits": 0, "cancel_at_period_end": False}})
+                try:
+                    from services.teams import disband_team
+                    await disband_team(meta["user_id"])
+                except Exception:
+                    logger.exception("team disband on cancel failed")
         elif etype == "customer.subscription.updated":
             meta = obj.get("metadata") or {}
             if meta.get("user_id"):

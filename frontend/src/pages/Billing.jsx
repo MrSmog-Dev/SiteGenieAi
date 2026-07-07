@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import DashboardLayout from "@/components/DashboardLayout";
+import { TeamPanel } from "@/components/TeamPanel";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
@@ -115,6 +116,9 @@ export default function Billing() {
             </button>
           </div>
         </div>
+
+        {/* Team (multi-seat) */}
+        <TeamPanel onChange={() => { load(); refreshUser(); }} />
 
         {/* Invoices */}
         <div className="border border-white/10 bg-surface1">

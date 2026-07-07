@@ -344,7 +344,7 @@ async def _set_stage(job_id: str, stage: str):
     await db.gen_jobs.update_one({"job_id": job_id}, {"$set": {"stage": stage}})
 
 
-async def _run_generation(job_id: str, user_id: str, fields: dict, mode: str = "new", template_id: str = None, free: bool = False):
+async def _run_generation(job_id: str, user_id: str, fields: dict, mode: str = "new", template_id: str = None, free: bool = False, bill_user_id: str = None):
     cost_inputs = []
     build_model = (fields.get("model") or "").strip() or None
     try:
@@ -425,10 +425,11 @@ async def _run_generation(job_id: str, user_id: str, fields: dict, mode: str = "
             {"template_id": template_id, "user_id": user_id},
             {"$set": update},
         )
-    user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
-    charged = 0 if free or user_is_unlimited(user) else cost
+    bill_id = bill_user_id or user_id
+    bill = await db.users.find_one({"user_id": bill_id}, {"_id": 0})
+    charged = 0 if free or user_is_unlimited(bill) else cost
     if charged:
-        await deduct_credits(user_id, charged)
+        await deduct_credits(bill_id, charged)
     await db.gen_jobs.update_one({"job_id": job_id},
                                  {"$set": {"status": "done", "template_id": template_id,
                                            "cost": charged, "mode": mode}})
@@ -443,10 +444,12 @@ def _min_cost(mode: str, fields: dict) -> int:
 
 
 async def _start_job(user: dict, fields: dict, mode: str = "new", template_id: str = None, free: bool = False):
-    metered = not free and not user_is_unlimited(user)
-    if metered and total_credits(user) <= 0:
+    from security import billing_user
+    bill = await billing_user(user)          # team members draw from the team owner's pool
+    metered = not free and not user_is_unlimited(bill)
+    if metered and total_credits(bill) <= 0:
         raise HTTPException(status_code=402, detail="You're out of credits. Purchase a credit pack to keep building.")
-    if metered and total_credits(user) < _min_cost(mode, fields):
+    if metered and total_credits(bill) < _min_cost(mode, fields):
         raise HTTPException(status_code=402,
                             detail=f"This operation needs at least {_min_cost(mode, fields)} credits. "
                                    "Top up a credit pack to continue.")
@@ -458,8 +461,6 @@ async def _start_job(user: dict, fields: dict, mode: str = "new", template_id: s
         "template_id": template_id, "error": None, "created_at": datetime.now(timezone.utc),
     })
     if not is_owner(user):
-        # Atomic-enough concurrency cap: count AFTER inserting our own job (self included),
-        # so two racing requests both see the overflow and both get rejected.
         recent = datetime.now(timezone.utc) - timedelta(minutes=10)
         active = await db.gen_jobs.count_documents(
             {"user_id": user["user_id"], "status": "pending", "created_at": {"$gt": recent}})
@@ -467,5 +468,6 @@ async def _start_job(user: dict, fields: dict, mode: str = "new", template_id: s
             await db.gen_jobs.delete_one({"job_id": job_id})
             raise HTTPException(status_code=429,
                                 detail="You already have builds in progress. Please wait for them to finish.")
-    asyncio.create_task(_run_generation(job_id, user["user_id"], fields, mode, template_id, free))
+    asyncio.create_task(_run_generation(job_id, user["user_id"], fields, mode, template_id, free,
+                                        bill_user_id=bill["user_id"]))
     return {"job_id": job_id, "status": "pending"}

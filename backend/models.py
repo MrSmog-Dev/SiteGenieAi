@@ -133,6 +133,10 @@ class HtmlSaveInput(BaseModel):
     html: str
 
 
+class TeamInviteInput(BaseModel):
+    email: EmailStr
+
+
 class SupportChatInput(BaseModel):
     message: str
     session_id: Optional[str] = None

@@ -86,6 +86,15 @@ async def _activate_native_sub(user_id: str, plan_id: str, sub):
                   "stripe_subscription_id": sub_id, "started_at": now.isoformat()}},
         upsert=True,
     )
+    # Team plan → spin up (or keep) the shared team; any other plan → disband if one existed.
+    try:
+        from services.teams import ensure_team_for_owner, disband_team
+        if plan_id == "team":
+            await ensure_team_for_owner(user_id)
+        else:
+            await disband_team(user_id)
+    except Exception:
+        logger.exception("team lifecycle on activate failed")
 
 
 async def _renew_native_sub(user_id: str, plan_id: str, sub):
