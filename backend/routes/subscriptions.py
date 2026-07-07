@@ -78,11 +78,11 @@ async def reactivate_subscription(user: dict = Depends(get_current_user)):
 
 @router.post("/subscription/checkout")
 async def subscription_checkout(input: SubCheckoutInput, user: dict = Depends(get_current_user)):
-    if not STRIPE_SECRET_KEY:
-        raise HTTPException(status_code=503, detail="Subscriptions are not configured yet.")
     plan = SUBSCRIPTION_PLANS.get(input.plan_id)
     if not plan or not plan.get("purchasable"):
         raise HTTPException(status_code=400, detail="Invalid plan")
+    if not STRIPE_SECRET_KEY:
+        raise HTTPException(status_code=503, detail="Subscriptions are not configured yet.")
     billing = "annual" if (input.billing == "annual" and plan.get("annual_available")) else "monthly"
     # Dynamic pricing — no pre-created Stripe Price IDs required.
     if billing == "annual":
