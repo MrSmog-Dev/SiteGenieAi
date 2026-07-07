@@ -197,6 +197,12 @@ async def run_war_room_meeting(meeting_id: str, owner_id: str, topic: str):
         await log_activity(owner_id, "titan", "meeting",
                            f"Chaired a War Room on '{topic[:60]}'.",
                            detail=f"Decision: {decision}", link="/team")
+        # Auto-capture the outcome into persistent memory (shared brain + owners' open threads).
+        try:
+            from services.memory import record_war_room_decision
+            await record_war_room_decision(owner_id, topic, decision, items)
+        except Exception:
+            logger.exception("war room decision memory capture failed")
         exec_n = sum(1 for t in created if t.get("executable"))
         if exec_n:
             await post_war_room(owner_id, "titan",

@@ -60,7 +60,7 @@ export default function AiTeam() {
   }, [setSearchParams]);
 
   const loadChat = useCallback((silent = false) => {
-    if (!isOwner || !activeId || activeId === "war_room" || activeId === "pulse") return;
+    if (!isOwner || !activeId || activeId === "war_room" || activeId === "pulse" || activeId === "team_brain") return;
     if (!silent) setMessages(null);
     api.get(`/agents/${activeId}/chat`)
       .then(({ data }) => setMessages(data.messages))
@@ -172,6 +172,17 @@ export default function AiTeam() {
               <div className="text-[11px] text-white/40 truncate">Team meetings, memos & tasks</div>
             </div>
           </button>
+          <button data-testid="team-brain-item" onClick={() => selectAgent("team_brain")}
+            className={`flex items-center gap-3 px-4 py-3 text-left transition-colors duration-300 border-l-2 ${
+              activeId === "team_brain" ? "bg-surface2 border-l-violet-400" : "border-l-transparent hover:bg-surface2/50"}`}>
+            <div className="w-10 h-10 rounded-full shrink-0 flex items-center justify-center bg-violet-400/15 border border-violet-400/40">
+              <Brain className="w-5 h-5 text-violet-300" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-sm font-semibold">Team Brain</div>
+              <div className="text-[11px] text-white/40 truncate">Shared memory all agents see</div>
+            </div>
+          </button>
           {agents.map((a) => {
             const st = statusBoard?.[a.id];
             const working = st?.status === "working";
@@ -211,6 +222,12 @@ export default function AiTeam() {
               className={`shrink-0 rounded-full p-0.5 ${activeId === "war_room" ? "ring-2 ring-brand" : ""}`}>
               <div className="w-10 h-10 rounded-full flex items-center justify-center bg-brand/20 border border-brand/40">
                 <Users className="w-5 h-5 text-brand" />
+              </div>
+            </button>
+            <button onClick={() => selectAgent("team_brain")}
+              className={`shrink-0 rounded-full p-0.5 ${activeId === "team_brain" ? "ring-2 ring-violet-400" : ""}`}>
+              <div className="w-10 h-10 rounded-full flex items-center justify-center bg-violet-400/15 border border-violet-400/40">
+                <Brain className="w-5 h-5 text-violet-300" />
               </div>
             </button>
             {agents.map((a) => (
@@ -289,6 +306,7 @@ export default function AiTeam() {
           )}
 
           {activeId === "pulse" ? <TeamPulse onOpenAgent={selectAgent} /> :
+           activeId === "team_brain" ? <AgentMemory shared /> :
            activeId === "war_room" ? <WarRoom agents={agents} /> : (<>
           <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-6 space-y-4" data-testid="agent-messages">
             {messages === null ? (

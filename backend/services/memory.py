@@ -21,6 +21,8 @@ from database import db
 FACTS_CAP = 40
 THREADS_CAP = 15
 SUMMARY_MAX = 900
+TEAM_AGENT = "__team__"          # sentinel agent_id for the team-wide shared brain
+SHARED_FACTS_CAP = 60
 
 
 def _now() -> str:
@@ -42,14 +44,27 @@ async def get_memory(user_id: str, agent_id: str) -> dict:
     return mem
 
 
+async def team_brain_context(user_id: str) -> str:
+    """Shared team brain — facts every agent can see (decisions, shared context, standards)."""
+    mem = await get_memory(user_id, TEAM_AGENT)
+    facts = mem.get("facts") or []
+    if not facts:
+        return ""
+    lines = ["TEAM SHARED BRAIN (facts the WHOLE team knows — durable, survives resets; treat as true):"]
+    lines += [f"  • {f['text']}" for f in facts[-SHARED_FACTS_CAP:]]
+    return "\n".join(lines)
+
+
 async def agent_memory_context(user_id: str, agent_id: str) -> str:
+    shared = "" if agent_id == TEAM_AGENT else await team_brain_context(user_id)
     mem = await get_memory(user_id, agent_id)
     facts = mem.get("facts") or []
     threads = [t for t in (mem.get("open_threads") or []) if t.get("status") != "done"]
     summary = mem.get("rolling_summary") or ""
     if not (facts or threads or summary):
-        return ("YOUR PERSISTENT MEMORY: empty so far — you'll build durable memory of the owner's "
-                "preferences, decisions and open work as you go (it survives data resets).")
+        own = ("YOUR PERSISTENT MEMORY: empty so far — you'll build durable memory of the owner's "
+               "preferences, decisions and open work as you go (it survives data resets).")
+        return (shared + "\n\n" + own) if shared else own
     lines = ["YOUR PERSISTENT MEMORY (durable — survives data resets; treat as true and continue from it):"]
     if summary:
         lines.append(f"Where we left off: {summary}")
@@ -59,7 +74,8 @@ async def agent_memory_context(user_id: str, agent_id: str) -> str:
     if threads:
         lines.append("Open threads you were working on (pick these back up):")
         lines += [f"  • {t['text']}" for t in threads[-THREADS_CAP:]]
-    return "\n".join(lines)
+    own = "\n".join(lines)
+    return (shared + "\n\n" + own) if shared else own
 
 
 EXTRACT_SYSTEM = (
@@ -119,8 +135,9 @@ async def _merge_memory(user_id: str, agent_id: str, data: dict, source: str):
             open_norms.add(_norm(text))
 
     summary = str(data.get("summary", "")).strip()[:SUMMARY_MAX] or mem.get("rolling_summary", "")
+    facts_cap = SHARED_FACTS_CAP if agent_id == TEAM_AGENT else FACTS_CAP
     update = {
-        "facts": facts[-FACTS_CAP:],
+        "facts": facts[-facts_cap:],
         "open_threads": threads[-THREADS_CAP:],
         "rolling_summary": summary,
         "summary_updated_at": _now(), "updated_at": _now(),
@@ -128,6 +145,44 @@ async def _merge_memory(user_id: str, agent_id: str, data: dict, source: str):
     await db.agent_memory.update_one(
         {"user_id": user_id, "agent_id": agent_id},
         {"$set": update, "$setOnInsert": {"user_id": user_id, "agent_id": agent_id}}, upsert=True)
+
+
+# ---------------- Shared team brain + open-thread helpers ----------------
+
+async def get_team_brain(user_id: str) -> dict:
+    mem = await get_memory(user_id, TEAM_AGENT)
+    return {"facts": mem.get("facts", [])}
+
+
+async def add_shared_fact(user_id: str, text: str, kind: str = "fact") -> dict:
+    return await add_fact(user_id, TEAM_AGENT, text, kind)
+
+
+async def delete_shared_item(user_id: str, mem_id: str) -> bool:
+    return await delete_memory_item(user_id, TEAM_AGENT, mem_id)
+
+
+async def add_open_thread(user_id: str, agent_id: str, text: str):
+    """Add an open work thread to a specific agent's memory (e.g. a War Room action item)."""
+    text = (text or "").strip()
+    if not text:
+        return
+    await _merge_memory(user_id, agent_id, {"open_threads": [{"text": text}]}, source="auto")
+
+
+async def record_war_room_decision(user_id: str, topic: str, decision: str, items: list):
+    """Auto-capture a War Room outcome into memory: the decision -> shared team brain,
+    and each action item -> the owning agent's open threads. Survives resets."""
+    date = datetime.now(timezone.utc).strftime("%b %d")
+    if decision:
+        await add_shared_fact(user_id, f"War Room decision ({date}) on '{topic[:60]}': {decision}",
+                              kind="decision")
+    for it in (items or [])[:8]:
+        owner_agent = it.get("owner")
+        task = str(it.get("task") or it.get("brief") or "").strip()
+        if owner_agent and task:
+            await add_open_thread(user_id, owner_agent,
+                                  f"{task} (assigned in the War Room on '{topic[:50]}')")
 
 
 async def add_fact(user_id: str, agent_id: str, text: str, kind: str = "fact") -> dict:

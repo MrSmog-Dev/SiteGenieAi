@@ -322,6 +322,55 @@ frontend:
           agent: "testing"
           comment: "✅ PASSED - Per-agent memory isolation verified. Closed Nova's memory panel, switched to Titan agent (data-testid='agent-item-titan'), opened Titan's memory panel (data-testid='memory-toggle'). Titan's memory panel opened successfully showing 0 memory facts with empty state message 'Nothing yet — chat with Titan or add a memory.' Verified Titan's memory does NOT contain any of Nova's seeded facts (no October launch, no sitegenie-ai.com domain, no bullet-point preference). Memory is correctly isolated per agent. Screenshot captured showing Titan's empty memory panel."
 
+  - task: "Team Shared Brain - Open and View"
+    implemented: true
+    working: true
+    file: "frontend/src/pages/AiTeam.jsx, frontend/src/components/AgentMemory.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✅ PASSED - Team Shared Brain opens correctly from AI Team page. After login, navigated to AI Team page (data-testid='nav-ai-team'), clicked Team Brain roster item (data-testid='team-brain-item'), and Team Brain panel (data-testid='team-brain') opened successfully in main area. Panel displays correct title 'Team Shared Brain' with violet theme. Found all 3 seeded facts visible: (1) 'Brand voice is luxury-but-approachable; never use jargon', (2) 'Company domain is sitegenie-ai.com', (3) 'War Room decision (Jul 07) on Premium tier launch: Ship the premium tier on October 1st with a new hero and an SEO push'. All required seeded content verified present. Backend GET /api/agents/team-memory endpoint working correctly."
+  
+  - task: "Team Shared Brain - Add Shared Fact"
+    implemented: true
+    working: true
+    file: "frontend/src/components/AgentMemory.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✅ PASSED - Add shared fact functionality working correctly. In Team Brain panel, clicked 'Remember something' button (data-testid='memory-add-toggle'), input field (data-testid='memory-add-input') appeared, typed 'We prioritize mobile-first design on every site', clicked save button (data-testid='memory-add-save'). Success toast 'The whole team will remember that.' appeared, new fact appeared in the list with correct text. Fact count increased from 3 to 4. POST /api/agents/team-memory endpoint working correctly."
+  
+  - task: "Team Shared Brain - Delete Shared Fact"
+    implemented: true
+    working: true
+    file: "frontend/src/components/AgentMemory.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✅ PASSED - Delete shared fact functionality working correctly. Found newly added memory fact (mem_id: m_04a9996b), hovered over the fact row to reveal delete button (data-testid='memory-delete-m_04a9996b'), clicked delete button. Success toast 'Forgotten.' appeared, memory fact row disappeared from the list. DELETE /api/agents/team-memory/{id} endpoint working correctly. Fact successfully removed from shared team memory."
+  
+  - task: "War Room Decision Auto-Capture to Agent Memory"
+    implemented: true
+    working: true
+    file: "backend/routes/agents.py, frontend/src/components/AgentMemory.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✅ PASSED - War Room decision auto-capture verified working. The War Room decision about 'Premium tier launch: Ship the premium tier on October 1st' is visible in Team Shared Brain as expected. Additionally verified that this decision was auto-captured into individual agent memories: Selected Quill agent (data-testid='agent-item-quill'), opened memory panel (data-testid='memory-toggle'), confirmed 'Open threads' section exists with War Room decision thread visible. Also verified Ivy agent (data-testid='agent-item-ivy') shows same War Room thread in her memory's 'Open threads' section. Auto-capture mechanism working correctly - War Room decisions are being propagated to both shared team memory and relevant agent memories."
+
+
 backend:
   - task: "Support Chat API - POST /api/support/chat"
     implemented: true
@@ -361,13 +410,14 @@ backend:
 
 metadata:
   created_by: "testing_agent"
-  version: "1.5"
-  test_sequence: 6
+  version: "1.6"
+  test_sequence: 7
   run_ui: true
 
 test_plan:
   current_focus:
-    - "Agent Memory feature tested and passing"
+    - "Team Shared Brain feature tested and passing"
+    - "War Room auto-capture feature tested and passing"
   stuck_tasks: []
   test_all: true
   test_priority: "high_first"
@@ -379,3 +429,5 @@ agent_communication:
       message: "Completed P1 legal/ownership features testing. ALL 4 TEST SCENARIOS PASSED: (1) Clickwrap gate on register page - consent checkbox (data-testid='register-consent') exists, submit button (data-testid='register-submit') correctly disabled until consent checked, consent text contains links to Terms, Privacy, and Refund Policy. (2) Privacy page - accessible at /privacy with correct title 'Privacy Policy' and 7428 characters of content, Terms and Refund Policy pages also verified. (3) Footer links - all footer links present (footer-privacy, footer-terms, footer-refund, footer-faq), footer-privacy correctly navigates to /privacy. (4) Ownership certificate + PDF download - ownership button (data-testid='ownership-cert-btn') present on purchased template tpl_ownedtest01, certificate modal (data-testid='certificate-modal') opens with correct content (business name 'Bella Vista Trattoria', price '$340', certificate ID 'cert_demo123'), download PDF button (data-testid='download-cert-pdf') triggers successful PDF download with success toast 'Certificate PDF downloaded'. Minor non-critical issues: 12x 401 console errors (auth checks), 9x CDN network errors (Cloudflare RUM). All core functionality working perfectly."
     - agent: "testing"
       message: "Completed comprehensive testing of Agent Memory / brain feature for SiteGenie. ALL 4 TEST SCENARIOS PASSED: (1) Open Memory Panel - Successfully logged in as owner (neobeyondlegacy2@gmail.com), navigated to AI Team page, selected Nova agent (data-testid='agent-item-nova'), clicked Memory button (data-testid='memory-toggle'), memory panel (data-testid='agent-memory') opened showing all required sections: 'Where we left off' with rolling summary about Oct 1st premium launch, 'What they remember' with 4 seeded facts (October 1st launch goal, bullet-point preference, sitegenie-ai.com domain, One Piece fan), and 'Open threads' with 1 thread about go-to-market plan. (2) Add Memory - Clicked 'Remember something' (data-testid='memory-add-toggle'), typed 'Always CC the owner on big decisions' into input (data-testid='memory-add-input'), clicked save (data-testid='memory-add-save'), success toast 'Nova will remember that.' appeared, new fact appeared in list with 'you' tag. (3) Delete Memory - Found newly added fact (ID: m_a3d7504b), hovered to reveal delete button (data-testid='memory-delete-m_a3d7504b'), clicked delete, 'Forgotten.' toast appeared, fact disappeared from list. (4) Per-Agent Isolation - Switched to Titan agent (data-testid='agent-item-titan'), opened Titan's memory panel, verified 0 facts and NO Nova seeded content present (correct isolation). Minor non-critical issues: 4x 401 console errors (auth checks before login), 1x CDN error (Cloudflare RUM). All backend endpoints working correctly: GET/POST /api/agents/{agent_id}/memory, DELETE /api/agents/{agent_id}/memory/{mem_id}. Screenshots captured for Nova's memory panel with seeded facts, after adding memory, after deletion, and Titan's empty memory panel. Feature is production-ready and working perfectly."
+    - agent: "testing"
+      message: "Completed comprehensive testing of NEW Team Shared Brain + War Room auto-capture memory features for SiteGenie. ALL 6 TEST SCENARIOS PASSED: (1) Login - Successfully logged in as owner (neobeyondlegacy2@gmail.com / OwnerGenie2025!) and redirected to dashboard. (2) Open Team Brain - Navigated to AI Team page, clicked Team Brain roster item (data-testid='team-brain-item'), Team Brain panel (data-testid='team-brain') opened successfully with title 'Team Shared Brain'. (3) Verify Seeded Facts - Found all 3 seeded facts: 'Brand voice is luxury-but-approachable; never use jargon', 'Company domain is sitegenie-ai.com', and 'War Room decision (Jul 07) on Premium tier launch: Ship the premium tier on October 1st with a new hero and an SEO push'. All required seeded content verified present. (4) Add Shared Fact - Clicked add toggle (data-testid='memory-add-toggle'), typed 'We prioritize mobile-first design on every site' into input (data-testid='memory-add-input'), clicked save (data-testid='memory-add-save'), success toast 'The whole team will remember that.' appeared, new fact appeared in list (count went from 3 to 4). (5) Delete Shared Fact - Found newly added fact (mem_id: m_04a9996b), hovered to reveal delete button (data-testid='memory-delete-m_04a9996b'), clicked delete, 'Forgotten.' toast appeared, fact successfully removed from list. (6) War Room Decision in Agent Memory - Selected Quill agent (data-testid='agent-item-quill'), opened memory panel (data-testid='memory-toggle'), verified 'Open threads' section exists with War Room decision thread visible. Also verified Ivy agent shows same War Room thread in her memory. Minor non-critical issues: 4x 401 console errors (auth checks), 1x CDN error (Cloudflare RUM). All backend endpoints working correctly: GET/POST /api/agents/team-memory, DELETE /api/agents/team-memory/{id}. Screenshots captured for Team Brain with seeded facts, after adding fact, after deletion, Quill's memory with War Room thread, and Ivy's memory with War Room thread. Both new features (Team Shared Brain + War Room auto-capture) are production-ready and working perfectly."

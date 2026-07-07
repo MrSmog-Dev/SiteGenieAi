@@ -10,17 +10,20 @@ const KIND_META = {
   context: { icon: Brain, tint: "text-sky-300", label: "Context" },
 };
 
-export function AgentMemory({ agentId, agentName, onClose }) {
+export function AgentMemory({ agentId, agentName, onClose, shared = false }) {
   const [data, setData] = useState(null);
   const [adding, setAdding] = useState(false);
   const [newText, setNewText] = useState("");
   const [busy, setBusy] = useState(null);
 
+  const base = shared ? "/agents/team-memory" : `/agents/${agentId}/memory`;
+  const label = shared ? "the team" : agentName;
+
   const load = useCallback(() => {
-    api.get(`/agents/${agentId}/memory`)
+    api.get(base)
       .then(({ data }) => setData(data))
       .catch(() => setData({ facts: [], open_threads: [], rolling_summary: "" }));
-  }, [agentId]);
+  }, [base]);
 
   useEffect(() => { setData(null); load(); }, [load]);
 
@@ -29,10 +32,10 @@ export function AgentMemory({ agentId, agentName, onClose }) {
     if (!text) return;
     setBusy("add");
     try {
-      const { data } = await api.post(`/agents/${agentId}/memory`, { text, kind: "fact" });
+      const { data } = await api.post(base, { text, kind: "fact" });
       setData((d) => ({ ...d, facts: data.facts, open_threads: (data.open_threads || []).filter((t) => t.status !== "done"), rolling_summary: data.rolling_summary }));
       setNewText(""); setAdding(false);
-      toast.success(`${agentName} will remember that.`);
+      toast.success(shared ? "The whole team will remember that." : `${agentName} will remember that.`);
     } catch (e) {
       toast.error(e.response?.data?.detail || "Couldn't save that memory.");
     } finally { setBusy(null); }
@@ -41,11 +44,11 @@ export function AgentMemory({ agentId, agentName, onClose }) {
   const removeItem = async (memId) => {
     setBusy(memId);
     try {
-      await api.delete(`/agents/${agentId}/memory/${memId}`);
+      await api.delete(`${base}/${memId}`);
       setData((d) => ({
         ...d,
-        facts: d.facts.filter((f) => f.mem_id !== memId),
-        open_threads: d.open_threads.filter((t) => t.mem_id !== memId),
+        facts: (d.facts || []).filter((f) => f.mem_id !== memId),
+        open_threads: (d.open_threads || []).filter((t) => t.mem_id !== memId),
       }));
       toast.success("Forgotten.");
     } catch {
@@ -57,27 +60,38 @@ export function AgentMemory({ agentId, agentName, onClose }) {
   const threads = data?.open_threads || [];
 
   return (
-    <div className="border-b border-violet-400/20 bg-violet-400/5 px-6 py-4" data-testid="agent-memory">
+    <div className={shared
+      ? "flex-1 overflow-y-auto px-6 py-5 bg-violet-400/5"
+      : "border-b border-violet-400/20 bg-violet-400/5 px-6 py-4"} data-testid={shared ? "team-brain" : "agent-memory"}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Brain className="w-4 h-4 text-violet-300" />
-          <p className="text-sm font-semibold text-violet-100">{agentName}'s Memory</p>
-          <span className="text-[10px] font-mono uppercase tracking-wider text-violet-300/60">persistent · survives resets</span>
+          <p className="text-sm font-semibold text-violet-100">{shared ? "Team Shared Brain" : `${agentName}'s Memory`}</p>
+          <span className="text-[10px] font-mono uppercase tracking-wider text-violet-300/60">
+            {shared ? "every agent sees this · survives resets" : "persistent · survives resets"}
+          </span>
         </div>
         <div className="flex items-center gap-2">
           <button data-testid="memory-add-toggle" onClick={() => setAdding((a) => !a)}
             className="flex items-center gap-1.5 text-xs border border-violet-400/40 text-violet-200 hover:border-violet-300 px-2.5 py-1.5 transition-colors duration-200">
             <Plus className="w-3.5 h-3.5" /> Remember something
           </button>
-          <button onClick={onClose} className="text-white/40 hover:text-white p-1"><X className="w-4 h-4" /></button>
+          {!shared && <button onClick={onClose} className="text-white/40 hover:text-white p-1"><X className="w-4 h-4" /></button>}
         </div>
       </div>
+
+      {shared && (
+        <p className="text-xs text-white/40 mt-2 max-w-2xl">
+          Facts here are shared with all 12 agents — brand standards, key decisions, company context.
+          War Room decisions land here automatically so the whole team stays aligned, even after a data reset.
+        </p>
+      )}
 
       {adding && (
         <div className="mt-3 flex gap-2">
           <input data-testid="memory-add-input" value={newText} onChange={(e) => setNewText(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && addMemory()} autoFocus
-            placeholder={`Tell ${agentName} something to always remember…`}
+            placeholder={shared ? "A fact the whole team should always know…" : `Tell ${agentName} something to always remember…`}
             className="flex-1 bg-surface2 border border-white/10 focus:border-violet-300 outline-none px-3 py-2 text-sm transition-colors duration-300" />
           <button data-testid="memory-add-save" onClick={addMemory} disabled={busy === "add" || !newText.trim()}
             className="flex items-center gap-1.5 bg-violet-500 hover:bg-violet-400 px-3 py-2 text-sm transition-colors duration-300 disabled:opacity-40">
@@ -86,7 +100,7 @@ export function AgentMemory({ agentId, agentName, onClose }) {
         </div>
       )}
 
-      <div className="mt-4 max-h-[52vh] overflow-y-auto pr-1 space-y-4" data-testid="memory-body">
+      <div className={shared ? "mt-4 space-y-4" : "mt-4 max-h-[52vh] overflow-y-auto pr-1 space-y-4"} data-testid="memory-body">
         {data === null ? (
           <div className="flex items-center gap-2 text-white/40 text-sm font-mono py-6">
             <Loader2 className="w-4 h-4 animate-spin" /> Loading memory…
@@ -101,9 +115,11 @@ export function AgentMemory({ agentId, agentName, onClose }) {
             )}
 
             <div>
-              <div className="text-[10px] font-mono uppercase text-white/30 mb-2">What they remember ({facts.length})</div>
+              <div className="text-[10px] font-mono uppercase text-white/30 mb-2">{shared ? "Shared team facts" : "What they remember"} ({facts.length})</div>
               {facts.length === 0 ? (
-                <p className="text-xs text-white/40">Nothing yet — chat with {agentName} or add a memory. Durable facts, preferences and goals are learned automatically.</p>
+                <p className="text-xs text-white/40">{shared
+                  ? "Nothing shared yet — add a company-wide fact, or run a War Room and the decision lands here automatically."
+                  : `Nothing yet — chat with ${agentName} or add a memory. Durable facts, preferences and goals are learned automatically.`}</p>
               ) : (
                 <div className="space-y-1.5">
                   {facts.map((f) => {

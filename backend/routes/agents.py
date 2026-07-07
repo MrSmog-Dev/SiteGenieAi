@@ -10,7 +10,8 @@ from security import get_current_user, is_owner
 from services.agents import AGENTS, AGENT_MAP, agent_reply, run_forge_build
 from services.team import detect_and_route_memos, post_war_room, run_war_room_meeting
 from services.activity import get_activity_feed, get_status_board
-from services.memory import get_memory, add_fact, delete_memory_item
+from services.memory import (get_memory, add_fact, delete_memory_item,
+                             get_team_brain, add_shared_fact, delete_shared_item)
 
 router = APIRouter()
 
@@ -63,6 +64,32 @@ async def agent_activity_feed(limit: int = 40, before: str = None, agent_id: str
 async def agent_status_board(user: dict = Depends(get_current_user)):
     _require_owner(user)
     return await get_status_board(user["user_id"])
+
+
+@router.get("/agents/team-memory")
+async def get_team_memory(user: dict = Depends(get_current_user)):
+    _require_owner(user)
+    brain = await get_team_brain(user["user_id"])
+    return {"facts": brain.get("facts", [])}
+
+
+@router.post("/agents/team-memory")
+async def add_team_memory(input: AgentMemoryInput, user: dict = Depends(get_current_user)):
+    _require_owner(user)
+    text = (input.text or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Memory text is empty.")
+    await add_shared_fact(user["user_id"], text, input.kind or "fact")
+    return await get_team_brain(user["user_id"])
+
+
+@router.delete("/agents/team-memory/{mem_id}")
+async def delete_team_memory(mem_id: str, user: dict = Depends(get_current_user)):
+    _require_owner(user)
+    ok = await delete_shared_item(user["user_id"], mem_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Memory item not found")
+    return {"deleted": True}
 
 
 @router.get("/agents/{agent_id}/memory")
