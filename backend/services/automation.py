@@ -23,7 +23,7 @@ TICK_SECONDS = 900
 
 async def ensure_automation_state():
     for job in ("titan_briefing", "forge_weekly", "ivy_daily_blog", "rex_weekly_hunt",
-                "rex_pipeline_nudge", "mara_digest"):
+                "rex_pipeline_nudge", "mara_digest", "ivy_geo_sweep"):
         await db.automation_state.update_one({"job": job}, {"$setOnInsert": {"job": job}}, upsert=True)
 
 
@@ -110,6 +110,16 @@ async def _tick():
         {"$set": {"last_run": now.isoformat()}})
     if claimed:
         await run_forge_weekly(owner["user_id"])
+    # Weekly GEO / AI-visibility sweep of the top buyer questions -> trend posted to Team Pulse.
+    geo_claimed = await db.automation_state.find_one_and_update(
+        {"job": "ivy_geo_sweep", "$or": [{"last_run": {"$exists": False}}, {"last_run": {"$lt": cutoff}}]},
+        {"$set": {"last_run": now.isoformat()}})
+    if geo_claimed:
+        try:
+            from services.seo import run_weekly_geo_sweep
+            await run_weekly_geo_sweep(owner["user_id"])
+        except Exception:
+            logger.exception("weekly geo sweep failed")
     # Subtle proactive pulse — keeps the team visibly on-duty between scheduled jobs.
     try:
         await maybe_proactive_pulse(owner["user_id"])

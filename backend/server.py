@@ -143,6 +143,7 @@ async def _run_db_init():
     await db.agent_memory.create_index([("user_id", 1), ("agent_id", 1)], unique=True)
     await db.seo_calendar.create_index([("user_id", 1), ("status", 1), ("scheduled_for", 1)])
     await db.seo_audits.create_index([("user_id", 1), ("created_at", -1)])
+    await db.seo_state.create_index([("user_id", 1), ("key", 1)], unique=True)
     await db.rate_events.create_index("ts", expireAfterSeconds=GEN_WINDOW_SECONDS + 60)
     await db.login_attempts.create_index("ts", expireAfterSeconds=LOGIN_WINDOW_SECONDS + 60)
     await db.login_attempts.create_index("identifier")

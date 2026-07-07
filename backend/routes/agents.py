@@ -220,6 +220,24 @@ async def ivy_reddit(user: dict = Depends(get_current_user)):
     return await reddit_opportunities(user["user_id"])
 
 
+@router.post("/agents/ivy/seo/audit/{audit_id}/to-calendar")
+async def ivy_gap_to_calendar(audit_id: str, user: dict = Depends(get_current_user)):
+    _require_owner(user)
+    from services.seo import gap_to_calendar
+    try:
+        return await gap_to_calendar(user["user_id"], audit_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/agents/ivy/seo/weekly-sweep")
+async def ivy_weekly_sweep(user: dict = Depends(get_current_user)):
+    _require_owner(user)
+    from services.seo import run_weekly_geo_sweep
+    asyncio.create_task(run_weekly_geo_sweep(user["user_id"]))
+    return {"status": "running"}
+
+
 @router.get("/agents/war-room")
 async def get_war_room(user: dict = Depends(get_current_user)):
     _require_owner(user)

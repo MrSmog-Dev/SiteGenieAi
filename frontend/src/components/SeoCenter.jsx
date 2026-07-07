@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { toast } from "sonner";
 import { X, Loader2, CalendarDays, Bot, Wrench, Link2, MessageSquare, Gauge,
-  Sparkles, TrendingUp, CheckCircle2, AlertTriangle } from "lucide-react";
+  Sparkles, TrendingUp, CheckCircle2, AlertTriangle, CalendarPlus } from "lucide-react";
 
 const TABS = [
   { key: "overview", label: "Overview", icon: Gauge },
@@ -65,16 +65,51 @@ function Stat({ label, value, tint = "text-white" }) {
 
 function Overview() {
   const [data, setData] = useState(null);
-  useEffect(() => { api.get("/agents/ivy/seo/overview").then(({ data }) => setData(data)).catch(() => setData({})); }, []);
+  const [sweeping, setSweeping] = useState(false);
+  const load = useCallback(() => api.get("/agents/ivy/seo/overview").then(({ data }) => setData(data)).catch(() => setData({})), []);
+  useEffect(() => { load(); }, [load]);
+  const runSweep = async () => {
+    setSweeping(true);
+    try {
+      await api.post("/agents/ivy/seo/weekly-sweep");
+      toast.info("Ivy is running the AI-visibility sweep (~1 min). She'll post the trend to her chat.");
+    } catch { toast.error("Couldn't start the sweep."); }
+    finally { setTimeout(() => setSweeping(false), 4000); }
+  };
   if (!data) return <Loading />;
+  const trend = data.geo_trend || {};
+  const hist = trend.history || [];
+  const maxA = Math.max(...hist.map((h) => h.avg), 1);
   return (
     <div data-testid="seo-overview">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <Stat label="Planned topics" value={data.calendar_planned ?? 0} tint="text-green-300" />
         <Stat label="Articles live" value={data.articles_published ?? 0} />
         <Stat label="Avg SEO score" value={data.avg_article_score != null ? `${data.avg_article_score}` : "—"} tint={scoreColor(data.avg_article_score)} />
-        <Stat label="AI visibility" value={data.last_geo_visibility != null ? `${data.last_geo_visibility}` : "—"} tint={scoreColor(data.last_geo_visibility)} />
+        <Stat label="AI visibility" value={trend.avg != null ? `${trend.avg}` : (data.last_geo_visibility != null ? `${data.last_geo_visibility}` : "—")} tint={scoreColor(trend.avg ?? data.last_geo_visibility)} />
       </div>
+
+      <div className="mt-3 border border-white/10 bg-surface2/50 p-3" data-testid="seo-geo-trend">
+        <div className="flex items-center justify-between mb-2">
+          <div className="text-[10px] font-mono uppercase text-white/40">Weekly AI-visibility trend {trend.of ? `· cited ${trend.cited}/${trend.of}` : ""}</div>
+          <button data-testid="seo-run-sweep" onClick={runSweep} disabled={sweeping}
+            className="flex items-center gap-1.5 text-[11px] border border-green-400/40 text-green-300 hover:border-green-300 px-2 py-1 transition-colors duration-200 disabled:opacity-50">
+            {sweeping ? <Loader2 className="w-3 h-3 animate-spin" /> : <TrendingUp className="w-3 h-3" />} Run sweep now
+          </button>
+        </div>
+        {hist.length === 0 ? (
+          <p className="text-xs text-white/40">No sweep yet — runs weekly on autopilot, or click &quot;Run sweep now&quot;. Ivy audits your top buyer questions and tracks whether AI assistants cite SiteGenie over time.</p>
+        ) : (
+          <div className="flex items-end gap-1 h-14">
+            {hist.map((h, i) => (
+              <div key={i} title={`${h.date}: avg ${h.avg}/100, cited ${h.cited}`}
+                className="flex-1 bg-green-400/40 hover:bg-green-400 transition-colors duration-200"
+                style={{ height: `${Math.max((h.avg / maxA) * 100, 6)}%` }} />
+            ))}
+          </div>
+        )}
+      </div>
+
       <p className="text-xs text-white/50 mt-3 leading-relaxed">
         Ivy runs SEO on autopilot: she plans keywords, publishes a scored article daily, and tracks how visible
         SiteGenie is on Google and AI assistants. Use the tabs above to plan, audit and grow.
@@ -143,6 +178,17 @@ function Geo() {
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
     finally { setBusy(false); }
   };
+  const [addingGap, setAddingGap] = useState(false);
+  const addGap = async () => {
+    if (!res?.audit_id) return;
+    setAddingGap(true);
+    try {
+      const { data } = await api.post(`/agents/ivy/seo/audit/${res.audit_id}/to-calendar`);
+      toast.success(`Added to the calendar: "${data.title}" (${data.scheduled_for}).`);
+      setRes((r) => ({ ...r, gap_used: true }));
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+    finally { setAddingGap(false); }
+  };
   return (
     <div data-testid="seo-geo">
       <p className="text-xs text-white/50 mb-2">Check if AI assistants (ChatGPT/Perplexity/Gemini) would recommend SiteGenie for a buyer&apos;s question.</p>
@@ -170,6 +216,11 @@ function Geo() {
             <div className="mt-3 border-t border-white/10 pt-2">
               <div className="text-[10px] font-mono uppercase text-green-300/70">Content gap to win this</div>
               <div className="text-sm text-white/85 mt-0.5">{res.content_gap}</div>
+              <button data-testid="seo-add-gap" onClick={addGap} disabled={addingGap || res.gap_used}
+                className="mt-2 flex items-center gap-1.5 text-xs bg-green-500/90 hover:bg-green-400 text-black font-semibold px-3 py-1.5 transition-colors duration-200 disabled:opacity-50">
+                {addingGap ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CalendarPlus className="w-3.5 h-3.5" />}
+                {res.gap_used ? "Added to calendar ✓" : "Turn into a planned article"}
+              </button>
             </div>
           )}
         </div>

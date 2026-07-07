@@ -171,17 +171,19 @@ GEO_SYSTEM = (
 async def geo_audit(owner_id: str, query: str) -> dict:
     raw = await _call_llm(f"Buyer question: {query}", GEO_SYSTEM, STRATEGY_MODEL)
     data = _parse_json(raw)
+    audit_id = f"geo_{uuid.uuid4().hex[:10]}"
     result = {
+        "audit_id": audit_id,
         "query": query,
         "answer": str(data.get("answer", ""))[:600],
         "sitegenie_cited": bool(data.get("sitegenie_cited")),
         "visibility": int(data.get("visibility") or 0),
         "why": str(data.get("why", ""))[:300],
         "content_gap": str(data.get("content_gap", ""))[:200],
+        "gap_used": False,
         "created_at": _now(),
     }
-    await db.seo_audits.insert_one({"audit_id": f"geo_{uuid.uuid4().hex[:10]}",
-                                    "user_id": owner_id, "kind": "geo", **result})
+    await db.seo_audits.insert_one({"user_id": owner_id, "kind": "geo", **result})
     await log_activity(owner_id, "ivy", "seo",
                        f"GEO audit: '{query[:50]}' — AI visibility {result['visibility']}/100"
                        + (" (cited ✓)" if result["sitegenie_cited"] else " (not cited)"),
@@ -246,6 +248,119 @@ async def recent_audits(owner_id: str, limit: int = 20) -> list:
         "created_at", -1).to_list(limit)
 
 
+# ---------------- Weekly GEO audit sweep (autopilot) + content-gap -> calendar ----------------
+
+BUYER_QUESTIONS_SYSTEM = (
+    "You are Ivy. List the highest-intent questions SiteGenie's buyers actually ask AI assistants (ChatGPT/"
+    "Perplexity/Gemini) when looking for a solution SiteGenie provides (AI website builder, premium website "
+    "templates, small-business online presence). Mix branded and non-branded, commercial-intent phrasing.\n"
+    'Reply ONLY JSON: {"questions": ["<question>", ...]} with exactly the requested count.'
+)
+
+
+async def top_buyer_questions(owner_id: str, count: int = 5) -> list:
+    """Reuse the owner's saved set if present, else generate + persist one."""
+    saved = await db.seo_state.find_one({"user_id": owner_id, "key": "buyer_questions"}, {"_id": 0})
+    if saved and saved.get("questions"):
+        return saved["questions"][:count]
+    raw = await _call_llm(f"Give exactly {count} questions.", BUYER_QUESTIONS_SYSTEM, STRATEGY_MODEL)
+    qs = [str(q).strip()[:160] for q in (_parse_json(raw).get("questions") or []) if str(q).strip()][:count]
+    if qs:
+        await db.seo_state.update_one(
+            {"user_id": owner_id, "key": "buyer_questions"},
+            {"$set": {"questions": qs, "updated_at": _now()}}, upsert=True)
+    return qs
+
+
+async def run_weekly_geo_sweep(owner_id: str):
+    """Autopilot: audit the top buyer questions, compute week-over-week trend, post to Team Pulse."""
+    questions = await top_buyer_questions(owner_id, 5)
+    if not questions:
+        return
+    results = []
+    for q in questions:
+        try:
+            results.append(await geo_audit(owner_id, q))
+        except Exception:
+            logger.exception("weekly geo audit failed for %s", q)
+    if not results:
+        return
+    avg = round(sum(r["visibility"] for r in results) / len(results))
+    cited = sum(1 for r in results if r["sitegenie_cited"])
+    prev = await db.seo_state.find_one({"user_id": owner_id, "key": "geo_trend"}, {"_id": 0})
+    prev_avg = (prev or {}).get("avg")
+    delta = (avg - prev_avg) if isinstance(prev_avg, (int, float)) else None
+    history = ((prev or {}).get("history") or [])[-11:] + [{"date": _now()[:10], "avg": avg, "cited": cited}]
+    await db.seo_state.update_one(
+        {"user_id": owner_id, "key": "geo_trend"},
+        {"$set": {"avg": avg, "cited": cited, "of": len(results), "history": history, "updated_at": _now()}},
+        upsert=True)
+    arrow = ""
+    if delta is not None:
+        arrow = f" ({'up ' if delta > 0 else 'down ' if delta < 0 else 'flat '}{abs(delta)} vs last week)"
+    weakest = min(results, key=lambda r: r["visibility"])
+    msg = (f"Weekly AI-visibility sweep: average {avg}/100{arrow} across {len(results)} top buyer "
+           f"questions; SiteGenie cited in {cited}/{len(results)}. Weakest: \"{weakest['query']}\" "
+           f"({weakest['visibility']}/100) — biggest content gap: {weakest['content_gap']}. "
+           "I can turn any gap into a planned article from the SEO Center.")
+    await post_agent_message(owner_id, "ivy", msg)
+    await log_activity(owner_id, "ivy", "seo",
+                       f"Weekly AI-visibility sweep — avg {avg}/100{arrow}, cited {cited}/{len(results)}.",
+                       detail=f'Weakest: "{weakest["query"]}" ({weakest["visibility"]}/100).',
+                       link="/team?agent=ivy&seo=1")
+
+
+async def geo_trend(owner_id: str) -> dict:
+    st = await db.seo_state.find_one({"user_id": owner_id, "key": "geo_trend"}, {"_id": 0})
+    return {"avg": (st or {}).get("avg"), "cited": (st or {}).get("cited"),
+            "of": (st or {}).get("of"), "history": (st or {}).get("history", [])}
+
+
+async def gap_to_calendar(owner_id: str, audit_id: str) -> dict:
+    """One-click: turn a GEO audit's content gap into a scheduled calendar topic."""
+    audit = await db.seo_audits.find_one(
+        {"user_id": owner_id, "audit_id": audit_id, "kind": "geo"}, {"_id": 0})
+    if not audit:
+        raise ValueError("Audit not found")
+    if audit.get("gap_used"):
+        raise ValueError("This gap is already on the calendar")
+    gap = (audit.get("content_gap") or "").strip()
+    if not gap:
+        raise ValueError("This audit has no content gap")
+    raw = await _call_llm(
+        f"Buyer question: {audit['query']}\nContent gap to address: {gap}\n"
+        "Turn this into ONE blog article plan that would earn SiteGenie a citation in AI search.\n"
+        'Reply ONLY JSON: {"title": "<SEO headline <=60 chars>", "target_keyword": "<primary>", '
+        '"secondary_keywords": ["<kw>","<kw>"], "intent": "informational"|"commercial"|"comparison", '
+        '"format": "how-to"|"listicle"|"guide"|"comparison"|"faq", "pillar": "<short pillar>"}',
+        "You are Ivy planning a content topic to close an AI-search visibility gap.", STRATEGY_MODEL)
+    d = _parse_json(raw)
+    last = await db.seo_calendar.find_one({"user_id": owner_id}, {"_id": 0, "scheduled_for": 1},
+                                          sort=[("scheduled_for", -1)])
+    base = datetime.now(timezone.utc)
+    if last and last.get("scheduled_for"):
+        try:
+            base = max(base, datetime.strptime(last["scheduled_for"], "%Y-%m-%d").replace(tzinfo=timezone.utc))
+        except ValueError:
+            pass
+    doc = {
+        "cal_id": f"cal_{uuid.uuid4().hex[:10]}", "user_id": owner_id,
+        "title": str(d.get("title") or gap)[:90],
+        "target_keyword": str(d.get("target_keyword", ""))[:80],
+        "secondary_keywords": [str(k)[:60] for k in (d.get("secondary_keywords") or [])][:4],
+        "intent": d.get("intent", "informational"), "format": d.get("format", "guide"),
+        "ai_prompt": audit["query"][:200], "pillar": str(d.get("pillar", ""))[:60],
+        "scheduled_for": (base + timedelta(days=1)).strftime("%Y-%m-%d"),
+        "status": "planned", "source": "geo_gap", "created_at": _now(),
+    }
+    await db.seo_calendar.insert_one(dict(doc))
+    await db.seo_audits.update_one({"audit_id": audit_id}, {"$set": {"gap_used": True}})
+    await log_activity(owner_id, "ivy", "seo",
+                       f'Turned a GEO content gap into a planned article: "{doc["title"]}".',
+                       detail=f'To win the AI query: "{audit["query"]}".', link="/team?agent=ivy&seo=1")
+    return {"added": True, "title": doc["title"], "scheduled_for": doc["scheduled_for"]}
+
+
 # ---------------- 4. Internal link / pillar map ----------------
 
 async def internal_link_map(owner_id: str) -> dict:
@@ -304,6 +419,8 @@ async def seo_overview(owner_id: str) -> dict:
     avg = round(sum(p["seo_score"] for p in scored) / len(scored)) if scored else None
     last_geo = await db.seo_audits.find_one({"user_id": owner_id, "kind": "geo"},
                                             {"_id": 0}, sort=[("created_at", -1)])
+    trend = await geo_trend(owner_id)
     return {"calendar_total": cal, "calendar_planned": planned, "articles_published": published,
             "avg_article_score": avg, "scored_count": len(scored),
-            "last_geo_visibility": (last_geo or {}).get("visibility")}
+            "last_geo_visibility": (last_geo or {}).get("visibility"),
+            "geo_trend": trend}
