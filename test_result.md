@@ -602,15 +602,65 @@ frontend:
           agent: "testing"
           comment: "✅ PASSED - One-click 'content gap → calendar' flow working perfectly. Tested with query 'best AI website builder for a yoga studio'. GEO audit completed successfully (visibility 15/100, citation status 'Not cited yet'). 'Content gap to win this' section displayed with recommendation. 'Turn into a planned article' button (data-testid='seo-add-gap') present and functional. Clicked button, success toast appeared: 'Added to the calendar: \"AI Website Builder for Yoga Studios: SiteGenie Setup Guide\" (2026-07-09).' Button state updated correctly to 'Added to calendar ✓' and became disabled. Verified topic landed on Calendar tab - found newly added topic at position 2 with title 'AI Website Builder for Yoga Studios: SiteGenie Setup Guide', target keyword '🔑 AI website builder for yoga studios · 🤖 \"best AI website builder for a yoga studio\"', scheduled date 2026-07-09. Calendar count increased from 1 to 2 topics. Backend endpoint POST /api/agents/ivy/seo/audit/{audit_id}/to-calendar working correctly. Screenshots captured before clicking button, after clicking (showing toast and button state change), and calendar with new topic."
 
+
+frontend:
+  - task: "Conversational Build Canvas - Load and UI"
+    implemented: true
+    working: true
+    file: "frontend/src/pages/BuildCanvas.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✅ PASSED - Build Canvas loads correctly at /generate route. All UI elements present: build canvas container (data-testid='build-canvas'), chat messages area (data-testid='build-messages'), empty-state headline 'Tell me about your business. I'll build the website.', 4 starter buttons (data-testid='build-starter'), input field (data-testid='build-input') with placeholder 'Describe your business…', send button (data-testid='build-send'), and preview placeholder 'Your website appears here'. Settings toggle (data-testid='build-settings-toggle') and settings panel (data-testid='build-settings') working correctly, showing model options (Sonnet 4.6, Haiku 4.5) and quality tiers (Economy, Quality, Premium) with correct defaults: Haiku 4.5 + Economy selected."
+
+  - task: "Conversational Build Canvas - First Build"
+    implemented: true
+    working: true
+    file: "frontend/src/pages/BuildCanvas.jsx, backend/routes/build.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✅ PASSED - First build flow working perfectly. Tested with prompt 'A cozy coffee shop called Ember and Oak'. User message bubble appeared, assistant reply appeared, build status indicator (data-testid='build-status') showed 'Building your website…'. Build completed in ~110 seconds (within expected 90-110s range for Economy/Haiku tier). Build iframe (data-testid='build-iframe') appeared with fully rendered website showing 'EMBER AND OAK' coffee shop site with hero section, services, story, and proper styling. 'Open & publish' button (data-testid='build-open-full') present. CRITICAL: Page stayed on /generate throughout entire build wait (no redirect to /login - session remained valid for 7 days). Backend bug fix (missing post_agent_message import in services/seo.py) confirmed working - no errors during build. Canvas defaults to fast Economy/Haiku tier as expected."
+
+  - task: "Conversational Build Canvas - Refinement"
+    implemented: true
+    working: true
+    file: "frontend/src/pages/BuildCanvas.jsx, backend/routes/build.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✅ PASSED - Refinement flow working correctly. After initial build, typed refinement prompt 'make the buttons gold', clicked send. Assistant reply appeared, status indicator (data-testid='build-status') showed 'Applying your changes…'. Refinement completed within 90 seconds, iframe stayed/updated with changes, no errors or crashes. Build iframe remained present throughout refinement process."
+
+  - task: "Conversational Build Canvas - Mobile Toggle"
+    implemented: true
+    working: true
+    file: "frontend/src/pages/BuildCanvas.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✅ PASSED - Mobile view toggle working correctly. Clicked mobile view button (Smartphone icon) in preview header, iframe container narrowed to 390px (correct mobile width). No crashes or errors. Switched back to desktop view successfully. Mobile/desktop toggle transitions smooth without breaking preview."
+
 metadata:
   created_by: "testing_agent"
-  version: "1.9"
-  test_sequence: 10
+  version: "2.0"
+  test_sequence: 11
   run_ui: false
 
 test_plan:
   current_focus:
-    - "Ivy SEO Command Center - NEW features tested and passing"
+    - "Conversational Build Canvas - Re-tested after backend bug fix, all scenarios passing"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -630,3 +680,6 @@ agent_communication:
       message: "Completed comprehensive testing of Ivy's SEO Command Center UI. ALL 6 TEST SCENARIOS PASSED: (1) Open SEO Center - Successfully logged in as owner (neobeyondlegacy2@gmail.com / OwnerGenie2025!), navigated to AI Team page (/team), selected Ivy agent (data-testid='agent-item-ivy'), clicked 'SEO Center' button (data-testid='ivy-seo-toggle'). SEO Center panel (data-testid='seo-center') opened successfully with all 6 tab buttons visible: overview, calendar, geo, tech, links, reddit. (2) Overview Tab - Default tab (data-testid='seo-overview') displays 4 stat cards: 'Planned topics' (12), 'Articles live' (0), 'Avg SEO score' (—), 'AI visibility' (15). (3) Calendar Tab - Clicked data-testid='seo-tab-calendar', verified 12 seeded topic rows with dates, intent labels, titles, and target keywords. 'Plan 30 days' button (data-testid='seo-build-calendar') present. (4) AI Visibility (GEO) Tab - Clicked data-testid='seo-tab-geo', typed 'best AI website builder for a bakery' into input (data-testid='seo-geo-input'), clicked Audit (data-testid='seo-geo-run'). Result (data-testid='seo-geo-result') appeared in ~30s showing visibility score '8/100', citation status 'Not cited yet', and content gap section. (5) Site Audit (Tech) Tab - Clicked data-testid='seo-tab-tech', typed 'https://example.com' into input (data-testid='seo-tech-input'), clicked Audit (data-testid='seo-tech-run'). Result (data-testid='seo-tech-result') appeared in ~40s showing summary and 6 prioritized fix rows (HIGH/MEDIUM labels). (6) Community (Reddit) Tab - Clicked data-testid='seo-tab-reddit', clicked 'Find opportunities' (data-testid='seo-reddit-run'). Result appeared in ~35s showing 5 opportunity cards with subreddit names (r/smallbusiness, r/Entrepreneur, r/freelance, r/ecommerce) and reply drafts. (7) Link Map Tab - Clicked data-testid='seo-tab-links', tab renders without crashing and shows correct empty state message 'No published articles yet to map...'. Minor: data-testid='seo-links' not present on empty state (only when posts exist), but functionality correct. Console: 2x 401 errors (non-critical auth checks). Screenshots captured for Overview, Calendar, GEO result, Tech result, Reddit result, and Links tabs. All LLM integrations working correctly. Feature is production-ready."
     - agent: "testing"
       message: "Completed testing of TWO NEW ADDITIONS to Ivy's SEO Command Center. ALL 5 TEST SCENARIOS PASSED: (1) Login - Successfully logged in as owner (neobeyondlegacy2@gmail.com / OwnerGenie2025!) and redirected to dashboard. (2) Open SEO Center - Navigated to AI Team page, selected Ivy agent (data-testid='agent-item-ivy'), clicked SEO Center toggle (data-testid='ivy-seo-toggle'), panel opened successfully. (3) OVERVIEW TREND - Verified trend widget (data-testid='seo-geo-trend') displays correctly with 4 bars from seeded history (avg 22, history of 4 weekly points). 'Run sweep now' button (data-testid='seo-run-sweep') present and functional - clicking shows info toast 'Ivy is running the AI-visibility sweep (~1 min)' without errors. AI visibility stat card correctly shows '22' (trend average). (4) GEO GAP → CALENDAR - Tested with query 'best AI website builder for a yoga studio'. GEO audit completed (visibility 15/100). Content gap section displayed with 'Turn into a planned article' button (data-testid='seo-add-gap'). Clicked button, success toast appeared: 'Added to the calendar: \"AI Website Builder for Yoga Studios: SiteGenie Setup Guide\" (2026-07-09).' Button changed to 'Added to calendar ✓' and disabled. (5) VERIFY CALENDAR - Clicked Calendar tab (data-testid='seo-tab-calendar'), verified new topic landed at position 2 with title 'AI Website Builder for Yoga Studios: SiteGenie Setup Guide', target keyword '🔑 AI website builder for yoga studios · 🤖 \"best AI website builder for a yoga studio\"', scheduled date 2026-07-09. Calendar count increased from 1 to 2 topics. No console errors. Screenshots captured: Overview with trend widget (4 bars visible), GEO result before clicking button, GEO result after clicking (showing toast and button state), and Calendar with new topic. Both new features working perfectly and production-ready."
+
+    - agent: "testing"
+      message: "RE-TEST COMPLETE: Conversational Build Canvas on SiteGenie - ALL 6 TEST SCENARIOS PASSED after backend bug fix (missing post_agent_message import in services/seo.py). (1) LOGIN - Successfully logged in as owner (neobeyondlegacy2@gmail.com / OwnerGenie2025!) on first attempt, no rate limiting issues, redirected to /dashboard. (2) CANVAS LOADS - Navigated to /generate, build canvas (data-testid='build-canvas') loaded correctly with chat area (data-testid='build-messages'), empty-state headline 'Tell me about your business. I'll build the website.', 4 starter buttons (data-testid='build-starter'), input field (data-testid='build-input'), send button (data-testid='build-send'), and preview placeholder 'Your website appears here'. (3) FIRST BUILD - Typed 'A cozy coffee shop called Ember and Oak', clicked send, user bubble appeared, assistant reply appeared, build status (data-testid='build-status') showed 'Building your website…'. Build completed in ~110 seconds (within expected 90-110s range). Build iframe (data-testid='build-iframe') appeared with rendered website, 'Open & publish' button (data-testid='build-open-full') present. CRITICAL: Page stayed on /generate throughout entire build wait (no redirect to /login - session remained valid). (4) REFINEMENT - Typed 'make the buttons gold', clicked send, assistant reply appeared, status showed 'Applying your changes…'. Refinement completed within 90s, iframe stayed/updated, no errors. (5) SETTINGS - Clicked settings toggle (data-testid='build-settings-toggle'), settings panel (data-testid='build-settings') opened showing model options (Sonnet 4.6, Haiku 4.5) and quality tiers (Economy, Quality, Premium). Confirmed defaults: Haiku 4.5 + Economy selected. (6) MOBILE TOGGLE - Clicked mobile view button, iframe container narrowed to 390px (correct mobile width), no crashes, switched back to desktop successfully. Minor non-critical issues: 2x 401 console errors (auth checks), 7x network failures (3x Cloudflare RUM CDN analytics, 2x Unsplash CORS/ORB). Screenshots captured: empty canvas, mid-build with status, completed build with live preview, settings panel, mobile view. Backend bug fix confirmed working - no post_agent_message errors. Canvas defaults to fast Economy/Haiku tier as expected. All core functionality working perfectly and production-ready."

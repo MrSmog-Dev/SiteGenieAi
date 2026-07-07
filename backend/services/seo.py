@@ -15,6 +15,7 @@ from config import EMERGENT_LLM_KEY, STRATEGY_MODEL, logger
 from database import db
 from services.llm import _call_llm
 from services.activity import log_activity
+from services.agents import post_agent_message
 
 
 def _now() -> str:

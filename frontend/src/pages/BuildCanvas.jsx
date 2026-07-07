@@ -43,8 +43,8 @@ export default function BuildCanvas() {
   const [html, setHtml] = useState("");
   const [templateId, setTemplateId] = useState(null);
   const [view, setView] = useState("desktop");
-  const [model, setModel] = useState("claude-sonnet-4-6");
-  const [quality, setQuality] = useState("quality");
+  const [model, setModel] = useState("claude-haiku-4-5");
+  const [quality, setQuality] = useState("economy");
   const [showSettings, setShowSettings] = useState(false);
   const scrollRef = useRef(null);
   const pollRef = useRef(null);
