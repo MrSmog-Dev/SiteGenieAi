@@ -148,6 +148,10 @@ An online store that creates website templates for businesses without a website.
 
 ## Key Endpoints
 - `POST /api/templates/generate` → job; poll job for template
+- 2026-07-07 (later): **Ivy weekly GEO sweep + one-click gap->calendar** (extends SEO Autopilot). Backend verified (gap->calendar E2E; sweep completes as background task, writes trend + posts to Ivy chat + Team Pulse) + frontend 5/5 pass.
+  - **Weekly GEO sweep** (`services/seo.py::run_weekly_geo_sweep`): audits the owner's top 5 buyer questions (`top_buyer_questions`, persisted in `seo_state` key=buyer_questions), computes average AI-visibility + cited count, stores week-over-week trend + 12-pt history (`seo_state` key=geo_trend), posts a trend update to Ivy's chat and Team Pulse (kind=`seo`). Runs weekly on the automation tick (`ivy_geo_sweep` job, 7-day claim) + manual trigger `POST /api/agents/ivy/seo/weekly-sweep`. `geo_trend()` read model; `geo_audit` now returns `audit_id` + `gap_used`.
+  - **Gap -> calendar** (`gap_to_calendar`): `POST /api/agents/ivy/seo/audit/{audit_id}/to-calendar` turns a GEO audit's content_gap into a scheduled `seo_calendar` topic (LLM expands to title/keywords/intent/format; scheduled after the last item; marks audit `gap_used=true`; blocks double-add).
+  - **Frontend** `SeoCenter.jsx`: Overview shows a weekly AI-visibility **trend sparkline** (`seo-geo-trend`) + "Run sweep now" (`seo-run-sweep`); GEO result has a **"Turn into a planned article"** button (`seo-add-gap`) -> success toast + "Added to calendar". DB: `seo_state` (user_id,key) unique index in server.py.
 - `POST /api/templates/{id}/publish`, `GET /api/p/{slug}`, `GET /api/og/{slug}.png`, `GET /api/templates/{id}/export`
 
 ## Test Credentials
