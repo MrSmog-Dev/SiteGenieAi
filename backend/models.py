@@ -98,6 +98,16 @@ class DomainInput(BaseModel):
     domain: str
 
 
+class TemplateDetailsInput(BaseModel):
+    """Owner/buyer edits to a purchased or generated site's core details ("Make it yours")."""
+    business_name: Optional[str] = None
+    contact_email: Optional[str] = None
+    phone: Optional[str] = None
+    primary_color: Optional[str] = None
+    industry: Optional[str] = None
+    description: Optional[str] = None
+
+
 class SupportChatInput(BaseModel):
     message: str
     session_id: Optional[str] = None

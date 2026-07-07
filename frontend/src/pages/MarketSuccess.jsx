@@ -47,18 +47,18 @@ export default function MarketSuccess() {
         {state === "success" && (
           <>
             <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto" />
-            <h1 className="font-display text-2xl font-bold mt-6">The template is yours!</h1>
+            <h1 className="font-display text-2xl font-bold mt-6">This website is now yours 🎉</h1>
             <p className="text-white/50 mt-2 text-sm">
-              It's been added to My Websites. You own it forever — publish it, export the ZIP, and make
-              unlimited AI edits at no extra cost.
+              Ownership has been transferred to your account and it's been removed from the Market —
+              it's one-of-one, exclusively yours. Edit anything, publish it, and export the ZIP anytime.
             </p>
             <div className="mt-6 flex items-center justify-center gap-2 border border-amber-400/30 text-amber-300 py-3">
               <Wand2 className="w-4 h-4" />
-              <span className="font-mono text-sm">Free unlimited AI edits included</span>
+              <span className="font-mono text-sm">Full ownership · free unlimited AI edits</span>
             </div>
-            <button data-testid="open-purchased-btn" onClick={() => navigate(`/templates/${info.template_id}`)}
+            <button data-testid="make-it-yours-btn" onClick={() => navigate(`/templates/${info.template_id}?onboard=1`)}
               className="mt-6 w-full bg-brand hover:bg-brand-hover py-3 transition-colors duration-300">
-              Open your website
+              Make it yours →
             </button>
             <button data-testid="back-to-market-btn" onClick={() => navigate("/market")}
               className="mt-3 w-full border border-white/15 hover:border-white/40 py-3 transition-colors duration-300">

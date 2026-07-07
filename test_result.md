@@ -102,7 +102,68 @@
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
 
-user_problem_statement: "Test the new owner-side Customer Feedback Inbox for SiteGenie (owner can view, filter, and manage customer feedback from Halo in a dedicated inbox panel)"
+user_problem_statement: "Test the new 'Make it yours' ownership onboarding + ownership certificate + luxury generation flow on SiteGenie"
+
+frontend:
+  - task: "Ownership Certificate Modal"
+    implemented: true
+    working: true
+    file: "frontend/src/components/OwnershipOnboarding.jsx, frontend/src/pages/TemplateView.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✅ PASSED - Ownership certificate modal (data-testid='certificate-modal') opens correctly when clicking 'Ownership' button (data-testid='ownership-cert-btn') on purchased template page. Modal displays all required information: 'Certificate of Ownership' title, business name 'Bella Vista Trattoria', transfer date '7/7/2026', price '$340', and certificate ID 'cert_demo123'. Modal closes correctly. Screenshot captured showing certificate details."
+  
+  - task: "Onboarding Modal Auto-open"
+    implemented: true
+    working: true
+    file: "frontend/src/components/OwnershipOnboarding.jsx, frontend/src/pages/TemplateView.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✅ PASSED - Onboarding modal (data-testid='onboarding-modal') auto-opens correctly when navigating to /templates/tpl_ownedtest01?onboard=1. Modal opens on step 1 (data-testid='onboard-step-details') with all required inputs present: business name (onboard-name), contact email (onboard-email), phone (onboard-phone), and brand color (onboard-color). All inputs are functional and pre-populated with existing template data."
+  
+  - task: "Onboarding Step 1 - Save Details"
+    implemented: true
+    working: true
+    file: "frontend/src/components/OwnershipOnboarding.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✅ PASSED - Step 1 details saving working correctly. Successfully changed business name from 'Bella Vista Trattoria' to 'Bella Vista Ristorante' and email from 'ciao@bellavista.com' to 'hello@bellavista.com'. Clicking 'Save & continue' button (data-testid='onboard-save-details') triggers PUT /api/templates/{id}/details API call, displays success toast 'Your details are in — the site now reflects them.', and advances to step 2 (data-testid='onboard-step-publish')."
+  
+  - task: "Onboarding Step 2 - Publish"
+    implemented: true
+    working: true
+    file: "frontend/src/components/OwnershipOnboarding.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✅ PASSED - Step 2 publish functionality working correctly. Step displays 'Take it live' message with 'Publish my site' button (data-testid='onboard-publish'). Clicking publish button triggers POST /api/templates/{id}/publish API call, waits ~4-6 seconds for operation to complete, displays success toast 'Your site is live!', and advances to step 3 (data-testid='onboard-step-done'). Step 3 shows completion message 'You're all set 🎉', displays public URL (https://genie-deploy-1.preview.emergentagent.com/api/p/bella-vista-ristorante-796b9b), and presents 'Download ZIP' (data-testid='onboard-download-zip') and 'Start editing' (data-testid='onboard-finish') buttons."
+  
+  - task: "Onboarding Details Persistence"
+    implemented: true
+    working: true
+    file: "frontend/src/components/OwnershipOnboarding.jsx, frontend/src/pages/TemplateView.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✅ PASSED - Details persistence verified. After completing onboarding flow and clicking 'Start editing' button (data-testid='onboard-finish'), modal closes and page header immediately reflects updated business name 'Bella Vista Ristorante'. Template iframe also displays updated business name and email 'hello@bellavista.com'. Backend successfully updated template details via PUT /api/templates/{id}/details endpoint and changes are reflected in real-time without page reload."
 
 frontend:
   - task: "Halo Widget - Anonymous user support chat"
@@ -204,19 +265,17 @@ backend:
 
 metadata:
   created_by: "testing_agent"
-  version: "1.2"
-  test_sequence: 3
+  version: "1.3"
+  test_sequence: 4
   run_ui: true
 
 test_plan:
   current_focus:
-    - "Customer Feedback Inbox feature tested and passing"
+    - "Ownership onboarding flow tested and passing"
   stuck_tasks: []
   test_all: true
   test_priority: "high_first"
 
 agent_communication:
     - agent: "testing"
-      message: "Completed comprehensive testing of Halo Customer Support AI feature. All 4 test scenarios PASSED: (1) Halo widget for anonymous users with AI chat working, (2) Feedback routing from Halo to Team Pulse E2E flow confirmed, (3) All three policy pages (FAQ, Refund, Terms) rendering correctly, (4) Widget correctly hidden for owner/admin users. Minor non-critical issue: 4x 401 errors on /api/auth/me during initial page loads (before auth completes) - does not affect functionality. Screenshots captured for Halo widget with pricing reply, Team Pulse showing customer feedback, FAQ page, and dashboard without Halo. Feature is production-ready."
-    - agent: "testing"
-      message: "Completed testing of Customer Feedback Inbox feature. RESULTS: 5 of 6 test scenarios PASSED with 1 minor issue. ✅ PASSED: (1) Inbox opens correctly with feedback items and counts, (2) All status tabs working with proper filtering, (3) Status transitions working bidirectionally (new→reviewed→dismissed→new), (4) Type filters working correctly, (5) No deletions performed. ⚠️ MINOR ISSUE: Deep link from Team Pulse navigates to Halo correctly but inbox doesn't auto-open (requires manual toggle click). Root cause: AiTeam.jsx expects 'inbox=1' URL parameter but TeamPulse.jsx doesn't set it when navigating. This is a convenience feature issue, not a blocker - all core functionality works perfectly. Feature is production-ready."
+      message: "Completed comprehensive testing of ownership onboarding + certificate flow for SiteGenie. ALL 5 TEST SCENARIOS PASSED: (1) Ownership certificate modal displays correctly with all required information (business name, price $340, certificate ID, transfer date), (2) Onboarding modal auto-opens with ?onboard=1 parameter and shows all input fields, (3) Step 1 details saving works correctly - successfully updated business name to 'Bella Vista Ristorante' and email to 'hello@bellavista.com' with success toast and step transition, (4) Step 2 publish functionality works - site published successfully with public URL displayed in step 3, (5) Details persistence verified - updated business name appears in page header and template iframe immediately after onboarding completion. Minor non-critical issue: 2x 401 console errors during page load (auth checks). Screenshots captured for all 3 onboarding steps and final state. Feature is production-ready and working perfectly."

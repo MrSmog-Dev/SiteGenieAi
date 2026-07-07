@@ -35,10 +35,12 @@ async def create_listing(tpl: dict, owner_user_id: str) -> dict:
 
 
 async def fulfill_market_purchase(txn: dict):
-    """Copies the listing's template to the buyer with free-edit ownership."""
+    """Exclusive sale: transfer full ownership of the site to the buyer, delist it from the
+    Market, and record a clean ownership-transfer certificate."""
     listing = await db.market_listings.find_one({"market_id": txn.get("market_id")}, {"_id": 0})
     if not listing:
         return
+    now = datetime.now(timezone.utc)
     new_id = f"tpl_{uuid.uuid4().hex[:12]}"
     doc = {k: listing.get(k) for k in GEN_FIELDS}
     doc.update({
@@ -48,9 +50,33 @@ async def fulfill_market_purchase(txn: dict):
         "purchased": True,
         "purchased_market_id": listing["market_id"],
         "purchased_price": listing.get("price_usd"),
-        "created_at": datetime.now(timezone.utc),
+        "owned_exclusive": True,          # buyer owns this one-of-one; fully editable
+        "onboarded": False,               # drives the post-purchase "Make it yours" flow
+        "created_at": now,
     })
     await db.templates.insert_one(doc)
-    await db.market_listings.update_one({"market_id": listing["market_id"]}, {"$inc": {"purchases": 1}})
+
+    # Exclusive transfer — the site is no longer for sale on the Market.
+    await db.market_listings.update_one(
+        {"market_id": listing["market_id"]},
+        {"$inc": {"purchases": 1},
+         "$set": {"active": False, "sold": True, "sold_to": txn["user_id"],
+                  "sold_at": now, "sold_template_id": new_id}})
+
+    # Clean ownership certificate — a verifiable record of the transfer.
+    cert_id = f"cert_{uuid.uuid4().hex[:10]}"
+    await db.ownership_certificates.insert_one({
+        "cert_id": cert_id,
+        "template_id": new_id,
+        "market_id": listing["market_id"],
+        "buyer_user_id": txn["user_id"],
+        "seller_user_id": listing.get("owner_user_id"),
+        "title": listing.get("title") or listing.get("business_name") or "Website",
+        "price_usd": listing.get("price_usd"),
+        "session_id": txn.get("session_id"),
+        "transferred_at": now,
+    })
+
     await db.payment_transactions.update_one(
-        {"session_id": txn["session_id"]}, {"$set": {"fulfilled_template_id": new_id}})
+        {"session_id": txn["session_id"]},
+        {"$set": {"fulfilled_template_id": new_id, "ownership_cert_id": cert_id}})

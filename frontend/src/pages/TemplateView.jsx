@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import DashboardLayout from "@/components/DashboardLayout";
+import { OwnershipOnboarding, OwnershipCertificate } from "@/components/OwnershipOnboarding";
 import { api, formatApiError, pollGenerationJob } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
@@ -9,8 +10,11 @@ import { ArrowLeft, Download, Copy, Monitor, Smartphone, Code, RefreshCw, Wand2,
 export default function TemplateView() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user, refreshUser } = useAuth();
   const [tpl, setTpl] = useState(null);
+  const [onboardOpen, setOnboardOpen] = useState(false);
+  const [certOpen, setCertOpen] = useState(false);
   const [view, setView] = useState("desktop");
   const [showCode, setShowCode] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -41,6 +45,10 @@ export default function TemplateView() {
     setTpl(data);
     setDomainDraft(data.custom_domain || "");
     if (data.published) loadStats();
+    // Post-purchase: open the "Make it yours" flow (once) for freshly-transferred sites.
+    if (data.purchased && !data.onboarded && searchParams.get("onboard") === "1") {
+      setOnboardOpen(true);
+    }
   }).catch(() => { toast.error("Not found"); navigate("/templates"); });
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
 
@@ -215,6 +223,18 @@ export default function TemplateView() {
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
+            {tpl.purchased && (
+              <>
+                <button data-testid="make-it-yours-btn" onClick={() => setOnboardOpen(true)}
+                  className="flex items-center gap-2 text-sm border border-emerald-400/50 text-emerald-300 hover:border-emerald-300 px-3 py-2 transition-colors duration-300">
+                  <ShieldCheck className="w-4 h-4" /> Make it yours
+                </button>
+                <button data-testid="ownership-cert-btn" onClick={() => setCertOpen(true)}
+                  className="flex items-center gap-2 text-sm border border-amber-400/40 text-amber-300 hover:border-amber-300 px-3 py-2 transition-colors duration-300">
+                  <Store className="w-4 h-4" /> Ownership
+                </button>
+              </>
+            )}
             {isOwnerUser && !tpl.purchased && (listing ? (
               <button data-testid="delist-market-btn" onClick={delistFromMarket}
                 className="flex items-center gap-2 text-sm border border-amber-400/50 text-amber-300 hover:border-amber-300 px-3 py-2 transition-colors duration-300">
@@ -460,6 +480,16 @@ export default function TemplateView() {
             )}
           </div>
         </div>
+      )}
+      {onboardOpen && tpl && (
+        <OwnershipOnboarding
+          tpl={tpl}
+          onClose={() => { setOnboardOpen(false); if (searchParams.get("onboard")) setSearchParams({}, { replace: true }); }}
+          onUpdated={(patch) => setTpl((t) => ({ ...t, ...patch }))}
+        />
+      )}
+      {certOpen && (
+        <OwnershipCertificate templateId={id} onClose={() => setCertOpen(false)} />
       )}
     </DashboardLayout>
   );

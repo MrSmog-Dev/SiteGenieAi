@@ -137,6 +137,8 @@ async def _run_db_init():
     await db.site_pages.create_index("kind", unique=True)
     await db.support_chats.create_index("session_id", unique=True)
     await db.customer_feedback.create_index([("created_at", -1)])
+    await db.ownership_certificates.create_index("template_id")
+    await db.ownership_certificates.create_index("cert_id", unique=True)
     await db.rate_events.create_index("ts", expireAfterSeconds=GEN_WINDOW_SECONDS + 60)
     await db.login_attempts.create_index("ts", expireAfterSeconds=LOGIN_WINDOW_SECONDS + 60)
     await db.login_attempts.create_index("identifier")

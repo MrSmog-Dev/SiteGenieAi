@@ -11,7 +11,7 @@ from fastapi.responses import HTMLResponse
 from pymongo.errors import DuplicateKeyError
 
 from database import db
-from models import GenerateInput, EditInput, SlugInput, DomainInput
+from models import GenerateInput, EditInput, SlugInput, DomainInput, TemplateDetailsInput
 from security import get_current_user, total_credits, user_is_unlimited, parse_dt
 from services.llm import _start_job
 from services.og_image import render_og_png
@@ -110,6 +110,66 @@ async def get_template(template_id: str, user: dict = Depends(get_current_user))
 async def delete_template(template_id: str, user: dict = Depends(get_current_user)):
     await db.templates.delete_one({"template_id": template_id, "user_id": user["user_id"]})
     return {"success": True}
+
+
+@router.put("/templates/{template_id}/details")
+async def update_template_details(template_id: str, input: TemplateDetailsInput,
+                                  user: dict = Depends(get_current_user)):
+    """'Make it yours' — update core business details on a site and reflect the safe ones in the HTML.
+
+    Only literal, unambiguous substitutions are applied to the HTML (business name, email, phone, and
+    brand color where the old value is present). For deeper copy/design changes the user uses AI edit."""
+    tpl = await db.templates.find_one({"template_id": template_id, "user_id": user["user_id"]}, {"_id": 0})
+    if not tpl:
+        raise HTTPException(status_code=404, detail="Template not found")
+    changes = {k: v for k, v in input.dict().items() if v is not None and str(v).strip() != ""}
+    if not changes:
+        raise HTTPException(status_code=400, detail="No changes provided.")
+
+    html = tpl.get("html", "") or ""
+    # Safe literal HTML replacements when the previous value is clearly present.
+    for field in ("business_name", "contact_email", "phone", "primary_color"):
+        new_val = changes.get(field)
+        old_val = tpl.get(field)
+        if new_val and old_val and str(old_val).strip() and str(old_val) != str(new_val):
+            html = html.replace(str(old_val), str(new_val))
+
+    update = {**changes, "html": html, "updated_at": datetime.now(timezone.utc)}
+    await db.templates.update_one({"template_id": template_id, "user_id": user["user_id"]},
+                                  {"$set": update})
+    doc = await db.templates.find_one({"template_id": template_id, "user_id": user["user_id"]}, {"_id": 0})
+    if isinstance(doc.get("created_at"), datetime):
+        doc["created_at"] = doc["created_at"].isoformat()
+    return doc
+
+
+@router.post("/templates/{template_id}/onboarded")
+async def mark_onboarded(template_id: str, user: dict = Depends(get_current_user)):
+    res = await db.templates.update_one(
+        {"template_id": template_id, "user_id": user["user_id"]},
+        {"$set": {"onboarded": True}})
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Template not found")
+    return {"onboarded": True}
+
+
+@router.get("/templates/{template_id}/certificate")
+async def ownership_certificate(template_id: str, user: dict = Depends(get_current_user)):
+    """Clean proof-of-ownership for a purchased (exclusively transferred) site."""
+    tpl = await db.templates.find_one(
+        {"template_id": template_id, "user_id": user["user_id"]},
+        {"_id": 0, "business_name": 1, "purchased": 1})
+    if not tpl:
+        raise HTTPException(status_code=404, detail="Template not found")
+    cert = await db.ownership_certificates.find_one(
+        {"template_id": template_id, "buyer_user_id": user["user_id"]}, {"_id": 0})
+    if not cert:
+        raise HTTPException(status_code=404, detail="No ownership certificate for this site.")
+    if isinstance(cert.get("transferred_at"), datetime):
+        cert["transferred_at"] = cert["transferred_at"].isoformat()
+    cert["owner_name"] = user.get("name") or user.get("email")
+    cert["owner_email"] = user.get("email")
+    return cert
 
 
 # ---------------- Publish / hosting ----------------
