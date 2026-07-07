@@ -10,6 +10,7 @@ import Register from "@/pages/Register";
 import AuthCallback from "@/pages/AuthCallback";
 import Dashboard from "@/pages/Dashboard";
 import Generator from "@/pages/Generator";
+import BuildCanvas from "@/pages/BuildCanvas";
 import MyTemplates from "@/pages/MyTemplates";
 import TemplateView from "@/pages/TemplateView";
 import Pricing from "@/pages/Pricing";
@@ -57,7 +58,8 @@ function AppRouter() {
       <Route path="/privacy" element={<PolicyPage kind="privacy" />} />
       <Route path="/s/:slug" element={<PublicSite />} />
       <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-      <Route path="/generate" element={<ProtectedRoute><Generator /></ProtectedRoute>} />
+      <Route path="/generate" element={<ProtectedRoute><BuildCanvas /></ProtectedRoute>} />
+      <Route path="/generate/classic" element={<ProtectedRoute><Generator /></ProtectedRoute>} />
       <Route path="/templates" element={<ProtectedRoute><MyTemplates /></ProtectedRoute>} />
       <Route path="/templates/:id" element={<ProtectedRoute><TemplateView /></ProtectedRoute>} />
     </Routes>

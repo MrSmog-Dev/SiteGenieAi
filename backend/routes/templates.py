@@ -71,7 +71,7 @@ async def generation_status(job_id: str, user: dict = Depends(get_current_user))
             await db.gen_jobs.update_one({"job_id": job_id},
                 {"$set": {"status": "error", "error": "Generation timed out. Please try again."}})
             job["status"], job["error"] = "error", "Generation timed out. Please try again."
-    resp = {"status": job["status"], "error": job.get("error")}
+    resp = {"status": job["status"], "error": job.get("error"), "stage": job.get("stage")}
     if job["status"] == "done" and job.get("template_id"):
         tpl = await db.templates.find_one({"template_id": job["template_id"]}, {"_id": 0})
         updated = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0})

@@ -114,6 +114,14 @@ def _build_brief_prompt(fields: dict) -> str:
     return "\n".join(lines)
 
 
+def _design_block(fields: dict) -> str:
+    try:
+        from services.design_intel import design_directive
+        return "\n\n" + design_directive(fields)
+    except Exception:
+        return ""
+
+
 def _build_site_prompt(fields: dict, brief: str) -> str:
     return (
         f"CREATIVE BRIEF:\n{brief}\n\n"
@@ -127,6 +135,7 @@ def _build_site_prompt(fields: dict, brief: str) -> str:
         "section anchor; wire 'Call' to tel: and 'Email'/'Contact' to mailto: using the contact details "
         "above (or the #contact form); the form must validate and show a success state. Include the "
         "professional trust badges and value cards in the About section."
+        + _design_block(fields)
     )
 
 
@@ -162,7 +171,7 @@ def _build_economy_prompt(fields: dict) -> str:
     if fields.get("contact_email"): lines.append(f"Contact email: {fields['contact_email']}")
     if fields.get("phone"): lines.append(f"Phone: {fields['phone']}")
     lines.append("\nBuild the full premium website now.")
-    return "\n".join(lines)
+    return "\n".join(lines) + _design_block(fields)
 
 
 async def _call_llm(prompt: str, system_message: str, model: str, timeout: int = None) -> str:
@@ -331,6 +340,10 @@ async def _fail_job(job_id: str, e: Exception):
     await db.gen_jobs.update_one({"job_id": job_id}, {"$set": {"status": "error", "error": err}})
 
 
+async def _set_stage(job_id: str, stage: str):
+    await db.gen_jobs.update_one({"job_id": job_id}, {"$set": {"stage": stage}})
+
+
 async def _run_generation(job_id: str, user_id: str, fields: dict, mode: str = "new", template_id: str = None, free: bool = False):
     cost_inputs = []
     build_model = (fields.get("model") or "").strip() or None
@@ -346,6 +359,7 @@ async def _run_generation(job_id: str, user_id: str, fields: dict, mode: str = "
                 return
             cost_inputs = outputs
         elif mode == "edit":
+            await _set_stage(job_id, "refining")
             existing = await db.templates.find_one({"template_id": template_id, "user_id": user_id}, {"_id": 0})
             prompt = (
                 "Here is an existing complete HTML website document. Apply the requested changes with the care "
@@ -360,19 +374,23 @@ async def _run_generation(job_id: str, user_id: str, fields: dict, mode: str = "
             quality = (fields.get("quality") or "quality").lower()
             if quality == "economy":
                 # Fast single-pass build on the lighter model (fewer credits).
+                await _set_stage(job_id, "building")
                 site_prompt = _build_economy_prompt(fields)
                 html = clean_html(await _call_llm(site_prompt, GEN_BUILD_SYSTEM, STRATEGY_MODEL))
                 cost_inputs = [site_prompt, html]
             else:
                 # Step 1 — strategist thinks and writes a creative brief
+                await _set_stage(job_id, "designing")
                 brief_prompt = _build_brief_prompt(fields)
                 brief = await _call_llm(brief_prompt, GEN_STRATEGY_SYSTEM, STRATEGY_MODEL)
                 # Step 2 — builder crafts the site from the brief
+                await _set_stage(job_id, "building")
                 site_prompt = _build_site_prompt(fields, brief)
                 html = clean_html(await _call_build_llm(site_prompt, build_model))
                 cost_inputs = [brief_prompt, brief, site_prompt, html]
                 # Step 3 (Premium only) — polish pass for depth, animations, gallery, counters
                 if quality == "premium":
+                    await _set_stage(job_id, "polishing")
                     polished = await _premium_polish(html)
                     if polished != html:
                         cost_inputs.append(polished)
@@ -382,6 +400,9 @@ async def _run_generation(job_id: str, user_id: str, fields: dict, mode: str = "
         return
 
     cost = estimate_cost(*cost_inputs)
+    # Small conversational tweaks are billed at a discount (half, min 1 credit).
+    if mode == "edit" and fields.get("tweak"):
+        cost = max(1, cost // 2)
     if mode == "new":
         template_id = f"tpl_{uuid.uuid4().hex[:12]}"
         await db.templates.insert_one({

@@ -122,6 +122,12 @@ class TemplateDetailsInput(BaseModel):
     description: Optional[str] = None
 
 
+class BuildMessageInput(BaseModel):
+    message: str
+    model: Optional[str] = None
+    quality: Optional[str] = None
+
+
 class SupportChatInput(BaseModel):
     message: str
     session_id: Optional[str] = None
