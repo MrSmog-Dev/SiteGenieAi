@@ -128,6 +128,10 @@ class BuildMessageInput(BaseModel):
     quality: Optional[str] = None
 
 
+class HtmlSaveInput(BaseModel):
+    html: str
+
+
 class SupportChatInput(BaseModel):
     message: str
     session_id: Optional[str] = None

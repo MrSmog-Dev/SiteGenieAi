@@ -652,15 +652,75 @@ frontend:
           agent: "testing"
           comment: "✅ PASSED - Mobile view toggle working correctly. Clicked mobile view button (Smartphone icon) in preview header, iframe container narrowed to 390px (correct mobile width). No crashes or errors. Switched back to desktop view successfully. Mobile/desktop toggle transitions smooth without breaking preview."
 
+  - task: "Visual Editor - Open and UI"
+    implemented: true
+    working: true
+    file: "frontend/src/components/VisualEditor.jsx, frontend/src/pages/TemplateView.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✅ PASSED - Visual editor opens correctly from template page. Clicked Edit button (data-testid='visual-edit-btn') on /templates/tpl_editortest01, full-screen editor (data-testid='visual-editor') opened with all required elements: 'Visual Editor' title with 'live' indicator, Save button (data-testid='editor-save' initially disabled), iframe (data-testid='editor-iframe') with site content, and Close button (data-testid='editor-close'). Editor runtime initializes within ~2s, makes text elements contenteditable with data-sg-editable attribute, adds section hover toolbars with controls (move up/down, duplicate, color picker, delete), and '+ Add' buttons at bottom of sections."
+
+  - task: "Visual Editor - Inline Text Editing"
+    implemented: true
+    working: true
+    file: "frontend/src/components/VisualEditor.jsx, frontend/src/lib/editorRuntime.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✅ PASSED - Inline text editing working correctly inside iframe. Successfully found H1 headline 'Welcome to Editor Test' with data-sg-editable attribute, clicked into it, changed text to 'My New Headline' using JavaScript to dispatch input event. Editor runtime correctly posts 'dirty' message to parent, Save button (data-testid='editor-save') becomes ENABLED after edit. Text elements (h1, h2, h3, h4, h5, h6, p, span, a, button, li, figcaption, blockquote, label) are made contenteditable by runtime."
+
+  - task: "Visual Editor - Add Block Flow"
+    implemented: true
+    working: true
+    file: "frontend/src/components/VisualEditor.jsx, frontend/src/lib/editorRuntime.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✅ PASSED - Add block flow working correctly. Hovered over section inside iframe, '+ Add' button (.sg-add-btn) appeared, clicked it, add-block menu (data-testid='add-block-menu') opened in parent with all 8 block options visible: Sub-headline (data-testid='add-block-subheadline'), Text paragraph (add-block-text), Button (add-block-button), Image (add-block-image), Bullet list (add-block-list), Quick links (add-block-quicklinks), Divider (add-block-divider), Spacer (add-block-spacer). Clicked 'Sub-headline' option, menu closed, new H3 element 'New sub-headline' was inserted into section, Save button remained enabled. Editor runtime correctly posts 'open-add' message with sectionId, parent sends 'add-block' message back to iframe."
+
+  - task: "Visual Editor - Save Changes"
+    implemented: true
+    working: true
+    file: "frontend/src/components/VisualEditor.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✅ PASSED - Save functionality working correctly. Clicked Save button (data-testid='editor-save'), editor requests HTML from iframe via 'request-html' message, iframe runtime cleans HTML (removes editor chrome, contenteditable attributes, data-sg-* attributes), returns cleaned HTML via 'html' message. Backend PUT /api/templates/{id}/html endpoint called successfully. Success toast appeared: 'Saved. Publish to push it live.' Save button returned to 'Saved' state (disabled) with checkmark icon. No errors during save operation."
+
+  - task: "Visual Editor - Close and Return"
+    implemented: true
+    working: true
+    file: "frontend/src/components/VisualEditor.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✅ PASSED - Close functionality working correctly. Clicked Close button (data-testid='editor-close'), editor closed (removed from DOM), returned to TemplateView at /templates/tpl_editortest01. Template preview iframe (data-testid='template-iframe') visible with updated content showing 'My New Headline' and new sub-headline. If there are unsaved changes, closeGuarded() function shows confirmation dialog 'Discard unsaved edits?' before closing."
+
 metadata:
   created_by: "testing_agent"
   version: "2.0"
-  test_sequence: 11
+  test_sequence: 12
   run_ui: false
 
 test_plan:
   current_focus:
-    - "Conversational Build Canvas - Re-tested after backend bug fix, all scenarios passing"
+    - "Visual Editor - All scenarios tested and passing"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -683,3 +743,6 @@ agent_communication:
 
     - agent: "testing"
       message: "RE-TEST COMPLETE: Conversational Build Canvas on SiteGenie - ALL 6 TEST SCENARIOS PASSED after backend bug fix (missing post_agent_message import in services/seo.py). (1) LOGIN - Successfully logged in as owner (neobeyondlegacy2@gmail.com / OwnerGenie2025!) on first attempt, no rate limiting issues, redirected to /dashboard. (2) CANVAS LOADS - Navigated to /generate, build canvas (data-testid='build-canvas') loaded correctly with chat area (data-testid='build-messages'), empty-state headline 'Tell me about your business. I'll build the website.', 4 starter buttons (data-testid='build-starter'), input field (data-testid='build-input'), send button (data-testid='build-send'), and preview placeholder 'Your website appears here'. (3) FIRST BUILD - Typed 'A cozy coffee shop called Ember and Oak', clicked send, user bubble appeared, assistant reply appeared, build status (data-testid='build-status') showed 'Building your website…'. Build completed in ~110 seconds (within expected 90-110s range). Build iframe (data-testid='build-iframe') appeared with rendered website, 'Open & publish' button (data-testid='build-open-full') present. CRITICAL: Page stayed on /generate throughout entire build wait (no redirect to /login - session remained valid). (4) REFINEMENT - Typed 'make the buttons gold', clicked send, assistant reply appeared, status showed 'Applying your changes…'. Refinement completed within 90s, iframe stayed/updated, no errors. (5) SETTINGS - Clicked settings toggle (data-testid='build-settings-toggle'), settings panel (data-testid='build-settings') opened showing model options (Sonnet 4.6, Haiku 4.5) and quality tiers (Economy, Quality, Premium). Confirmed defaults: Haiku 4.5 + Economy selected. (6) MOBILE TOGGLE - Clicked mobile view button, iframe container narrowed to 390px (correct mobile width), no crashes, switched back to desktop successfully. Minor non-critical issues: 2x 401 console errors (auth checks), 7x network failures (3x Cloudflare RUM CDN analytics, 2x Unsplash CORS/ORB). Screenshots captured: empty canvas, mid-build with status, completed build with live preview, settings panel, mobile view. Backend bug fix confirmed working - no post_agent_message errors. Canvas defaults to fast Economy/Haiku tier as expected. All core functionality working perfectly and production-ready."
+    
+    - agent: "testing"
+      message: "VISUAL EDITOR TEST COMPLETE: Shopify-style click-to-edit builder on SiteGenie - ALL 5 TEST SCENARIOS PASSED. (1) OPEN EDITOR - Successfully logged in as owner (neobeyondlegacy2@gmail.com / OwnerGenie2025!), navigated to /templates/tpl_editortest01, verified Edit button (data-testid='visual-edit-btn') present, clicked it and full-screen editor (data-testid='visual-editor') opened with 'Visual Editor' title, 'live' indicator, Save button (data-testid='editor-save' initially disabled), iframe (data-testid='editor-iframe'), and Close button (data-testid='editor-close'). (2) INLINE TEXT EDIT - Successfully interacted with iframe content, found H1 headline 'Welcome to Editor Test' with data-sg-editable attribute, clicked into it, changed text to 'My New Headline' using JavaScript to dispatch input event, verified Save button became ENABLED after edit. (3) ADD BLOCK - Hovered over first section inside iframe, found 3 .sg-add-btn elements, clicked '+ Add' button, add-block menu (data-testid='add-block-menu') opened in parent with all 8 block options visible (subheadline, text, button, image, list, quicklinks, divider, spacer), clicked 'Sub-headline' option (data-testid='add-block-subheadline'), menu closed, new sub-headline 'New sub-headline' appeared in section, Save button remained enabled. (4) SAVE - Clicked Save button, success toast appeared 'Saved. Publish to push it live.', Save button returned to 'Saved' state (disabled). (5) CLOSE - Clicked Close button, editor closed (removed from DOM), returned to TemplateView at /templates/tpl_editortest01, template preview iframe (data-testid='template-iframe') visible with updated content showing 'My New Headline' and new sub-headline. Minor non-critical issues: 4x 401 console errors (auth checks before login), 3x CDN network errors (Cloudflare RUM analytics), 1x sandbox warning (expected for iframe with allow-scripts and allow-same-origin). Screenshots captured: editor opened with test site, H1 text changed, add-block menu open with all options, new sub-headline added with section toolbar visible, after save, editor closed back to template view. All core functionality working perfectly - inline text editing, add block flow, save/close operations all functional. Editor runtime initializes correctly, makes text contenteditable, adds section hover toolbars with controls (move up/down, duplicate, color picker, delete), and '+ Add' buttons. Backend PUT /api/templates/{id}/html endpoint working correctly. Feature is production-ready."

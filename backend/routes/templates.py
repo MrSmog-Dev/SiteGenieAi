@@ -11,7 +11,7 @@ from fastapi.responses import HTMLResponse
 from pymongo.errors import DuplicateKeyError
 
 from database import db
-from models import GenerateInput, EditInput, SlugInput, DomainInput, TemplateDetailsInput
+from models import GenerateInput, EditInput, SlugInput, DomainInput, TemplateDetailsInput, HtmlSaveInput
 from security import get_current_user, total_credits, user_is_unlimited, parse_dt
 from services.llm import _start_job
 from services.og_image import render_og_png
@@ -141,6 +141,26 @@ async def update_template_details(template_id: str, input: TemplateDetailsInput,
     if isinstance(doc.get("created_at"), datetime):
         doc["created_at"] = doc["created_at"].isoformat()
     return doc
+
+
+@router.put("/templates/{template_id}/html")
+async def save_template_html(template_id: str, input: HtmlSaveInput, user: dict = Depends(get_current_user)):
+    """Save edits from the visual (click-to-edit) builder. Owner of the template (incl. buyers of a
+    purchased site, since the copy belongs to their user_id) can save raw HTML."""
+    tpl = await db.templates.find_one({"template_id": template_id, "user_id": user["user_id"]}, {"_id": 1})
+    if not tpl:
+        raise HTTPException(status_code=404, detail="Template not found")
+    html = (input.html or "").strip()
+    if len(html) < 100 or "<" not in html:
+        raise HTTPException(status_code=400, detail="That doesn't look like a valid page.")
+    # Strip any leftover editor chrome/attributes that might have been serialized in.
+    html = re.sub(r'\s(?:contenteditable|data-sg-[a-z-]+)="[^"]*"', "", html)
+    html = re.sub(r"<style[^>]*id=[\"']sg-editor-style[\"'][\s\S]*?</style>", "", html, flags=re.I)
+    html = re.sub(r"<script[^>]*id=[\"']sg-editor-script[\"'][\s\S]*?</script>", "", html, flags=re.I)
+    await db.templates.update_one(
+        {"template_id": template_id, "user_id": user["user_id"]},
+        {"$set": {"html": html[:900_000], "updated_at": datetime.now(timezone.utc)}})
+    return {"saved": True}
 
 
 @router.post("/templates/{template_id}/onboarded")

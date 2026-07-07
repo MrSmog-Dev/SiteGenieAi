@@ -2,10 +2,11 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import DashboardLayout from "@/components/DashboardLayout";
 import { OwnershipOnboarding, OwnershipCertificate } from "@/components/OwnershipOnboarding";
+import { VisualEditor } from "@/components/VisualEditor";
 import { api, formatApiError, pollGenerationJob } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
-import { ArrowLeft, Download, Copy, Monitor, Smartphone, Code, RefreshCw, Wand2, Loader2, X, Globe, Share2, Check, ExternalLink, ChevronDown, FileArchive, FileCode, BarChart2, ShieldCheck, Clock, Store, Gem } from "lucide-react";
+import { ArrowLeft, Download, Copy, Monitor, Smartphone, Code, RefreshCw, Wand2, Loader2, X, Globe, Share2, Check, ExternalLink, ChevronDown, FileArchive, FileCode, BarChart2, ShieldCheck, Clock, Store, Gem, PencilRuler } from "lucide-react";
 
 export default function TemplateView() {
   const { id } = useParams();
@@ -15,6 +16,7 @@ export default function TemplateView() {
   const [tpl, setTpl] = useState(null);
   const [onboardOpen, setOnboardOpen] = useState(false);
   const [certOpen, setCertOpen] = useState(false);
+  const [editorOpen, setEditorOpen] = useState(false);
   const [view, setView] = useState("desktop");
   const [showCode, setShowCode] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -260,6 +262,10 @@ export default function TemplateView() {
               className="flex items-center gap-2 text-sm border border-white/15 hover:border-brand hover:text-brand px-3 py-2 transition-colors duration-300 disabled:opacity-50">
               <RefreshCw className={`w-4 h-4 ${busy && busyLabel === "Regenerate" ? "animate-spin" : ""}`} /> Regenerate
             </button>
+            <button data-testid="visual-edit-btn" onClick={() => setEditorOpen(true)} disabled={busy}
+              className="flex items-center gap-2 text-sm bg-brand/15 border border-brand/50 text-brand hover:bg-brand/25 px-3 py-2 transition-colors duration-300 disabled:opacity-50">
+              <PencilRuler className="w-4 h-4" /> Edit
+            </button>
             <button data-testid="edit-btn" onClick={() => setEditOpen(true)} disabled={busy}
               className="flex items-center gap-2 text-sm border border-white/15 hover:border-neon hover:text-neon px-3 py-2 transition-colors duration-300 disabled:opacity-50">
               <Wand2 className="w-4 h-4" /> Edit with AI
@@ -490,6 +496,14 @@ export default function TemplateView() {
       )}
       {certOpen && (
         <OwnershipCertificate templateId={id} onClose={() => setCertOpen(false)} />
+      )}
+      {editorOpen && tpl && (
+        <VisualEditor
+          templateId={id}
+          initialHtml={tpl.html}
+          onClose={() => setEditorOpen(false)}
+          onSaved={(html) => setTpl((t) => ({ ...t, html }))}
+        />
       )}
     </DashboardLayout>
   );
