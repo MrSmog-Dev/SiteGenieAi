@@ -504,15 +504,88 @@ backend:
           agent: "testing"
           comment: "✅ PASSED - Owner-gated authentication working correctly. Tested GET /api/agents/ivy/seo/overview WITHOUT session cookie. Returns 401 (Unauthorized) as expected. Unauthenticated requests are correctly rejected. All Ivy SEO endpoints properly protected."
 
+frontend:
+  - task: "Ivy SEO Command Center - Overview Tab"
+    implemented: true
+    working: true
+    file: "frontend/src/components/SeoCenter.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✅ PASSED - SEO Center panel (data-testid='seo-center') opens correctly when clicking 'SEO Center' button (data-testid='ivy-seo-toggle') in Ivy's chat header. All 6 tab buttons present: overview, calendar, geo, tech, links, reddit. Overview tab (data-testid='seo-overview') displays by default with 4 stat cards: 'Planned topics' (12), 'Articles live' (0), 'Avg SEO score' (—), 'AI visibility' (15). Screenshot captured."
+  
+  - task: "Ivy SEO Command Center - Calendar Tab"
+    implemented: true
+    working: true
+    file: "frontend/src/components/SeoCenter.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✅ PASSED - Calendar tab (data-testid='seo-calendar') displays correctly with 12 seeded topic rows. Each row shows date, intent label, title, and target keyword (🔑). 'Plan 30 days' button (data-testid='seo-build-calendar') is present. Sample topics include 'AI Website Builder for Small Business: 2025 Guide', 'Website Builder vs. Hiring a Designer: ROI Breakdown', etc. Screenshot captured."
+  
+  - task: "Ivy SEO Command Center - AI Visibility (GEO) Tab"
+    implemented: true
+    working: true
+    file: "frontend/src/components/SeoCenter.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✅ PASSED - GEO tab (data-testid='seo-geo') working correctly. Typed query 'best AI website builder for a bakery' into input (data-testid='seo-geo-input'), clicked Audit button (data-testid='seo-geo-run'). Result (data-testid='seo-geo-result') appeared within ~30s showing visibility score '8/100', citation status 'Not cited yet', answer text, and 'Content gap to win this' section with recommendations. LLM integration working correctly. Screenshot captured."
+  
+  - task: "Ivy SEO Command Center - Site Audit (Tech) Tab"
+    implemented: true
+    working: true
+    file: "frontend/src/components/SeoCenter.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✅ PASSED - Tech tab (data-testid='seo-tech') working correctly. Typed URL 'https://example.com' into input (data-testid='seo-tech-input'), clicked Audit button (data-testid='seo-tech-run'). Result (data-testid='seo-tech-result') appeared within ~40s showing summary text and 6 prioritized fix rows with priority labels (HIGH/MEDIUM/LOW). Fixes include 'Add meta description', 'Add canonical tag', 'Expand content to 300+ words', 'Add Open Graph tags', 'Add image with alt text', 'Add JSON-LD schema markup'. LLM integration working correctly. Screenshot captured."
+  
+  - task: "Ivy SEO Command Center - Community (Reddit) Tab"
+    implemented: true
+    working: true
+    file: "frontend/src/components/SeoCenter.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✅ PASSED - Reddit tab (data-testid='seo-reddit') working correctly. Clicked 'Find opportunities' button (data-testid='seo-reddit-run'). Result appeared within ~35s showing 5 opportunity cards with subreddit names (r/smallbusiness, r/Entrepreneur, r/freelance, r/ecommerce), angle descriptions, and 'Reply draft' sections with ready-to-post helpful replies. LLM integration working correctly. Screenshot captured."
+  
+  - task: "Ivy SEO Command Center - Link Map Tab"
+    implemented: true
+    working: true
+    file: "frontend/src/components/SeoCenter.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✅ PASSED - Links tab renders without crashing and displays correct empty state message: 'No published articles yet to map. Once Ivy publishes a few, she'll build a pillar/cluster internal-link map here.' Minor: data-testid='seo-links' is not present on empty state (only added when there are posts), but functionality is correct as expected. Screenshot captured."
+
 metadata:
   created_by: "testing_agent"
-  version: "1.7"
-  test_sequence: 8
+  version: "1.8"
+  test_sequence: 9
   run_ui: false
 
 test_plan:
   current_focus:
-    - "Ivy SEO Autopilot backend endpoints tested and passing"
+    - "Ivy SEO Command Center UI fully tested and passing"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -528,3 +601,5 @@ agent_communication:
       message: "Completed comprehensive testing of NEW Team Shared Brain + War Room auto-capture memory features for SiteGenie. ALL 6 TEST SCENARIOS PASSED: (1) Login - Successfully logged in as owner (neobeyondlegacy2@gmail.com / OwnerGenie2025!) and redirected to dashboard. (2) Open Team Brain - Navigated to AI Team page, clicked Team Brain roster item (data-testid='team-brain-item'), Team Brain panel (data-testid='team-brain') opened successfully with title 'Team Shared Brain'. (3) Verify Seeded Facts - Found all 3 seeded facts: 'Brand voice is luxury-but-approachable; never use jargon', 'Company domain is sitegenie-ai.com', and 'War Room decision (Jul 07) on Premium tier launch: Ship the premium tier on October 1st with a new hero and an SEO push'. All required seeded content verified present. (4) Add Shared Fact - Clicked add toggle (data-testid='memory-add-toggle'), typed 'We prioritize mobile-first design on every site' into input (data-testid='memory-add-input'), clicked save (data-testid='memory-add-save'), success toast 'The whole team will remember that.' appeared, new fact appeared in list (count went from 3 to 4). (5) Delete Shared Fact - Found newly added fact (mem_id: m_04a9996b), hovered to reveal delete button (data-testid='memory-delete-m_04a9996b'), clicked delete, 'Forgotten.' toast appeared, fact successfully removed from list. (6) War Room Decision in Agent Memory - Selected Quill agent (data-testid='agent-item-quill'), opened memory panel (data-testid='memory-toggle'), verified 'Open threads' section exists with War Room decision thread visible. Also verified Ivy agent shows same War Room thread in her memory. Minor non-critical issues: 4x 401 console errors (auth checks), 1x CDN error (Cloudflare RUM). All backend endpoints working correctly: GET/POST /api/agents/team-memory, DELETE /api/agents/team-memory/{id}. Screenshots captured for Team Brain with seeded facts, after adding fact, after deletion, Quill's memory with War Room thread, and Ivy's memory with War Room thread. Both new features (Team Shared Brain + War Room auto-capture) are production-ready and working perfectly."
     - agent: "testing"
       message: "Completed comprehensive testing of Ivy SEO Autopilot backend endpoints. ALL 9 TEST SCENARIOS PASSED: (1) Login - Successfully authenticated with neobeyondlegacy2@gmail.com / OwnerGenie2025! and captured session cookie. (2) GET /api/agents/ivy/seo/overview - Returns 200 with all required keys: calendar_total (12), calendar_planned (12), articles_published (0), avg_article_score (None), last_geo_visibility (None). (3) GET /api/agents/ivy/seo/calendar - Returns 200 with 12 seeded planned topics, each with title, target_keyword, intent, scheduled_for, status='planned'. Sample: 'AI Website Builder for Small Business: 2025 Guide'. (4) POST /api/agents/ivy/seo/geo-audit - Tested with query 'best AI website builder for a small bakery'. Returns 200 with query, answer (non-empty), sitegenie_cited (False), visibility (15/100), content_gap (non-empty). LLM integration working, completed in ~30s. (5) POST /api/agents/ivy/seo/tech-audit - Tested with url 'https://example.com'. Returns 200 with url, signals (title='Example Domain', has_meta_description, h1_count=1, etc.), summary (non-empty), fixes (6 items). URL fetch + LLM working, completed in ~40s. (6) GET /api/agents/ivy/seo/audits - Returns 200 with 2 audits (geo + tech audits just created), verified both present in list. (7) POST /api/agents/ivy/seo/reddit - Returns 200 with 5 opportunities, each with subreddit (e.g., 'r/freelance'), angle, reply_draft. LLM working, completed in ~30s. (8) GET /api/agents/ivy/seo/link-map - Returns 200 with pillars (empty), total_posts (0), suggestions (empty) - expected since no blog posts exist. (9) Auth Guard - Unauthenticated request to overview endpoint correctly rejected with 401. All endpoints owner-gated and working correctly. All LLM integrations functional. Database operations (calendar seeding, audit storage/retrieval) working correctly. Feature is production-ready."
+    - agent: "testing"
+      message: "Completed comprehensive testing of Ivy's SEO Command Center UI. ALL 6 TEST SCENARIOS PASSED: (1) Open SEO Center - Successfully logged in as owner (neobeyondlegacy2@gmail.com / OwnerGenie2025!), navigated to AI Team page (/team), selected Ivy agent (data-testid='agent-item-ivy'), clicked 'SEO Center' button (data-testid='ivy-seo-toggle'). SEO Center panel (data-testid='seo-center') opened successfully with all 6 tab buttons visible: overview, calendar, geo, tech, links, reddit. (2) Overview Tab - Default tab (data-testid='seo-overview') displays 4 stat cards: 'Planned topics' (12), 'Articles live' (0), 'Avg SEO score' (—), 'AI visibility' (15). (3) Calendar Tab - Clicked data-testid='seo-tab-calendar', verified 12 seeded topic rows with dates, intent labels, titles, and target keywords. 'Plan 30 days' button (data-testid='seo-build-calendar') present. (4) AI Visibility (GEO) Tab - Clicked data-testid='seo-tab-geo', typed 'best AI website builder for a bakery' into input (data-testid='seo-geo-input'), clicked Audit (data-testid='seo-geo-run'). Result (data-testid='seo-geo-result') appeared in ~30s showing visibility score '8/100', citation status 'Not cited yet', and content gap section. (5) Site Audit (Tech) Tab - Clicked data-testid='seo-tab-tech', typed 'https://example.com' into input (data-testid='seo-tech-input'), clicked Audit (data-testid='seo-tech-run'). Result (data-testid='seo-tech-result') appeared in ~40s showing summary and 6 prioritized fix rows (HIGH/MEDIUM labels). (6) Community (Reddit) Tab - Clicked data-testid='seo-tab-reddit', clicked 'Find opportunities' (data-testid='seo-reddit-run'). Result appeared in ~35s showing 5 opportunity cards with subreddit names (r/smallbusiness, r/Entrepreneur, r/freelance, r/ecommerce) and reply drafts. (7) Link Map Tab - Clicked data-testid='seo-tab-links', tab renders without crashing and shows correct empty state message 'No published articles yet to map...'. Minor: data-testid='seo-links' not present on empty state (only when posts exist), but functionality correct. Console: 2x 401 errors (non-critical auth checks). Screenshots captured for Overview, Calendar, GEO result, Tech result, Reddit result, and Links tabs. All LLM integrations working correctly. Feature is production-ready."
