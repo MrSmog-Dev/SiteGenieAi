@@ -86,3 +86,8 @@ android-sdk/
 credentials.json
 *.key
 .credentials
+
+# graphify - machine-local state (rebuild cache + resolved interpreter/root paths)
+graphify-out/cache/
+graphify-out/.graphify_python
+graphify-out/.graphify_root
