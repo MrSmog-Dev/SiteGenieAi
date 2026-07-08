@@ -2,6 +2,22 @@ from typing import Optional
 from pydantic import BaseModel, EmailStr
 
 
+class BlueprintSpec(BaseModel):
+    """Structured planning fields for a Website Blueprint. All optional - populated incrementally."""
+    business_name: Optional[str] = None
+    industry: Optional[str] = None
+    description: Optional[str] = None
+    style: Optional[str] = None
+    primary_color: Optional[str] = None
+    contact_email: Optional[str] = None
+    phone: Optional[str] = None
+    target_audience: Optional[str] = None
+    key_services: Optional[str] = None
+    brand_keywords: Optional[str] = None
+    pages: Optional[str] = None
+    notes: Optional[str] = None
+
+
 class RegisterInput(BaseModel):
     name: str
     email: EmailStr
@@ -146,3 +162,17 @@ class SupportChatInput(BaseModel):
 
 class FeedbackStatusInput(BaseModel):
     status: str   # "new" | "reviewed" | "actioned" | "dismissed"
+
+
+class BlueprintCreateInput(BaseModel):
+    name: Optional[str] = None      # human label for the project, e.g. "Q3 rebrand"
+    spec: Optional[BlueprintSpec] = None
+
+
+class BlueprintUpdateInput(BaseModel):
+    name: Optional[str] = None
+    spec: BlueprintSpec
+
+
+class BlueprintStatusInput(BaseModel):
+    status: str   # "draft" | "ready" | "generated" | "archived"
