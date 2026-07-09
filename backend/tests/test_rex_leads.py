@@ -1,4 +1,4 @@
-"""Tests for Rex's refined lead accuracy: smart confidence scoring, the 100/month discovery
+"""Tests for Rex's refined lead accuracy: smart confidence scoring, the 200,000/month discovery
 cap, and systematic 50-state rotation. hunt_places()'s Google Places call itself isn't exercised
 here (needs a real/mocked network + API key) - these cover the deterministic logic around it."""
 import os
@@ -115,5 +115,5 @@ async def test_hunt_status_reports_monthly_budget(owner_session):
     data = r.json()
     assert "leads_remaining_this_month" in data
     assert "monthly_lead_cap" in data
-    assert data["monthly_lead_cap"] == 100
-    assert 0 <= data["leads_remaining_this_month"] <= 100
+    assert data["monthly_lead_cap"] == 200_000
+    assert 0 <= data["leads_remaining_this_month"] <= 200_000

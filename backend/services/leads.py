@@ -21,7 +21,7 @@ PUBLIC_BASE = next((o.strip().rstrip("/") for o in os.environ.get("CORS_ORIGINS"
 
 # Discovery budget: caps new leads added per calendar month across manual + automated hunts
 # (a deliberate single-URL /leads/scan is not discovery volume and isn't counted here).
-MONTHLY_LEAD_CAP = 100
+MONTHLY_LEAD_CAP = 200_000
 
 US_STATES = [
     "Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut",

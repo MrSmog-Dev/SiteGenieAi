@@ -7634,14 +7634,14 @@
       "norm_label": "test_hunt_status_reports_monthly_budget()"
     },
     {
-      "label": "Tests for Rex's refined lead accuracy: smart confidence scoring, the 100/month d",
+      "label": "Tests for Rex's refined lead accuracy: smart confidence scoring, the 200,000/mon",
       "file_type": "rationale",
       "source_file": "backend/tests/test_rex_leads.py",
       "source_location": "L1",
       "_origin": "ast",
       "id": "backend_tests_test_rex_leads_rationale_1",
       "community": 17,
-      "norm_label": "tests for rex's refined lead accuracy: smart confidence scoring, the 100/month d"
+      "norm_label": "tests for rex's refined lead accuracy: smart confidence scoring, the 200,000/mon"
     },
     {
       "label": "test_stripe_subscription.py",
@@ -16135,7 +16135,7 @@
       "community": 185,
       "norm_label": "graphify skill directive (.claude/claude.md)",
       "community_name": "Graphify Skill Directive (.claude/CLAUDE.md)",
-      "id": "claude_claude_claude_claude_claude_graphify_directive"
+      "id": "claude_claude_claude_claude_claude_claude_graphify_directive"
     },
     {
       "label": "Knowledge Graph Pipeline (code/docs/papers/images/video to graph)",
@@ -16471,7 +16471,7 @@
       "community": 153,
       "norm_label": "emergent env image (fastapi_react_mongo_shadcn_base_image_cloud_arm)",
       "community_name": "Unresolved Node",
-      "id": "emergent_emergent_emergent_emergent_emergent_env_image"
+      "id": "emergent_emergent_emergent_emergent_emergent_emergent_env_image"
     },
     {
       "label": "SiteGenie Project graphify Integration (top-level CLAUDE.md)",
@@ -42660,5 +42660,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "adf2dd2e8842f318394feadb3f388875b980b5ee"
+  "built_at_commit": "e120a81545318e33c094a17325b806863f60d631"
 }
