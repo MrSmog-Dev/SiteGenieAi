@@ -188,7 +188,9 @@ export const RexLeadPanel = ({ onClose }) => {
               {leads.map((l) => (
                 <div key={l.lead_id} data-testid={`lead-${l.lead_id}`} className="flex items-center gap-3 border border-white/10 bg-surface1 px-3 py-2.5">
                   {l.source === "no_website" ? (
-                    <span className="shrink-0 text-[10px] font-mono uppercase bg-red-500/20 text-red-300 border border-red-400/30 px-2 py-0.5">No website</span>
+                    <span className="shrink-0 flex items-center gap-1 text-[10px] font-mono uppercase bg-red-500/20 text-red-300 border border-red-400/30 px-2 py-0.5">
+                      No website{typeof l.confidence_score === "number" ? ` · ${l.confidence_score}/100` : ""}
+                    </span>
                   ) : (
                     <span className={`shrink-0 text-[10px] font-mono uppercase px-2 py-0.5 ${l.score <= 40 ? "bg-red-500 text-white" : "bg-amber-400 text-black"}`}>{l.score}/100</span>
                   )}

@@ -116,6 +116,8 @@ async def _run_db_init():
     await db.market_listings.create_index("active")
     await db.leads.create_index("lead_id", unique=True)
     await db.leads.create_index("dedupe_key", unique=True)
+    await db.leads.create_index("created_at")
+    await db.rex_state_coverage.create_index("state", unique=True)
     await db.blog_posts.create_index("slug", unique=True)
     await db.team_memos.create_index("created_at")
     await db.team_tasks.create_index("task_id", unique=True)

@@ -153,10 +153,12 @@ NICHE_SYSTEM = ("You are Forge, SiteGenie's template curator. Given the current 
 
 
 HUNT_PICK_SYSTEM = (
-    "You are Rex, SiteGenie's lead hunter, picking this week's hunting ground. Choose ONE US city or town "
-    "(mid-size or small — less saturated) and ONE local business category likely to have established "
-    "businesses WITHOUT websites (e.g. barbershops, food trucks, auto repair, landscaping, taquerias, "
-    "nail salons, plumbers, towing). Avoid the recently hunted combos provided. "
+    "You are Rex, SiteGenie's lead hunter, picking this week's hunting ground. You are given the ONE US "
+    "state to hunt in this run (state coverage is rotated systematically so all 50 states get hunted over "
+    "time - do not pick a different state). Within that state, choose ONE specific city or town (mid-size "
+    "or small - less saturated) and ONE local business category likely to have established businesses "
+    "WITHOUT websites (e.g. barbershops, food trucks, auto repair, landscaping, taquerias, nail salons, "
+    "plumbers, towing). Avoid the recently hunted combos provided. "
     'Reply ONLY JSON: {"location": "<City, ST>", "category": "<category>"}'
 )
 
@@ -166,17 +168,26 @@ async def run_rex_weekly_hunt(owner_id: str):
     if not GOOGLE_PLACES_API_KEY:
         logger.info("automation: rex weekly hunt skipped — no Google Places key")
         return
+    from services.leads import leads_remaining_this_month, least_recent_states, mark_state_hunted, MONTHLY_LEAD_CAP
+    if await leads_remaining_this_month() <= 0:
+        logger.info("automation: rex weekly hunt skipped — monthly discovery cap reached")
+        await post_agent_message(owner_id, "rex",
+                                 f"Hit the monthly discovery cap ({MONTHLY_LEAD_CAP} leads) — skipping this "
+                                 "week's auto-hunt. Budget resets on the 1st.")
+        return
+    state = (await least_recent_states(1))[0]
     recent = await db.leads.find({"location": {"$exists": True, "$ne": None}},
                                  {"_id": 0, "location": 1, "category": 1}
                                  ).sort("created_at", -1).to_list(30)
     combos = sorted({f"{l.get('category')} in {l.get('location')}" for l in recent if l.get("location")})
     try:
-        raw = await _call_llm("Recently hunted: " + ("; ".join(combos) or "none yet"),
+        raw = await _call_llm(f"State to hunt: {state}\nRecently hunted: " + ("; ".join(combos) or "none yet"),
                               HUNT_PICK_SYSTEM, STRATEGY_MODEL)
         pick = json.loads(re.search(r"\{[\s\S]*\}", str(raw)).group(0))
         from services.team import rex_hunt_and_report
-        await rex_hunt_and_report(owner_id, pick["location"], pick["category"], intro="Auto-hunt")
-        logger.info("automation: rex auto-hunt done (%s / %s)", pick["location"], pick["category"])
+        await rex_hunt_and_report(owner_id, pick["location"], pick["category"], intro="Auto-hunt", state=state)
+        await mark_state_hunted(state)
+        logger.info("automation: rex auto-hunt done (%s / %s, state=%s)", pick["location"], pick["category"], state)
         await rex_autopilot(owner_id)
     except Exception as e:
         logger.exception("rex auto-hunt failed")
