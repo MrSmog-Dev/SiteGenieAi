@@ -30,6 +30,7 @@ from routes.blog import router as blog_router
 from routes.support import router as support_router
 from routes.build import router as build_router
 from routes.teams import router as teams_router
+from routes.blueprint import router as blueprint_router
 
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
@@ -67,6 +68,7 @@ api_router.include_router(blog_router)
 api_router.include_router(support_router)
 api_router.include_router(build_router)
 api_router.include_router(teams_router)
+api_router.include_router(blueprint_router)
 
 
 @app.on_event("startup")
@@ -114,6 +116,8 @@ async def _run_db_init():
     await db.market_listings.create_index("active")
     await db.leads.create_index("lead_id", unique=True)
     await db.leads.create_index("dedupe_key", unique=True)
+    await db.leads.create_index("created_at")
+    await db.rex_state_coverage.create_index("state", unique=True)
     await db.blog_posts.create_index("slug", unique=True)
     await db.team_memos.create_index("created_at")
     await db.team_tasks.create_index("task_id", unique=True)
@@ -150,6 +154,8 @@ async def _run_db_init():
     await db.seo_state.create_index([("user_id", 1), ("key", 1)], unique=True)
     await db.build_sessions.create_index("session_id", unique=True)
     await db.build_sessions.create_index([("user_id", 1), ("updated_at", -1)])
+    await db.blueprints.create_index("blueprint_id", unique=True)
+    await db.blueprints.create_index([("user_id", 1), ("updated_at", -1)])
     await db.teams.create_index("team_id", unique=True)
     await db.teams.create_index("owner_user_id", unique=True)
     await db.team_invites.create_index("invite_id", unique=True)

@@ -19,6 +19,88 @@ LEAD_STATUSES = ("new", "contacted", "won", "lost")
 
 PUBLIC_BASE = next((o.strip().rstrip("/") for o in os.environ.get("CORS_ORIGINS", "").split(",") if o.strip()), "")
 
+# Discovery budget: caps new leads added per calendar month across manual + automated hunts
+# (a deliberate single-URL /leads/scan is not discovery volume and isn't counted here).
+MONTHLY_LEAD_CAP = 200_000
+
+US_STATES = [
+    "Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut",
+    "Delaware", "Florida", "Georgia", "Hawaii", "Idaho", "Illinois", "Indiana", "Iowa",
+    "Kansas", "Kentucky", "Louisiana", "Maine", "Maryland", "Massachusetts", "Michigan",
+    "Minnesota", "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada",
+    "New Hampshire", "New Jersey", "New Mexico", "New York", "North Carolina",
+    "North Dakota", "Ohio", "Oklahoma", "Oregon", "Pennsylvania", "Rhode Island",
+    "South Carolina", "South Dakota", "Tennessee", "Texas", "Utah", "Vermont",
+    "Virginia", "Washington", "West Virginia", "Wisconsin", "Wyoming",
+]
+
+
+async def leads_this_month_count() -> int:
+    start = datetime.now(timezone.utc).replace(
+        day=1, hour=0, minute=0, second=0, microsecond=0).isoformat()
+    return await db.leads.count_documents({
+        "source": {"$in": ["no_website", "weak_website"]},
+        "created_at": {"$gte": start},
+    })
+
+
+async def leads_remaining_this_month() -> int:
+    return max(0, MONTHLY_LEAD_CAP - await leads_this_month_count())
+
+
+async def least_recent_states(n: int = 1) -> list[str]:
+    """States never hunted sort first; among hunted states, the longest-idle one is next.
+
+    Guarantees every one of the 50 states gets covered over time rather than the picker
+    gravitating toward whatever the model finds naturally salient.
+    """
+    covered = {c["state"]: c["last_hunted"] async for c in db.rex_state_coverage.find({}, {"_id": 0})}
+    ranked = sorted(US_STATES, key=lambda s: covered.get(s, ""))
+    return ranked[:n]
+
+
+async def mark_state_hunted(state: str):
+    now = datetime.now(timezone.utc).isoformat()
+    await db.rex_state_coverage.update_one(
+        {"state": state}, {"$set": {"state": state, "last_hunted": now}}, upsert=True)
+
+
+def _lead_confidence(reviews: int, rating: float, phone: str | None, address: str | None) -> dict:
+    """Smart lead scoring for a no-website business: how real, reachable, and worth pitching is it.
+
+    Transparent point breakdown (mirrors the weak-website scorer's style) rather than a single
+    opaque number, so the owner can see why a lead was rated the way it was.
+    """
+    checks = []
+
+    def add(name, pts, max_pts, note=""):
+        checks.append({"check": name, "points": pts, "max": max_pts, "note": note})
+
+    if reviews >= 200:
+        rv = 50
+    elif reviews >= 100:
+        rv = 42
+    elif reviews >= 50:
+        rv = 32
+    elif reviews >= 30:
+        rv = 20
+    elif reviews >= 15:
+        rv = 10
+    else:
+        rv = 0
+    add("Review volume", rv, 50, f"{reviews} reviews")
+
+    rq = round(max(0.0, min(30.0, (rating - 3.5) / 1.5 * 30)))
+    add("Rating quality", rq, 30, f"{rating}★")
+
+    cp = (10 if phone else 0) + (10 if address else 0)
+    add("Contactable (phone/address on file)", cp, 20,
+        "phone+address" if phone and address else ("phone only" if phone else ("address only" if address else "neither")))
+
+    score = sum(c["points"] for c in checks)
+    tier = "hot" if score >= 70 else "warm" if score >= 40 else None
+    return {"confidence_score": score, "confidence_breakdown": checks, "tier": tier}
+
 
 def _tier(score: int) -> str | None:
     if score <= 40:
@@ -177,8 +259,18 @@ PLACES_FIELDS = ("places.id,places.displayName,places.rating,places.userRatingCo
                  "places.websiteUri,places.nationalPhoneNumber,places.formattedAddress")
 
 
-async def hunt_places(location: str, category: str) -> dict:
-    """Rex's hunt: real businesses via Google Places. Criteria: >=15 reviews, rating >=3.5, no website."""
+async def hunt_places(location: str, category: str, state: str | None = None) -> dict:
+    """Rex's hunt: real businesses via Google Places. Criteria: >=15 reviews, rating >=3.5, no website.
+
+    Enforces MONTHLY_LEAD_CAP across every caller (manual hunt, automated weekly hunt, War Room
+    rex_hunt) since they all funnel through here - no per-caller bookkeeping needed. `state`, when
+    given, tags new leads for the 50-state coverage tracker (see least_recent_states/mark_state_hunted);
+    manual owner-directed hunts pass no state and simply aren't part of that rotation.
+    """
+    remaining = await leads_remaining_this_month()
+    if remaining <= 0:
+        return {"found": 0, "new_leads": 0, "skipped_existing": 0, "website_candidates": [],
+                "capped": True, "remaining_this_month": 0}
     async with httpx.AsyncClient(timeout=20) as client:
         r = await client.post(PLACES_URL, json={"textQuery": f"{category} in {location}", "pageSize": 20},
                               headers={"X-Goog-Api-Key": GOOGLE_PLACES_API_KEY,
@@ -201,7 +293,7 @@ async def hunt_places(location: str, category: str) -> dict:
             f"Google Places rejected the request ({r.status_code}). {msg or 'Check the API key and that Places API (New) is enabled.'}")
     places = r.json().get("places", [])
     now = datetime.now(timezone.utc).isoformat()
-    added, skipped, candidates = 0, 0, []
+    added, skipped, capped_out, candidates = 0, 0, 0, []
     for p in places:
         reviews = int(p.get("userRatingCount") or 0)
         rating = float(p.get("rating") or 0)
@@ -217,17 +309,24 @@ async def hunt_places(location: str, category: str) -> dict:
         if await db.leads.find_one({"dedupe_key": dedupe_key}, {"_id": 1}):
             skipped += 1
             continue
+        if added >= remaining:
+            capped_out += 1
+            continue
+        phone, address = p.get("nationalPhoneNumber"), p.get("formattedAddress")
+        confidence = _lead_confidence(reviews, rating, phone, address)
         await db.leads.insert_one({
             "lead_id": f"lead_{uuid.uuid4().hex[:12]}", "dedupe_key": dedupe_key, "source": "no_website",
-            "business_name": name, "category": category, "location": location,
-            "phone": p.get("nationalPhoneNumber"), "address": p.get("formattedAddress"),
+            "business_name": name, "category": category, "location": location, "state": state,
+            "phone": phone, "address": address,
             "rating": rating, "reviews_count": reviews, "website": None, "score": None,
-            "tier": "hot" if reviews >= 50 else "warm",
+            "confidence_score": confidence["confidence_score"],
+            "confidence_breakdown": confidence["confidence_breakdown"], "tier": confidence["tier"],
             "rex_pitch": f"{name} has {reviews} reviews ({rating}★) and NO website — customers are searching and finding nothing. SiteGenie can launch their site this week.",
             "status": "new", "created_at": now, "updated_at": now})
         added += 1
     return {"found": len(places), "new_leads": added, "skipped_existing": skipped,
-            "website_candidates": candidates}
+            "capped_out": capped_out, "capped": remaining - added <= 0,
+            "remaining_this_month": max(0, remaining - added), "website_candidates": candidates}
 
 
 OUTREACH_SYSTEM = (

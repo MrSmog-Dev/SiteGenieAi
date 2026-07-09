@@ -6,7 +6,10 @@ from config import GOOGLE_PLACES_API_KEY
 from database import db
 from models import LeadScanInput, LeadHuntInput, LeadStatusInput
 from security import get_current_user, is_owner
-from services.leads import scan_website, upsert_weak_site_lead, hunt_places, set_lead_outreach, LEAD_STATUSES
+from services.leads import (
+    scan_website, upsert_weak_site_lead, hunt_places, set_lead_outreach, LEAD_STATUSES,
+    leads_remaining_this_month, MONTHLY_LEAD_CAP,
+)
 
 router = APIRouter()
 
@@ -25,7 +28,9 @@ async def list_leads(user: dict = Depends(get_current_user)):
 @router.get("/leads/hunt/status")
 async def hunt_status(user: dict = Depends(get_current_user)):
     _require_owner(user)
-    return {"places_configured": bool(GOOGLE_PLACES_API_KEY)}
+    return {"places_configured": bool(GOOGLE_PLACES_API_KEY),
+            "leads_remaining_this_month": await leads_remaining_this_month(),
+            "monthly_lead_cap": MONTHLY_LEAD_CAP}
 
 
 @router.post("/leads/hunt")

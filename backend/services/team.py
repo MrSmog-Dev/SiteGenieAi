@@ -323,9 +323,14 @@ async def _exec_ivy(owner_id: str, task: dict):
 
 
 async def rex_hunt_and_report(owner_id: str, location: str, category: str,
-                              intro: str = "Hunt report") -> dict:
-    from services.leads import hunt_places
-    res = await hunt_places(location, category)
+                              intro: str = "Hunt report", state: str | None = None) -> dict:
+    from services.leads import hunt_places, MONTHLY_LEAD_CAP
+    res = await hunt_places(location, category, state=state)
+    if res.get("capped") and res["new_leads"] == 0:
+        msg = (f"🎯 {intro} — hit the monthly discovery cap ({MONTHLY_LEAD_CAP} leads) before I could hunt "
+               f"{category} in {location}. Budget resets on the 1st.")
+        await post_agent_message(owner_id, "rex", msg)
+        return res
     new_leads = []
     if res["new_leads"]:
         new_leads = await db.leads.find(
@@ -335,10 +340,12 @@ async def rex_hunt_and_report(owner_id: str, location: str, category: str,
     if new_leads:
         lines = "\n".join(f"• {l['business_name']} — {l['reviews_count']} reviews, {l['rating']}★ "
                           f"({(l.get('tier') or 'warm').upper()})" for l in new_leads)
+        capped_note = (f"\nHeads up: hit the monthly discovery cap mid-hunt ({res['capped_out']} qualified "
+                       f"businesses left unadded) — resets on the 1st." if res.get("capped_out") else "")
         msg = (f"🎯 {intro} — {category} in {location}: scanned {res['found']} businesses, bagged "
                f"{res['new_leads']} new no-website lead(s):\n{lines}\n"
                "They're on the Lead Board. Mark one Contacted and Forge auto-builds their demo site — "
-               "nothing closes like a finished product.")
+               f"nothing closes like a finished product.{capped_note}")
     else:
         msg = (f"🎯 {intro} — {category} in {location}: scanned {res['found']} businesses, no new qualified "
                f"no-website leads this time ({res['skipped_existing']} already on the board). "
